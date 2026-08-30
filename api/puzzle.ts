@@ -57,7 +57,11 @@ async function forwardRateLimit(upstream: Response, response: VercelResponse): P
   const retryAfter = upstream.headers.get("retry-after");
   if (retryAfter) response.setHeader("retry-after", retryAfter);
   response.setHeader("cache-control", "no-store");
-  response.status(429).json(isJson(upstream) ? await upstream.json() : { error: "Too many dojo requests. Please wait a moment, then try again." });
+  try {
+    response.status(429).json(isJson(upstream) ? await upstream.json() : { error: "Too many dojo requests. Please wait a moment, then try again." });
+  } catch {
+    response.status(429).json({ error: "Too many dojo requests. Please wait a moment, then try again." });
+  }
   return true;
 }
 
