@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabId, renderButton, renderTabs } from "./ui";
+import { nextTabId, renderButton, renderGridCard, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -18,6 +18,14 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"');
   });
 
+  it("provides standard controls for both compact mobile and wider layouts", () => {
+    const markup = renderTabs(tabs, "weight");
+
+    expect(markup).toContain('class="grid-picker"');
+    expect(markup).toContain('class="grid-tabs"');
+    expect(markup).not.toContain("hidden");
+  });
+
   it("moves through tabs with the standard arrow, Home, and End keys", () => {
     expect(nextTabId(tabs, "weight", "ArrowRight")).toBe("tatami");
     expect(nextTabId(tabs, "weight", "ArrowLeft")).toBe("club");
@@ -29,5 +37,13 @@ describe("shared UI primitives", () => {
   it("uses a shared button primitive for regular and icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     expect(renderButton({ id: "undo", label: "Undo", icon: "↶" })).toContain('class="button button--icon"');
+  });
+
+  it("uses a shared grid-card primitive without hiding desktop panels", () => {
+    const markup = renderGridCard({ id: "weight", label: "Tournament order × Weight", active: true, content: "<table></table>" });
+
+    expect(markup).toContain('id="grid-weight"');
+    expect(markup).toContain('class="grid-card is-active"');
+    expect(markup).not.toContain("hidden");
   });
 });

@@ -12,6 +12,13 @@ export interface ButtonOptions {
   attributes?: string;
 }
 
+export interface GridCardOptions {
+  id: string;
+  label: string;
+  active: boolean;
+  content: string;
+}
+
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
@@ -20,6 +27,11 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
   const accessibleName = icon ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : "";
   return `<button${idAttribute} class="${classes}"${accessibleName}${disabled ? " disabled" : ""}${attributes ? ` ${attributes}` : ""}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
+}
+
+/** A reusable labelled working-grid container for desktop stacks and mobile panels. */
+export function renderGridCard({ id, label, active, content }: GridCardOptions): string {
+  return `<section id="grid-${escapeHtml(id)}" role="tabpanel" aria-label="${escapeHtml(label)}" class="grid-card ${active ? "is-active" : ""}" data-grid-card="${escapeHtml(id)}"><h3>${escapeHtml(label).replace(" × ", ' <span>×</span> ')}</h3>${content}</section>`;
 }
 
 /** Renders a complete ARIA tablist with roving tab focus. */
