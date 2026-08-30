@@ -24,7 +24,9 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
 
 /** Renders a complete ARIA tablist with roving tab focus. */
 export function renderTabs(tabs: TabItem[], activeId: string): string {
-  return `<div class="grid-tabs" role="tablist" aria-label="Choose working grid">${tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("")}</div>`;
+  const options = tabs.map(tab => `<option value="${escapeHtml(tab.id)}" ${tab.id === activeId ? "selected" : ""}>${escapeHtml(tab.label)}</option>`).join("");
+  const buttons = tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
+  return `<label class="grid-picker">Working grid <select id="grid-select" aria-label="Choose working grid">${options}</select></label><div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>`;
 }
 
 /** Returns the next tab for the ARIA tab keyboard commands, wrapping at either end. */
