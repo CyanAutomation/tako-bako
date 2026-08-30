@@ -4,11 +4,32 @@ const YOKAIBA_ORIGIN = "https://yokaiba.scheimann.workers.dev";
 const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;
 const YOKAIBA_VERIFY_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/verify`;
 const SEED_PATTERN = /^[a-zA-Z0-9-]{1,128}$/;
+const MAX_TOKEN_LENGTH = 16_384;
+const MAX_ASSIGNMENTS = 32;
+const MAX_VALUES_PER_ASSIGNMENT = 32;
+const MAX_ANSWER_STRING_LENGTH = 256;
 
-function isCompletion(value: unknown): value is { puzzleToken: string; answer: unknown } {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+interface Completion {
+  puzzleToken: string;
+  answer: { assignments: Record<string, string[]> };
+}
+
+function parseCompletion(value: unknown): Completion | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const completion = value as Record<string, unknown>;
-  return typeof completion.puzzleToken === "string" && completion.puzzleToken.length > 0 && "answer" in completion;
+  if (typeof completion.puzzleToken !== "string" || completion.puzzleToken.length === 0 || completion.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
+  if (!completion.answer || typeof completion.answer !== "object" || Array.isArray(completion.answer)) return undefined;
+  const answer = completion.answer as Record<string, unknown>;
+  if (!answer.assignments || typeof answer.assignments !== "object" || Array.isArray(answer.assignments)) return undefined;
+  const entries = Object.entries(answer.assignments);
+  if (entries.length === 0 || entries.length > MAX_ASSIGNMENTS) return undefined;
+  const assignments: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
+  for (const [category, assignedValues] of entries) {
+    if (category.length === 0 || category.length > MAX_ANSWER_STRING_LENGTH || !Array.isArray(assignedValues) || assignedValues.length === 0 || assignedValues.length > MAX_VALUES_PER_ASSIGNMENT) return undefined;
+    if (!assignedValues.every(item => typeof item === "string" && item.length > 0 && item.length <= MAX_ANSWER_STRING_LENGTH)) return undefined;
+    assignments[category] = [...assignedValues];
+  }
+  return { puzzleToken: completion.puzzleToken, answer: { assignments } };
 }
 
 function isJson(response: Response): boolean {
@@ -22,7 +43,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return;
   }
   if (request.method === "POST") {
-    if (!isCompletion(request.body)) {
+    const completion = parseCompletion(request.body);
+    if (!completion) {
       response.status(400).json({ error: "A complete signed answer is required" });
       return;
     }
@@ -30,7 +52,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       const upstream = await fetch(YOKAIBA_VERIFY_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(request.body),
+        body: JSON.stringify(completion),
       });
       if (!upstream.ok || !isJson(upstream)) {
         response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
