@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cycleMark, loadBoard, parsePuzzle, type Mark } from "./puzzle";
+import { answerFromBoard, cycleMark, loadBoard, markBoard, parsePuzzle, squareKey, type Mark } from "./puzzle";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -37,8 +37,67 @@ describe("parsePuzzle", () => {
     expect(puzzle.difficulty.label).toBe("Easy");
   });
 
+  it("retains an optional signed puzzle token for answer verification", () => {
+    const puzzle = parsePuzzle({
+      id: "tournament-order-v1:verified-dojo",
+      seed: "verified-dojo",
+      puzzleToken: "signed-token",
+      clues: [],
+      difficulty: { level: 1, label: "Very easy", modelVersion: "yokaiba-difficulty-v1" },
+      spec: {
+        id: "tournament-order-v1", title: "Tournament Order", baseCategory: "judoka",
+        categories: [
+          { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+          { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+        ],
+      },
+    });
+
+    expect(puzzle.puzzleToken).toBe("signed-token");
+  });
+
   it("rejects a malformed response before it reaches the board", () => {
     expect(() => parsePuzzle({ id: "missing everything" })).toThrow("invalid puzzle response");
+  });
+});
+
+describe("markBoard", () => {
+  it("optionally eliminates the rest of a confirmed row and column", () => {
+    const category = { id: "club", label: "Club", values: ["Lions", "Wolves"] };
+    const base = { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] };
+
+    expect(markBoard({}, squareKey("club", "Aki", "Lions"), category, base, true)).toEqual({
+      [squareKey("club", "Aki", "Lions")]: "yes",
+      [squareKey("club", "Aki", "Wolves")]: "no",
+      [squareKey("club", "Ben", "Lions")]: "no",
+    });
+  });
+});
+
+describe("answerFromBoard", () => {
+  const spec = {
+    id: "tournament-order-v1", title: "Tournament Order", baseCategory: "judoka",
+    categories: [
+      { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+      { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+    ],
+  };
+
+  it("creates a verification answer only for a complete one-to-one board", () => {
+    const board = {
+      [squareKey("club", "Aki", "Lions")]: "yes" as const,
+      [squareKey("club", "Ben", "Wolves")]: "yes" as const,
+    };
+
+    expect(answerFromBoard(board, spec)).toEqual({ assignments: { club: ["Lions", "Wolves"] } });
+  });
+
+  it("refuses incomplete or contradictory boards", () => {
+    expect(answerFromBoard({ [squareKey("club", "Aki", "Lions")]: "yes" }, spec)).toBeUndefined();
+    expect(answerFromBoard({
+      [squareKey("club", "Aki", "Lions")]: "yes",
+      [squareKey("club", "Ben", "Lions")]: "yes",
+    }, spec)).toBeUndefined();
   });
 });
 
