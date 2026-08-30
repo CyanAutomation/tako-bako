@@ -8,6 +8,8 @@ const MAX_TOKEN_LENGTH = 16_384;
 const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
+const UPSTREAM_TIMEOUT_MS = 8_000;
+const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
 
 interface Completion {
   puzzleToken: string;
@@ -36,6 +38,20 @@ function isJson(response: Response): boolean {
   return response.headers.get("content-type")?.toLowerCase().includes("application/json") ?? false;
 }
 
+function isTimeoutError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "TimeoutError";
+}
+
+async function fetchYokaiba(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+}
+
+function upstreamFailure(response: VercelResponse, operation: "generate" | "verify", error: unknown): void {
+  const timedOut = isTimeoutError(error);
+  console.error("yokaiba_request_failed", { operation, timedOut, error: error instanceof Error ? error.message : String(error) });
+  response.status(timedOut ? 504 : 502).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET" && request.method !== "POST") {
     response.setHeader("allow", "GET, POST");
@@ -49,7 +65,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     try {
-      const upstream = await fetch(YOKAIBA_VERIFY_URL, {
+      const upstream = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(completion),
@@ -60,8 +76,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
       }
       response.setHeader("cache-control", "no-store");
       response.status(200).json(await upstream.json());
-    } catch {
-      response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
+    } catch (error) {
+      upstreamFailure(response, "verify", error);
     }
     return;
   }
@@ -78,7 +94,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   try {
     const parameters = new URLSearchParams({ templateId: "tournament-order-v1", seed });
     if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
-    const upstream = await fetch(`${YOKAIBA_GENERATE_URL}?${parameters}`);
+    const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     if (!upstream.ok) {
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
       return;
@@ -88,10 +104,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     const body: unknown = await upstream.json();
-    response.setHeader("cache-control", "no-store");
+    response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
-  } catch {
-    response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
+  } catch (error) {
+    upstreamFailure(response, "generate", error);
   }
 }
