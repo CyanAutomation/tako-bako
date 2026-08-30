@@ -12,7 +12,7 @@ let message = "Preparing a new dojo puzzle…";
 
 const markSymbol: Record<Mark, string> = { unknown: "", yes: "✓", no: "×" };
 const markName: Record<Mark, string> = { unknown: "unknown", yes: "yes", no: "no" };
-const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]!);
+const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 function newSeed(): string {
   return crypto.randomUUID();
