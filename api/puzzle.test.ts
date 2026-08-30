@@ -80,4 +80,28 @@ describe("puzzle proxy", () => {
       body: JSON.stringify({ puzzleToken: "signed-token", answer: { assignments: { club: ["Lions"] } } }),
     }));
   });
+
+  it("caches deterministic generated puzzles at the CDN", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), {
+      status: 200, headers: { "content-type": "application/json" },
+    })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
+
+    expect(result).toMatchObject({ statusCode: 200 });
+    expect(result.headers.get("cache-control")).toContain("s-maxage=300");
+  });
+
+  it("reports an upstream timeout distinctly and emits structured telemetry", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(Object.assign(new Error("timed out"), { name: "TimeoutError" })));
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
+
+    expect(result).toMatchObject({ statusCode: 504, body: { error: "Yokaiba took too long to respond. Please try again." } });
+    expect(error).toHaveBeenCalledWith("yokaiba_request_failed", expect.objectContaining({ operation: "generate", timedOut: true }));
+    error.mockRestore();
+  });
 });
