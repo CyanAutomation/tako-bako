@@ -88,6 +88,18 @@ export function answerFromBoard(board: Board, spec: Puzzle["spec"]): Answer | un
   return { assignments };
 }
 
+/** Counts only marks that belong to the current puzzle's playable grids. */
+export function boardProgress(board: Board, spec: Puzzle["spec"]): { marked: number; total: number } {
+  const base = spec.categories.find(category => category.id === spec.baseCategory);
+  if (!base) return { marked: 0, total: 0 };
+  const categories = spec.categories.filter(category => category.id !== base.id);
+  const validKeys = new Set(categories.flatMap(category => base.values.flatMap(row => category.values.map(column => squareKey(category.id, row, column)))));
+  return {
+    marked: Object.entries(board).filter(([key, mark]) => validKeys.has(key) && mark !== "unknown").length,
+    total: validKeys.size,
+  };
+}
+
 export function loadBoard(puzzleId: string): Board {
   try {
     const saved = localStorage.getItem(`tako-bako.board.${puzzleId}`);
