@@ -18,24 +18,32 @@ function newSeed(): string {
   return crypto.randomUUID();
 }
 
+let currentFetchId = 0;
+
 async function fetchPuzzle(): Promise<void> {
   loading = true;
   message = "Sensei is arranging the puzzle tiles…";
+  const fetchId = ++currentFetchId;
   render();
   try {
     const seed = newSeed();
     const endpoint = import.meta.env.DEV ? `/api/puzzle/${seed}` : `/api/puzzle?${new URLSearchParams({ seed })}`;
     const result = await fetch(endpoint);
     if (!result.ok) throw new Error(result.status === 429 ? "The dojo is busy. Please wait a moment, then try again." : "The puzzle could not be collected. Please try again.");
-    puzzle = parsePuzzle(await result.json());
+    const data = parsePuzzle(await result.json());
+    if (fetchId !== currentFetchId) return;
+    puzzle = data;
     board = loadBoard(puzzle.id);
     message = "Mark each possibility: blank, yes, or no.";
   } catch (error) {
+    if (fetchId !== currentFetchId) return;
     puzzle = null;
     message = error instanceof Error ? error.message : "The puzzle could not be collected. Please try again.";
   } finally {
-    loading = false;
-    render();
+    if (fetchId === currentFetchId) {
+      loading = false;
+      render();
+    }
   }
 }
 
