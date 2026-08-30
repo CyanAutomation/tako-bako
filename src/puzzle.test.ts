@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answerFromBoard, cycleMark, loadBoard, markBoard, parsePuzzle, squareKey, type Mark } from "./puzzle";
+import { answerFromBoard, boardProgress, cycleMark, loadBoard, markBoard, parsePuzzle, squareKey, type Mark } from "./puzzle";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -98,6 +98,28 @@ describe("answerFromBoard", () => {
       [squareKey("club", "Aki", "Lions")]: "yes",
       [squareKey("club", "Ben", "Lions")]: "yes",
     }, spec)).toBeUndefined();
+  });
+});
+
+describe("boardProgress", () => {
+  const spec = {
+    id: "tournament-order-v1", title: "Tournament Order", baseCategory: "judoka",
+    categories: [
+      { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+      { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+      { id: "weight", label: "Weight", values: ["-60 kg", "-66 kg"] },
+    ],
+  };
+
+  it("counts marked squares across every non-base grid", () => {
+    expect(boardProgress({
+      [squareKey("club", "Aki", "Lions")]: "yes",
+      [squareKey("weight", "Ben", "-66 kg")]: "no",
+    }, spec)).toEqual({ marked: 2, total: 8 });
+  });
+
+  it("does not count stale marks from another puzzle category", () => {
+    expect(boardProgress({ [squareKey("stale", "Aki", "Lions")]: "yes" }, spec)).toEqual({ marked: 0, total: 8 });
   });
 });
 
