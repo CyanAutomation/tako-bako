@@ -53,10 +53,15 @@ export function loadBoard(puzzleId: string): Board {
     if (!saved) return {};
     const parsed: unknown = JSON.parse(saved);
     if (!isRecord(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).filter(([, mark]) => mark === "yes" || mark === "no")) as Board;
+    const safeEntries = Object.entries(parsed).filter(([key, mark]) => {
+      if (key === "__proto__" || key === "constructor" || key === "prototype") return false;
+      return mark === "yes" || mark === "no";
+    });
+    return Object.fromEntries(safeEntries) as Board;
   } catch {
     return {};
   }
+}
 }
 
 export function saveBoard(puzzleId: string, board: Board): void {
