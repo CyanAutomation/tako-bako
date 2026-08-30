@@ -27,6 +27,7 @@ describe("puzzle proxy", () => {
 
     expect(upstream).toHaveBeenCalledWith("https://yokaiba.scheimann.workers.dev/v1/puzzles/verify", expect.objectContaining({
       method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ puzzleToken: "signed-token", answer: { assignments: { club: ["Lions", "Wolves"] } } }),
     }));
     expect(result).toMatchObject({ statusCode: 200, body: { correct: true } });
   });
@@ -40,5 +41,43 @@ describe("puzzle proxy", () => {
 
     expect(upstream).not.toHaveBeenCalled();
     expect(result).toMatchObject({ statusCode: 400, body: { error: "A complete signed answer is required" } });
+  });
+
+  it.each([
+    { puzzleToken: "signed-token", answer: null },
+    { puzzleToken: "signed-token", answer: { assignments: [] } },
+    { puzzleToken: "signed-token", answer: { assignments: { club: "Lions" } } },
+    { puzzleToken: "signed-token", answer: { assignments: { club: ["Lions", 42] } } },
+    { puzzleToken: "signed-token", answer: { assignments: { club: [] } } },
+  ])("rejects malformed completion payloads before contacting Yokaiba", async body => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body } as never, response as never);
+
+    expect(upstream).not.toHaveBeenCalled();
+    expect(result.statusCode).toBe(400);
+  });
+
+  it("forwards only validated completion fields", async () => {
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ correct: true }), {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", upstream);
+    const { response } = responseRecorder();
+
+    await handler({
+      method: "POST",
+      body: {
+        puzzleToken: "signed-token",
+        answer: { assignments: { club: ["Lions"] }, ignored: "value" },
+        ignored: "value",
+      },
+    } as never, response as never);
+
+    expect(upstream).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      body: JSON.stringify({ puzzleToken: "signed-token", answer: { assignments: { club: ["Lions"] } } }),
+    }));
   });
 });
