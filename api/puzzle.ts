@@ -10,6 +10,10 @@ const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
+const MAX_RATE_LIMIT_CLIENTS = 10_000;
+const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 interface Completion {
   puzzleToken: string;
@@ -52,10 +56,31 @@ function upstreamFailure(response: VercelResponse, operation: "generate" | "veri
   response.status(timedOut ? 504 : 502).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
 }
 
+function isRateLimited(request: VercelRequest): number | undefined {
+  const forwarded = request.headers?.["x-forwarded-for"];
+  const client = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || request.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const entry = requestCounts.get(client);
+  if (!entry || entry.resetAt <= now) {
+    if (!entry && requestCounts.size >= MAX_RATE_LIMIT_CLIENTS) requestCounts.delete(requestCounts.keys().next().value!);
+    requestCounts.set(client, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return undefined;
+  }
+  entry.count += 1;
+  if (entry.count <= RATE_LIMIT_MAX_REQUESTS) return undefined;
+  return Math.max(1, Math.ceil((entry.resetAt - now) / 1_000));
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET" && request.method !== "POST") {
     response.setHeader("allow", "GET, POST");
     response.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+  const retryAfter = isRateLimited(request);
+  if (retryAfter) {
+    response.setHeader("retry-after", String(retryAfter));
+    response.status(429).json({ error: "Too many dojo requests. Please wait a moment, then try again." });
     return;
   }
   if (request.method === "POST") {
@@ -105,6 +130,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
     const body: unknown = await upstream.json();
     response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
+    response.setHeader("cdn-cache-control", PUZZLE_CACHE_CONTROL);
+    response.setHeader("vercel-cdn-cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
   } catch (error) {

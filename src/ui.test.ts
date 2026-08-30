@@ -12,6 +12,8 @@ describe("shared UI primitives", () => {
     const markup = renderTabs(tabs, "weight");
 
     expect(markup).toContain('role="tablist"');
+    expect(markup).toContain('id="grid-select" aria-label="Choose working grid"');
+    expect(markup).toContain('<option value="weight" selected>Weight</option>');
     expect(markup).toContain('id="grid-tab-weight" aria-selected="true" aria-controls="grid-weight" tabindex="0"');
     expect(markup).toContain('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"');
   });

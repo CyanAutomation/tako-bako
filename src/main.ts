@@ -157,11 +157,11 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     const cells = category.values.map(column => {
       const key = squareKey(category.id, row, column);
       const mark = board[key] ?? "unknown";
-      return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(`${row}, ${column}: ${markName[mark]}. Activate to change.`)}" aria-pressed="${mark === "yes"}"><span aria-hidden="true">${markSymbol[mark]}</span></button></td>`;
+      return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(`${row}, ${column}: ${markName[mark]}. Activate to change.`)}"><span aria-hidden="true">${markSymbol[mark]}</span></button></td>`;
     }).join("");
     return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
-  return `<section id="grid-${escapeHtml(category.id)}" role="tabpanel" aria-labelledby="grid-tab-${escapeHtml(category.id)}" class="grid-card ${category.id === activeGridId ? "is-active" : ""}" ${category.id === activeGridId ? "" : "hidden"} data-grid-card="${escapeHtml(category.id)}"><h3>${escapeHtml(base.label)} <span>×</span> ${escapeHtml(category.label)}</h3><div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  return `<section id="grid-${escapeHtml(category.id)}" role="tabpanel" aria-label="${escapeHtml(`${base.label} × ${category.label}`)}" class="grid-card ${category.id === activeGridId ? "is-active" : ""}" ${category.id === activeGridId ? "" : "hidden"} data-grid-card="${escapeHtml(category.id)}"><h3>${escapeHtml(base.label)} <span>×</span> ${escapeHtml(category.label)}</h3><div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
 }
 
 function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][number]): boolean {
@@ -246,6 +246,10 @@ root.addEventListener("keydown", event => {
 
 root.addEventListener("change", event => {
   const input = event.target as HTMLInputElement;
+  if (input.id === "grid-select") {
+    selectGrid(input.value);
+    return;
+  }
   if (input.id !== "assist-toggle" && input.id !== "difficulty-select") return;
   if (input.id === "difficulty-select") {
     difficultyLevel = input.value ? Number(input.value) : undefined;

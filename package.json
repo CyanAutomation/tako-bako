@@ -14,11 +14,15 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",
-    "@vercel/node": "^5.3.12",
+    "@vercel/node": "^10.0.0",
     "eslint": "^9.39.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.2",
     "vitest": "^4.0.8"
+  },
+  "overrides": {
+    "path-to-regexp": "^6.3.0",
+    "undici": "^6.24.0"
   }
 }
