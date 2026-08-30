@@ -57,7 +57,9 @@ export function markBoard(board: Board, key: string, category: Category, base: C
   if (next === "unknown") delete updated[key]; else updated[key] = next;
   if (next !== "yes" || !assist) return updated;
 
-  const [, encodedRow, encodedColumn] = key.split("|");
+  const parts = key.split("|");
+  if (parts.length !== 3) return updated;
+  const [, encodedRow, encodedColumn] = parts;
   const row = decodeURIComponent(encodedRow);
   const column = decodeURIComponent(encodedColumn);
   for (const candidate of category.values) {
