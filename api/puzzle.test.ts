@@ -118,4 +118,20 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("retry-after")).toBe("30");
     expect(result.headers.get("cache-control")).toBe("no-store");
   });
+
+  it("uses a fallback error when a Yokaiba rate limit contains malformed JSON", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not valid JSON", {
+      status: 429, headers: { "content-type": "application/json", "retry-after": "30" },
+    })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
+
+    expect(result).toMatchObject({
+      statusCode: 429,
+      body: { error: "Too many dojo requests. Please wait a moment, then try again." },
+    });
+    expect(result.headers.get("retry-after")).toBe("30");
+    expect(result.headers.get("cache-control")).toBe("no-store");
+  });
 });
