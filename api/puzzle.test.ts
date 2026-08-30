@@ -91,6 +91,7 @@ describe("puzzle proxy", () => {
 
     expect(result).toMatchObject({ statusCode: 200 });
     expect(result.headers.get("cache-control")).toContain("s-maxage=300");
+    expect(result.headers.get("vercel-cdn-cache-control")).toContain("s-maxage=300");
   });
 
   it("reports an upstream timeout distinctly and emits structured telemetry", async () => {
@@ -103,5 +104,22 @@ describe("puzzle proxy", () => {
     expect(result).toMatchObject({ statusCode: 504, body: { error: "Yokaiba took too long to respond. Please try again." } });
     expect(error).toHaveBeenCalledWith("yokaiba_request_failed", expect.objectContaining({ operation: "generate", timedOut: true }));
     error.mockRestore();
+  });
+
+  it("rate limits repeated requests from the same client", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), {
+      status: 200, headers: { "content-type": "application/json" },
+    })));
+    const request = { method: "GET", query: { seed: "dojo-day" }, headers: { "x-forwarded-for": "rate-limit-test" } } as never;
+    for (let index = 0; index < 60; index += 1) {
+      const { response } = responseRecorder();
+      await handler(request, response as never);
+    }
+    const { response, result } = responseRecorder();
+
+    await handler(request, response as never);
+
+    expect(result).toMatchObject({ statusCode: 429, body: { error: expect.stringContaining("Too many dojo requests") } });
+    expect(result.headers.get("retry-after")).toMatch(/^\d+$/);
   });
 });
