@@ -106,20 +106,16 @@ describe("puzzle proxy", () => {
     error.mockRestore();
   });
 
-  it("rate limits repeated requests from the same client", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), {
-      status: 200, headers: { "content-type": "application/json" },
+  it("forwards rate limits enforced by Yokaiba", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Slow down" }), {
+      status: 429, headers: { "content-type": "application/json", "retry-after": "30" },
     })));
-    const request = { method: "GET", query: { seed: "dojo-day" }, headers: { "x-forwarded-for": "rate-limit-test" } } as never;
-    for (let index = 0; index < 60; index += 1) {
-      const { response } = responseRecorder();
-      await handler(request, response as never);
-    }
     const { response, result } = responseRecorder();
 
-    await handler(request, response as never);
+    await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
 
-    expect(result).toMatchObject({ statusCode: 429, body: { error: expect.stringContaining("Too many dojo requests") } });
-    expect(result.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect(result).toMatchObject({ statusCode: 429, body: { error: "Slow down" } });
+    expect(result.headers.get("retry-after")).toBe("30");
+    expect(result.headers.get("cache-control")).toBe("no-store");
   });
 });
