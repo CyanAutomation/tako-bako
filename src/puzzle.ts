@@ -62,7 +62,6 @@ export function loadBoard(puzzleId: string): Board {
     return {};
   }
 }
-}
 
 export function saveBoard(puzzleId: string, board: Board): void {
   localStorage.setItem(`tako-bako.board.${puzzleId}`, JSON.stringify(board));

@@ -16,9 +16,19 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
   try {
     const upstream = await fetch(`${YOKAIBA_URL}?${new URLSearchParams({ templateId: "tournament-order-v1", seed })}`);
-    const body = await upstream.text();
+    if (!upstream.ok) {
+      response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
+      return;
+    }
+    const contentType = upstream.headers.get("content-type");
+    if (!contentType?.toLowerCase().includes("application/json")) {
+      response.status(502).json({ error: "Invalid response from Yokaiba." });
+      return;
+    }
+    const body: unknown = await upstream.json();
     response.setHeader("cache-control", "no-store");
-    response.status(upstream.status).send(body);
+    response.setHeader("content-type", "application/json");
+    response.status(200).json(body);
   } catch {
     response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
   }
