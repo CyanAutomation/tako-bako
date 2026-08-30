@@ -80,6 +80,7 @@ export function answerFromBoard(board: Board, spec: Puzzle["spec"]): Answer | un
     if (category.id === base.id) continue;
     const mapped = base.values.map(row => category.values.filter(column => board[squareKey(category.id, row, column)] === "yes"));
     if (mapped.some(matches => matches.length !== 1)) return undefined;
+    if (mapped.some(matches => matches.length === 0)) return undefined;
     const values = mapped.map(matches => matches[0]);
     if (new Set(values).size !== category.values.length) return undefined;
     assignments[category.id] = values;
