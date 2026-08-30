@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { cycleMark, parsePuzzle, type Mark } from "./puzzle";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cycleMark, loadBoard, parsePuzzle, type Mark } from "./puzzle";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("cycleMark", () => {
   it("moves an unmarked square through yes, no, and back to unknown", () => {
@@ -35,5 +39,15 @@ describe("parsePuzzle", () => {
 
   it("rejects a malformed response before it reaches the board", () => {
     expect(() => parsePuzzle({ id: "missing everything" })).toThrow("invalid puzzle response");
+  });
+});
+
+describe("loadBoard", () => {
+  it("keeps valid marks while discarding prototype-related keys", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify({ safe: "yes", constructor: "no", prototype: "yes", ignored: "unknown" }),
+    });
+
+    expect(loadBoard("dojo-day")).toEqual({ safe: "yes" });
   });
 });
