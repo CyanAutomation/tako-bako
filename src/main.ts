@@ -1,6 +1,6 @@
 import "./style.css";
 import { answerFromBoard, boardProgress, loadBoard, markBoard, parsePuzzle, saveBoard, squareKey, type Board, type Mark, type Puzzle } from "./puzzle";
-import { nextTabId, renderButton, renderTabs } from "./ui";
+import { nextTabId, renderButton, renderGridCard, renderTabs } from "./ui";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -161,7 +161,12 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     }).join("");
     return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
-  return `<section id="grid-${escapeHtml(category.id)}" role="tabpanel" aria-label="${escapeHtml(`${base.label} × ${category.label}`)}" class="grid-card ${category.id === activeGridId ? "is-active" : ""}" ${category.id === activeGridId ? "" : "hidden"} data-grid-card="${escapeHtml(category.id)}"><h3>${escapeHtml(base.label)} <span>×</span> ${escapeHtml(category.label)}</h3><div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  return renderGridCard({
+    id: category.id,
+    label: `${base.label} × ${category.label}`,
+    active: category.id === activeGridId,
+    content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
+  });
 }
 
 function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][number]): boolean {
