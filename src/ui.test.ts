@@ -44,6 +44,11 @@ describe("shared UI primitives", () => {
     expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" })).toBeUndefined();
   });
 
+  it("does not navigate grids without rows or columns", () => {
+    expect(nextGridCellKey({ categoryId: "club", rows: [], columns: ["Lions"], key: "club|Aki|Lions", keyName: "ArrowDown" })).toBeUndefined();
+    expect(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" })).toBeUndefined();
+  });
+
   it("uses a shared button primitive for regular and icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     expect(renderButton({ id: "undo", label: "Undo", icon: "↶" })).toContain('class="button button--icon"');

@@ -101,6 +101,7 @@ export function gridCellLabel(row: string, column: string, mark: GridCellOptions
 /** Finds the next cell for bounded arrow-key movement inside one puzzle grid. */
 export function nextGridCellKey({ categoryId, rows, columns, key, keyName }: { categoryId: string; rows: readonly string[]; columns: readonly string[]; key: string; keyName: string }): string | undefined {
   if (!/^Arrow(Up|Down|Left|Right)$/.test(keyName)) return undefined;
+  if (rows.length === 0 || columns.length === 0) return undefined;
   const [id, encodedRow, encodedColumn] = key.split("|");
   if (id !== categoryId || !encodedRow || !encodedColumn) return undefined;
   const rowIndex = rows.indexOf(decodeURIComponent(encodedRow));
