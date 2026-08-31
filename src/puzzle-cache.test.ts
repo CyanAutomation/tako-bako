@@ -22,10 +22,17 @@ describe("puzzle session cache", () => {
     expect(loadPuzzleFromCache<{ id: string }>(storage, "dojo-day", 3, 10_000 + 299_999)).toEqual({ id: "puzzle-1" });
   });
 
+  it("keeps a cached value through its expiration timestamp", () => {
+    const storage = new MemoryStorage();
+    savePuzzleToCache(storage, "dojo-day", undefined, { id: "puzzle-1" }, 10_000);
+
+    expect(loadPuzzleFromCache(storage, "dojo-day", undefined, 10_000 + 300_000)).toEqual({ id: "puzzle-1" });
+  });
+
   it("expires and removes stale or malformed cache entries", () => {
     const storage = new MemoryStorage();
     savePuzzleToCache(storage, "dojo-day", undefined, { id: "puzzle-1" }, 10_000);
-    expect(loadPuzzleFromCache(storage, "dojo-day", undefined, 10_000 + 300_000)).toBeUndefined();
+    expect(loadPuzzleFromCache(storage, "dojo-day", undefined, 10_000 + 300_001)).toBeUndefined();
     expect(storage.getItem(puzzleCacheKey("dojo-day", undefined))).toBeNull();
 
     storage.setItem(puzzleCacheKey("bad", undefined), "not json");
