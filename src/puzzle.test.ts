@@ -19,7 +19,9 @@ describe("parsePuzzle", () => {
       seed: "dojo-day",
       templateId: "tournament-order-v1",
       generatorVersion: "yokaiba-generator-v1",
-      solverVersion: "yokaiba-exhaustive-v1",
+      // Solver versions are reproducibility metadata. The player must remain
+      // compatible when Yokaiba introduces another conforming solver.
+      solverVersion: "yokaiba-go-contract-v2",
       clues: [{ id: "one", text: "Aki was associated with Lions.", constraint: { kind: "matches" } }],
       difficulty: { level: 2, label: "Easy", modelVersion: "yokaiba-difficulty-v1" },
       spec: {
