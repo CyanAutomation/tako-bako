@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabId, renderButton, renderDialog, renderGridCard, renderSelect, renderTabs } from "./ui";
+import { nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -80,5 +80,14 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('class="grid-card-controls"');
     expect(markup).toContain('is-unlocked');
     expect(markup).not.toContain("hidden");
+  });
+
+  it("renders shared status, panel, grid-cell, badge, and control-group primitives", () => {
+    expect(renderStatus({ message: "Ready", tone: "success" })).toContain('class="status status--success" role="status">Ready');
+    expect(renderPanel({ tag: "aside", className: "clues", labelledBy: "clues-title", content: "Notes" })).toBe('<aside class="clues" aria-labelledby="clues-title">Notes</aside>');
+    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "yes" })).toContain('aria-label="Aki, Lions: yes. Select to change."');
+    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", disabled: true })).toContain(" Grid locked.\" disabled");
+    expect(renderBadge("3 clues", "clue-count")).toBe('<span class="clue-count">3 clues</span>');
+    expect(renderControlGroup("Board history", "buttons", "history-controls")).toBe('<div class="history-controls" aria-label="Board history">buttons</div>');
   });
 });
