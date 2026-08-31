@@ -52,7 +52,7 @@ describe("shared UI primitives", () => {
   it("uses a shared button primitive for regular and custom SVG icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
-    expect(iconButton).toContain('class="button button--icon"');
+    expect(iconButton).toContain('class="button button--icon button--secondary"');
     expect(iconButton).toContain('<svg');
     expect(iconButton).toContain('aria-hidden="true"');
     expect(iconButton).not.toContain("↶");
@@ -91,7 +91,7 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('<option value="3" selected>Level 3</option>');
   });
 
-  it("uses a shared grid-card primitive without hiding desktop panels", () => {
+  it("uses a shared grid-card primitive with an explicit active state", () => {
     const markup = renderGridCard({ id: "weight", label: "Judoka × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
 
     expect(markup).toContain('id="grid-weight"');
