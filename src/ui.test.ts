@@ -40,10 +40,12 @@ describe("shared UI primitives", () => {
   });
 
   it("uses a shared grid-card primitive without hiding desktop panels", () => {
-    const markup = renderGridCard({ id: "weight", label: "Tournament order × Weight", active: true, content: "<table></table>" });
+    const markup = renderGridCard({ id: "weight", label: "Tournament order × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
 
     expect(markup).toContain('id="grid-weight"');
-    expect(markup).toContain('class="grid-card is-active"');
+    expect(markup).toContain('class="grid-card is-active is-unlocked"');
+    expect(markup).toContain('class="grid-card-controls"');
+    expect(markup).toContain('is-unlocked');
     expect(markup).not.toContain("hidden");
   });
 });
