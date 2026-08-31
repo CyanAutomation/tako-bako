@@ -16,6 +16,8 @@ export interface GridCardOptions {
   id: string;
   label: string;
   active: boolean;
+  locked: boolean;
+  controls: string;
   content: string;
 }
 
@@ -30,8 +32,8 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
 }
 
 /** A reusable labelled working-grid container for desktop stacks and mobile panels. */
-export function renderGridCard({ id, label, active, content }: GridCardOptions): string {
-  return `<section id="grid-${escapeHtml(id)}" role="tabpanel" aria-label="${escapeHtml(label)}" class="grid-card ${active ? "is-active" : ""}" data-grid-card="${escapeHtml(id)}"><h3>${escapeHtml(label).replace(" × ", ' <span>×</span> ')}</h3>${content}</section>`;
+export function renderGridCard({ id, label, active, locked, controls, content }: GridCardOptions): string {
+  return `<section id="grid-${escapeHtml(id)}" role="tabpanel" aria-label="${escapeHtml(label)}" class="grid-card ${active ? "is-active" : ""} ${locked ? "is-locked" : "is-unlocked"}" data-grid-card="${escapeHtml(id)}"><div class="grid-card-header"><h3>${escapeHtml(label).replace(" × ", ' <span>×</span> ')}</h3><div class="grid-card-controls">${controls}</div></div>${content}</section>`;
 }
 
 /** Renders a complete ARIA tablist with roving tab focus. */
