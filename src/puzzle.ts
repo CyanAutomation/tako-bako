@@ -24,13 +24,21 @@ export function cycleMark(mark: Mark): Mark {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isStringArray = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
+const MAX_CATEGORIES = 8;
+const MAX_VALUES_PER_CATEGORY = 16;
+const MAX_TEXT_LENGTH = 256;
+
+function isNonEmptyUniqueStrings(values: string[], maximum = MAX_VALUES_PER_CATEGORY): boolean {
+  return values.length > 0 && values.length <= maximum && values.every(value => value.length > 0 && value.length <= MAX_TEXT_LENGTH) && new Set(values).size === values.length;
+}
 
 export function parsePuzzle(value: unknown): Puzzle {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.seed !== "string" || !Array.isArray(value.clues) || !isRecord(value.difficulty) || !isRecord(value.spec)) {
     throw new Error("invalid puzzle response");
   }
   const { difficulty, spec } = value;
-  if (typeof difficulty.level !== "number" || typeof difficulty.label !== "string" || typeof difficulty.modelVersion !== "string" || typeof spec.id !== "string" || typeof spec.title !== "string" || typeof spec.baseCategory !== "string" || !Array.isArray(spec.categories)) {
+  const level = difficulty.level;
+  if (typeof level !== "number" || !Number.isInteger(level) || level < 1 || level > 5 || typeof difficulty.label !== "string" || difficulty.label.length === 0 || difficulty.label.length > MAX_TEXT_LENGTH || typeof difficulty.modelVersion !== "string" || difficulty.modelVersion.length === 0 || difficulty.modelVersion.length > MAX_TEXT_LENGTH || typeof spec.id !== "string" || spec.id.length === 0 || spec.id.length > MAX_TEXT_LENGTH || typeof spec.title !== "string" || spec.title.length === 0 || spec.title.length > MAX_TEXT_LENGTH || typeof spec.baseCategory !== "string" || spec.baseCategory.length === 0 || spec.baseCategory.length > MAX_TEXT_LENGTH || !Array.isArray(spec.categories) || spec.categories.length < 2 || spec.categories.length > MAX_CATEGORIES) {
     throw new Error("invalid puzzle response");
   }
   const clues = value.clues.map(clue => {
@@ -38,12 +46,13 @@ export function parsePuzzle(value: unknown): Puzzle {
     return { id: clue.id, text: clue.text };
   });
   const categories = spec.categories.map(category => {
-    if (!isRecord(category) || typeof category.id !== "string" || typeof category.label !== "string" || !isStringArray(category.values)) throw new Error("invalid puzzle response");
+    if (!isRecord(category) || typeof category.id !== "string" || category.id.length === 0 || category.id.length > MAX_TEXT_LENGTH || typeof category.label !== "string" || category.label.length === 0 || category.label.length > MAX_TEXT_LENGTH || !isStringArray(category.values) || !isNonEmptyUniqueStrings(category.values)) throw new Error("invalid puzzle response");
     return { id: category.id, label: category.label, values: category.values };
   });
-  if (categories.length < 2 || !categories.some(category => category.id === spec.baseCategory)) throw new Error("invalid puzzle response");
+  const base = categories.find(category => category.id === spec.baseCategory);
+  if (!base || new Set(categories.map(category => category.id)).size !== categories.length || categories.some(category => category.values.length !== base.values.length)) throw new Error("invalid puzzle response");
   if ("puzzleToken" in value && typeof value.puzzleToken !== "string") throw new Error("invalid puzzle response");
-  return { id: value.id, seed: value.seed, ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}), clues, difficulty: { level: difficulty.level, label: difficulty.label, modelVersion: difficulty.modelVersion }, spec: { id: spec.id, title: spec.title, baseCategory: spec.baseCategory, categories } };
+  return { id: value.id, seed: value.seed, ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}), clues, difficulty: { level, label: difficulty.label, modelVersion: difficulty.modelVersion }, spec: { id: spec.id, title: spec.title, baseCategory: spec.baseCategory, categories } };
 }
 
 export function squareKey(categoryId: string, row: string, column: string): string {

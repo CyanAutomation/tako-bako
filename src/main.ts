@@ -1,6 +1,7 @@
 import "./style.css";
-import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Mark, type Puzzle } from "./puzzle";
-import { nextTabId, renderButton, renderDialog, renderGridCard, renderSelect, renderTabs } from "./ui";
+import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
+import { dailySeed, DAILY_TIME_ZONE } from "./daily";
+import { nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -22,16 +23,10 @@ let resetReturnFocusSelector: string | undefined;
 let cluesOpen = true;
 let settingsOpen = false;
 
-const markSymbol: Record<Mark, string> = { unknown: "", yes: "✓", no: "×" };
-const markName: Record<Mark, string> = { unknown: "unknown", yes: "yes", no: "no" };
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 function newSeed(): string {
   return crypto.randomUUID();
-}
-
-function dailySeed(): string {
-  return `daily-${new Date().toISOString().slice(0, 10)}`;
 }
 
 function seedFromUrl(): string | undefined {
@@ -63,8 +58,14 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     const parameters = new URLSearchParams({ seed, ...(difficultyLevel ? { difficultyLevel: String(difficultyLevel) } : {}) });
     const endpoint = `/api/puzzle?${parameters}`;
     const result = await fetch(endpoint);
-    if (!result.ok) throw new Error(result.status === 429 ? "The dojo is busy. Please wait a moment, then try again." : "The puzzle could not be collected. Please try again.");
-    const data = parsePuzzle(await result.json());
+    if (!result.ok) throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
+    let data: Puzzle;
+    try {
+      data = parsePuzzle(await result.json());
+    } catch (error) {
+      console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
     if (fetchId !== currentFetchId) return;
     puzzle = data;
     board = loadBoard(puzzle.id);
@@ -87,6 +88,18 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
       render();
     }
   }
+}
+
+function retryAfterMessage(value: string | null): string {
+  if (!value) return "The dojo is busy. Please wait a moment, then try again.";
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds > 0) return `The dojo is busy. Try again in ${Math.ceil(seconds)} second${Math.ceil(seconds) === 1 ? "" : "s"}.`;
+  const retryAt = Date.parse(value);
+  if (Number.isFinite(retryAt)) {
+    const remaining = Math.max(1, Math.ceil((retryAt - Date.now()) / 1_000));
+    return `The dojo is busy. Try again in ${remaining} second${remaining === 1 ? "" : "s"}.`;
+  }
+  return "The dojo is busy. Please wait a moment, then try again.";
 }
 
 function saveCurrentBoard(next: Board): void {
@@ -190,7 +203,7 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     const cells = category.values.map(column => {
       const key = squareKey(category.id, row, column);
       const mark = board[key] ?? "unknown";
-      return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(`${row}, ${column}: ${markName[mark]}.${locked ? " Grid locked." : " Select to change."}`)}"${locked ? " disabled" : ""}><span aria-hidden="true">${markSymbol[mark]}</span></button></td>`;
+      return renderGridCell({ key, row, column, mark, disabled: locked });
     }).join("");
     return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
@@ -217,7 +230,12 @@ function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][numb
 }
 
 function renderClues(current: Puzzle, activeCategory: Puzzle["spec"]["categories"][number]): string {
-  return `<aside class="clues" aria-labelledby="clues-title"><details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Sensei’s notes</span><strong>Clues</strong></span><span class="clue-count">${current.clues.length} clues</span></summary><div class="clue-content"><p class="eyebrow">Sensei’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint">Clues mentioning ${escapeHtml(activeCategory.label)} are highlighted.</p><ol>${current.clues.map((clue, index) => `<li class="${clueIsRelated(clue.text, activeCategory) ? "is-related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`).join("")}</ol></div></details></aside>`;
+  return renderPanel({
+    tag: "aside",
+    className: "clues",
+    labelledBy: "clues-title",
+    content: `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Sensei’s notes</span><strong>Clues</strong></span>${renderBadge(`${current.clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Sensei’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint">Clues mentioning ${escapeHtml(activeCategory.label)} are highlighted.</p><ol>${current.clues.map((clue, index) => `<li class="${clueIsRelated(clue.text, activeCategory) ? "is-related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`).join("")}</ol></div></details>`,
+  });
 }
 
 function renderDifficultyPicker(): string {
@@ -240,11 +258,11 @@ function renderPuzzle(current: Puzzle): string {
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
   const progress = boardProgress(board, current.spec);
-  return `<main><section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(current.spec.title)}</h1><p class="status" role="status">${escapeHtml(message)}</p></div><span class="difficulty" title="${escapeHtml(current.difficulty.modelVersion)}">Level ${current.difficulty.level}: ${escapeHtml(current.difficulty.label)}</span></section><section class="workspace"><div class="board-workspace"><div class="workspace-bar"><p class="progress" aria-label="Board progress">${progress.marked} / ${progress.total} squares marked</p><div class="workspace-actions"><div class="history-controls" aria-label="Board history">${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoStack.length === 0 || loading })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoStack.length === 0 || loading })}</div>${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: loading || !canCheck })}</div></div>${renderTabs(categories, activeCategory.id)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · choose or unlock a grid to mark it</p><section class="grids" aria-label="Logic grids">${grids}</section></div>${renderClues(current, activeCategory)}</section><details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Puzzle settings</summary><div><label class="seed-entry">Seed <input id="seed-input" value="${escapeHtml(current.seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label><label class="assist"><input id="assist-toggle" type="checkbox" ${assist ? "checked" : ""}> Auto-eliminate on ✓</label></div></details></main>${renderResetModal(current)}`;
+  return `<main><section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(current.spec.title)}</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}</div>${renderBadge(`Level ${current.difficulty.level}: ${current.difficulty.label}`, "difficulty")}</section><section class="workspace"><div class="board-workspace"><div class="workspace-bar"><p class="progress" aria-label="Board progress">${progress.marked} / ${progress.total} squares marked</p><div class="workspace-actions">${renderControlGroup("Board history", `${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoStack.length === 0 || loading })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoStack.length === 0 || loading })}`, "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: loading || !canCheck })}</div></div>${renderTabs(categories, activeCategory.id)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · choose or unlock a grid to mark it</p><section class="grids" aria-label="Logic grids">${grids}</section></div>${renderClues(current, activeCategory)}</section><details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Puzzle settings</summary><div><label class="seed-entry">Seed <input id="seed-input" value="${escapeHtml(current.seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label><label class="assist"><input id="assist-toggle" type="checkbox" ${assist ? "checked" : ""}> Auto-eliminate on ✓</label></div></details></main>${renderResetModal(current)}`;
 }
 
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true">竹</span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Judo logic puzzles</p><small>Blank → tick → cross</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "↗" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily dojo", disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true">柔</div><h1>Dojo doors are open</h1><p>${escapeHtml(message)}</p>${renderButton({ id: "retry", label: loading ? "Loading…" : "Try again", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy Yokaiba puzzle table</span><span>Shareable puzzles, gentle assists, and optional solution checking.</span></footer></div>`;
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true">竹</span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Judo logic puzzles</p><small>Blank → tick → cross</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "↗" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: `Daily dojo (${DAILY_TIME_ZONE})`, disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true">柔</div><h1>Dojo doors are open</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Try again", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy Yokaiba puzzle table</span><span>Shareable puzzles, gentle assists, and optional solution checking.</span></footer></div>`;
 }
 
 function selectGrid(gridId: string, focus = false): void {
