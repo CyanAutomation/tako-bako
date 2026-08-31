@@ -246,11 +246,11 @@ function renderPuzzle(current: Puzzle): string {
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
   const progress = boardProgress(board, current.spec);
-  return `<main>${renderPuzzleHeader({ title: current.spec.title, difficulty: `Level ${current.difficulty.level}: ${current.difficulty.label}`, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, redoDisabled: redoStack.length === 0 || loading, checkDisabled: loading || !canCheck }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds })}</section>${renderPuzzleSettings({ seed: current.seed, assist, settingsOpen })}</main>${renderResetModal(current)}`;
+  return `<main>${renderPuzzleHeader({ title: current.spec.title, difficulty: `Level ${current.difficulty.level}: ${current.difficulty.label}`, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, assist, undoDisabled: undoStack.length === 0 || loading, redoDisabled: redoStack.length === 0 || loading, checkDisabled: loading || !canCheck }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds })}</section>${renderPuzzleSettings({ seed: current.seed, settingsOpen })}</main>${renderResetModal(current)}`;
 }
 
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true"><span class="brand-face">•ᴗ•</span></span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Tournament Order</p><small>A cosy judo logic table</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily tournament", disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", variant: "primary", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true"><span>•ᴗ•</span></div><p class="eyebrow">Tournament Order</p><h1>Your puzzle table is ready</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Start puzzle", variant: "primary", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy tournament table</span><span>Take your time. Every deduction is saved.</span></footer></div>`;
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true"><span class="brand-face">•ᴗ•</span></span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Logic puzzles</p><small>Mark · Deduce · Solve</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily tournament", disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", variant: "primary", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true"><span>•ᴗ•</span></div><p class="eyebrow">Tournament Order</p><h1>Your puzzle table is ready</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Start puzzle", variant: "primary", disabled: loading })}</main>`}<footer><span>TAKO BAKO · Yokaiba logic puzzles</span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>`;
 }
 
 function focusGridCell(key: string): void {
@@ -318,6 +318,14 @@ root.addEventListener("click", event => {
   }
   if (button.id === "confirm-grid-reset" && pendingResetGridId) resetGrid(pendingResetGridId);
   if (button.id === "share-puzzle") void sharePuzzle();
+  if (button.id === "assist-toggle") {
+    assist = !assist;
+    localStorage.setItem("tako-bako.assist", assist ? "on" : "off");
+    message = assist ? "Auto-elimination is on for new ✓ marks." : "Auto-elimination is off.";
+    render();
+    root.querySelector<HTMLButtonElement>("#assist-toggle")?.focus();
+    return;
+  }
   if (button.dataset.gridTab) {
     selectGrid(button.dataset.gridTab);
   }
@@ -404,18 +412,13 @@ root.addEventListener("change", event => {
     selectGrid(input.value);
     return;
   }
-  if (input.id !== "assist-toggle" && input.id !== "difficulty-select") return;
+  if (input.id !== "difficulty-select") return;
   if (input.id === "difficulty-select") {
     difficultyLevel = input.value ? Number(input.value) : undefined;
     // Reuse the shareable seed rather than Yokaiba's derived internal seed.
     void fetchPuzzle(seedFromUrl() ?? newSeed(), "push");
     return;
-  } else {
-    assist = input.checked;
-    localStorage.setItem("tako-bako.assist", assist ? "on" : "off");
-    message = assist ? "Auto-elimination is on for new ✓ marks." : "Auto-elimination is off.";
   }
-  render();
 });
 
 window.addEventListener("popstate", () => {
