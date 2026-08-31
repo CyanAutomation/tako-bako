@@ -49,13 +49,17 @@ describe("shared UI primitives", () => {
     expect(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" })).toBeUndefined();
   });
 
-  it("uses a shared button primitive for regular and icon actions", () => {
+  it("uses a shared button primitive for regular and custom SVG icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
-    expect(renderButton({ id: "undo", label: "Undo", icon: "↶" })).toContain('class="button button--icon"');
+    const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
+    expect(iconButton).toContain('class="button button--icon"');
+    expect(iconButton).toContain('<svg');
+    expect(iconButton).toContain('aria-hidden="true"');
+    expect(iconButton).not.toContain("↶");
   });
 
   it("renders typed state and data attributes without a raw attribute string", () => {
-    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "🔒", pressed: false, data: { gridLock: "weight" } });
+    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "lock", pressed: false, data: { gridLock: "weight" } });
 
     expect(markup).toContain('aria-pressed="false"');
     expect(markup).toContain('data-grid-lock="weight"');
