@@ -12,6 +12,15 @@ export interface ButtonOptions {
   attributes?: string;
 }
 
+export interface SelectOptions {
+  id: string;
+  label: string;
+  ariaLabel?: string;
+  options: TabItem[];
+  selectedId: string;
+  className?: string;
+}
+
 export interface GridCardOptions {
   id: string;
   label: string;
@@ -31,6 +40,12 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
   return `<button${idAttribute} class="${classes}"${accessibleName}${disabled ? " disabled" : ""}${attributes ? ` ${attributes}` : ""}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
 }
 
+/** A reusable native select with a visible label for compact configuration controls. */
+export function renderSelect({ id, label, ariaLabel, options, selectedId, className = "select-control" }: SelectOptions): string {
+  const entries = options.map(option => `<option value="${escapeHtml(option.id)}" ${option.id === selectedId ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("");
+  return `<label class="${escapeHtml(className)}">${escapeHtml(label)} <select id="${escapeHtml(id)}"${ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : ""}>${entries}</select></label>`;
+}
+
 /** A reusable labelled working-grid container for desktop stacks and mobile panels. */
 export function renderGridCard({ id, label, active, locked, controls, content }: GridCardOptions): string {
   return `<section id="grid-${escapeHtml(id)}" role="tabpanel" aria-label="${escapeHtml(label)}" class="grid-card ${active ? "is-active" : ""} ${locked ? "is-locked" : "is-unlocked"}" data-grid-card="${escapeHtml(id)}"><div class="grid-card-header"><h3>${escapeHtml(label).replace(" × ", ' <span>×</span> ')}</h3><div class="grid-card-controls">${controls}</div></div>${content}</section>`;
@@ -38,9 +53,8 @@ export function renderGridCard({ id, label, active, locked, controls, content }:
 
 /** Renders a complete ARIA tablist with roving tab focus. */
 export function renderTabs(tabs: TabItem[], activeId: string): string {
-  const options = tabs.map(tab => `<option value="${escapeHtml(tab.id)}" ${tab.id === activeId ? "selected" : ""}>${escapeHtml(tab.label)}</option>`).join("");
   const buttons = tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
-  return `<label class="grid-picker">Working grid <select id="grid-select" aria-label="Choose working grid">${options}</select></label><div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>`;
+  return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>`;
 }
 
 /** Returns the next tab for the ARIA tab keyboard commands, wrapping at either end. */
