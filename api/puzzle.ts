@@ -69,6 +69,11 @@ async function forwardRateLimit(upstream: Response, response: VercelResponse): P
   return true;
 }
 
+function forwardUpstreamRequestId(upstream: Response, response: VercelResponse): void {
+  const requestId = upstream.headers.get("x-request-id");
+  if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET" && request.method !== "POST") {
     response.setHeader("allow", "GET, POST");
@@ -87,6 +92,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         headers: { "content-type": "application/json" },
         body: JSON.stringify(completion),
       });
+      forwardUpstreamRequestId(upstream, response);
       if (await forwardRateLimit(upstream, response)) return;
       if (!upstream.ok || !isJson(upstream)) {
         response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
@@ -113,6 +119,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const parameters = new URLSearchParams({ templateId: "tournament-order-v1", seed });
     if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
+    forwardUpstreamRequestId(upstream, response);
     if (await forwardRateLimit(upstream, response)) return;
     if (!upstream.ok) {
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });

@@ -9,7 +9,18 @@ export interface ButtonOptions {
   icon?: string;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
-  attributes?: string;
+  /** State exposed by toggle-like controls. */
+  pressed?: boolean;
+  /** Application data hooks, emitted as escaped kebab-case data attributes. */
+  data?: Record<string, string>;
+}
+
+export interface DialogOptions {
+  id: string;
+  eyebrow?: string;
+  title: string;
+  description: string;
+  actions: string;
 }
 
 export interface SelectOptions {
@@ -33,11 +44,20 @@ export interface GridCardOptions {
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
-export function renderButton({ id, label, icon, variant = "secondary", disabled = false, attributes = "" }: ButtonOptions): string {
+export function renderButton({ id, label, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
   const classes = icon ? "button button--icon" : `button button--${variant}`;
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
   const accessibleName = icon ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : "";
-  return `<button${idAttribute} class="${classes}"${accessibleName}${disabled ? " disabled" : ""}${attributes ? ` ${attributes}` : ""}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
+  const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
+  const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
+  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
+}
+
+/** A reusable, labelled native dialog. The caller owns its open state and actions. */
+export function renderDialog({ id, eyebrow, title, description, actions }: DialogOptions): string {
+  const titleId = `${id}-title`;
+  const descriptionId = `${id}-description`;
+  return `<dialog id="${escapeHtml(id)}" class="confirm-modal" open aria-modal="true" aria-labelledby="${escapeHtml(titleId)}" aria-describedby="${escapeHtml(descriptionId)}">${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ""}<h2 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h2><p id="${escapeHtml(descriptionId)}">${escapeHtml(description)}</p><div class="modal-actions">${actions}</div></dialog>`;
 }
 
 /** A reusable native select with a visible label for compact configuration controls. */
