@@ -1,8 +1,15 @@
 import "./style.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "@fontsource/ibm-plex-mono/latin-700.css";
+import "@fontsource/roboto-slab/latin-600.css";
+import "@fontsource/roboto-slab/latin-700.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
+import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
 import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
 import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
+import mascotUrl from "./brand/tako-bako-mascot.png";
+import markUrl from "./brand/tako-bako-mark.png";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -58,14 +65,25 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   try {
     const parameters = new URLSearchParams({ seed, ...(difficultyLevel ? { difficultyLevel: String(difficultyLevel) } : {}) });
     const endpoint = `/api/puzzle?${parameters}`;
-    const result = await fetch(endpoint);
-    if (!result.ok) throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
-    let data: Puzzle;
-    try {
-      data = parsePuzzle(await result.json());
-    } catch (error) {
-      console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
-      throw error;
+    let data: Puzzle | undefined;
+    const cached = loadPuzzleFromCache<unknown>(sessionStorage, seed, difficultyLevel);
+    if (cached) {
+      try {
+        data = parsePuzzle(cached);
+      } catch {
+        sessionStorage.removeItem(puzzleCacheKey(seed, difficultyLevel));
+      }
+    }
+    if (!data) {
+      const result = await fetch(endpoint);
+      if (!result.ok) throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
+      try {
+        data = parsePuzzle(await result.json());
+        savePuzzleToCache(sessionStorage, seed, difficultyLevel, data);
+      } catch (error) {
+        console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
     }
     if (fetchId !== currentFetchId) return;
     puzzle = data;
@@ -250,7 +268,7 @@ function renderPuzzle(current: Puzzle): string {
 }
 
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><img src="/brand/tako-bako-wordmark-dark.png" alt="Tako Bako"></a><div class="header-copy"><p>Logic puzzles</p><small>Mark · Deduce · Solve</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily tournament", disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", variant: "primary", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><img class="mascot" src="/brand/tako-bako-mascot.png" alt="A cheerful octopus carrying a puzzle box"><p class="eyebrow">Tournament Order</p><h1>Your puzzle table is ready</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Start puzzle", variant: "primary", disabled: loading })}</main>`}<footer><span class="footer-brand"><img src="/brand/tako-bako-mark.png" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>`;
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" }) : ""}<details class="header-puzzle-controls"><summary>Puzzle options</summary><div>${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily tournament", disabled: loading })}</div></details>${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", variant: "primary", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><img class="mascot" src="${mascotUrl}" alt="A cheerful octopus carrying a puzzle box"><p class="eyebrow">Tournament Order</p><h1>Your puzzle table is ready</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Start puzzle", variant: "primary", disabled: loading })}</main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>`;
 }
 
 function focusGridCell(key: string): void {
