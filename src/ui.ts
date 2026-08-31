@@ -41,6 +41,26 @@ export interface GridCardOptions {
   content: string;
 }
 
+export interface StatusOptions {
+  message: string;
+  tone?: "neutral" | "success" | "warning" | "error";
+}
+
+export interface PanelOptions {
+  tag?: "aside" | "section";
+  className: string;
+  labelledBy?: string;
+  content: string;
+}
+
+export interface GridCellOptions {
+  key: string;
+  row: string;
+  column: string;
+  mark: "unknown" | "yes" | "no";
+  disabled?: boolean;
+}
+
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
@@ -51,6 +71,34 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
   const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
   return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
+}
+
+/** A consistent live message banner for loading, progress, and error feedback. */
+export function renderStatus({ message, tone = "neutral" }: StatusOptions): string {
+  return `<p class="status status--${tone}" role="status">${escapeHtml(message)}</p>`;
+}
+
+/** A semantic panel shell shared by supporting content such as clues. */
+export function renderPanel({ tag = "section", className, labelledBy, content }: PanelOptions): string {
+  const aria = labelledBy ? ` aria-labelledby="${escapeHtml(labelledBy)}"` : "";
+  return `<${tag} class="${escapeHtml(className)}"${aria}>${content}</${tag}>`;
+}
+
+/** A standard three-state puzzle-grid control with a descriptive accessible name. */
+export function renderGridCell({ key, row, column, mark, disabled = false }: GridCellOptions): string {
+  const symbols = { unknown: "", yes: "✓", no: "×" };
+  const names = { unknown: "unknown", yes: "yes", no: "no" };
+  return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(`${row}, ${column}: ${names[mark]}.${disabled ? " Grid locked." : " Select to change."}`)}"${disabled ? " disabled" : ""}><span aria-hidden="true">${symbols[mark]}</span></button></td>`;
+}
+
+/** A compact visual label for counts and puzzle metadata. */
+export function renderBadge(label: string, className = "badge"): string {
+  return `<span class="${escapeHtml(className)}">${escapeHtml(label)}</span>`;
+}
+
+/** Groups related controls under one accessible label. */
+export function renderControlGroup(label: string, controls: string, className = "control-group"): string {
+  return `<div class="${escapeHtml(className)}" aria-label="${escapeHtml(label)}">${controls}</div>`;
 }
 
 /** A reusable, labelled native dialog. The caller owns its open state and actions. */

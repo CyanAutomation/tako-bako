@@ -59,6 +59,29 @@ describe("parsePuzzle", () => {
   it("rejects a malformed response before it reaches the board", () => {
     expect(() => parsePuzzle({ id: "missing everything" })).toThrow("invalid puzzle response");
   });
+
+  it.each([
+    { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "club", label: "Club", values: ["Lions", "Lions"] }] },
+    { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "judoka", label: "Duplicate", values: ["Lions", "Wolves"] }] },
+    { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "club", label: "Club", values: ["Lions"] }] },
+  ])("rejects unsafe category boundaries", ({ categories }) => {
+    expect(() => parsePuzzle({
+      id: "bad-boundary", seed: "bad-boundary", clues: [],
+      difficulty: { level: 3, label: "Moderate", modelVersion: "v1" },
+      spec: { id: "test", title: "Test", baseCategory: "judoka", categories },
+    })).toThrow("invalid puzzle response");
+  });
+
+  it("rejects a difficulty outside the supported range", () => {
+    expect(() => parsePuzzle({
+      id: "bad-difficulty", seed: "bad-difficulty", clues: [],
+      difficulty: { level: 6, label: "Impossible", modelVersion: "v1" },
+      spec: { id: "test", title: "Test", baseCategory: "judoka", categories: [
+        { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+        { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+      ] },
+    })).toThrow("invalid puzzle response");
+  });
 });
 
 describe("markBoard", () => {

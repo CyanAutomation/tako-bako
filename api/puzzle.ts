@@ -11,6 +11,18 @@ const MAX_ANSWER_STRING_LENGTH = 256;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
 
+type Operation = "generate" | "verify";
+
+function logMetric(operation: Operation, outcome: string, status: number, startedAt: number, details: Record<string, unknown> = {}): void {
+  console.info("tako_bako_api_metric", {
+    operation,
+    outcome,
+    status,
+    durationMs: Date.now() - startedAt,
+    ...details,
+  });
+}
+
 interface Completion {
   puzzleToken: string;
   answer: { assignments: Record<string, string[]> };
@@ -46,13 +58,15 @@ async function fetchYokaiba(url: string, init?: RequestInit): Promise<Response> 
   return fetch(url, { ...init, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
 }
 
-function upstreamFailure(response: VercelResponse, operation: "generate" | "verify", error: unknown): void {
+function upstreamFailure(response: VercelResponse, operation: Operation, error: unknown, startedAt: number): void {
   const timedOut = isTimeoutError(error);
   console.error("yokaiba_request_failed", { operation, timedOut, error: error instanceof Error ? error.message : String(error) });
-  response.status(timedOut ? 504 : 502).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
+  const status = timedOut ? 504 : 502;
+  logMetric(operation, timedOut ? "timeout" : "upstream_error", status, startedAt);
+  response.status(status).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
 }
 
-async function forwardRateLimit(upstream: Response, response: VercelResponse): Promise<boolean> {
+async function forwardRateLimit(upstream: Response, response: VercelResponse, operation: Operation, startedAt: number): Promise<boolean> {
   if (upstream.status !== 429) return false;
   const retryAfter = upstream.headers.get("retry-after");
   if (retryAfter) response.setHeader("retry-after", retryAfter);
@@ -66,6 +80,7 @@ async function forwardRateLimit(upstream: Response, response: VercelResponse): P
     }
   }
   response.status(429).json(body);
+  logMetric(operation, "rate_limited", 429, startedAt);
   return true;
 }
 
@@ -81,9 +96,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return;
   }
   if (request.method === "POST") {
+    const startedAt = Date.now();
     const completion = parseCompletion(request.body);
     if (!completion) {
       response.status(400).json({ error: "A complete signed answer is required" });
+      logMetric("verify", "invalid_request", 400, startedAt);
       return;
     }
     try {
@@ -93,26 +110,31 @@ export default async function handler(request: VercelRequest, response: VercelRe
         body: JSON.stringify(completion),
       });
       forwardUpstreamRequestId(upstream, response);
-      if (await forwardRateLimit(upstream, response)) return;
+      if (await forwardRateLimit(upstream, response, "verify", startedAt)) return;
       if (!upstream.ok || !isJson(upstream)) {
         response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
+        logMetric("verify", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
         return;
       }
       response.setHeader("cache-control", "no-store");
       response.status(200).json(await upstream.json());
+      logMetric("verify", "success", 200, startedAt);
     } catch (error) {
-      upstreamFailure(response, "verify", error);
+      upstreamFailure(response, "verify", error, startedAt);
     }
     return;
   }
   const seed = typeof request.query.seed === "string" ? request.query.seed : "";
+  const startedAt = Date.now();
   const difficultyLevel = typeof request.query.difficultyLevel === "string" ? request.query.difficultyLevel : undefined;
   if (!SEED_PATTERN.test(seed)) {
     response.status(400).json({ error: "A valid puzzle seed is required" });
+    logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
   if (difficultyLevel !== undefined && !/^[1-5]$/.test(difficultyLevel)) {
     response.status(400).json({ error: "A difficulty level from 1 to 5 is required" });
+    logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
   try {
@@ -120,13 +142,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
     if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);
-    if (await forwardRateLimit(upstream, response)) return;
+    if (await forwardRateLimit(upstream, response, "generate", startedAt)) return;
     if (!upstream.ok) {
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
+      logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
       return;
     }
     if (!isJson(upstream)) {
       response.status(502).json({ error: "Invalid response from Yokaiba." });
+      logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
       return;
     }
     const body: unknown = await upstream.json();
@@ -135,7 +159,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     response.setHeader("vercel-cdn-cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
+    logMetric("generate", "success", 200, startedAt);
   } catch (error) {
-    upstreamFailure(response, "generate", error);
+    upstreamFailure(response, "generate", error, startedAt);
   }
 }
