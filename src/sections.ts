@@ -6,11 +6,11 @@ export function renderPuzzleHeader({ title, difficulty, message }: { title: stri
 }
 
 export function renderBoardToolbar({ marked, total, undoDisabled, redoDisabled, checkDisabled }: { marked: number; total: number; undoDisabled: boolean; redoDisabled: boolean; checkDisabled: boolean }): string {
-  return `<div class="workspace-bar"><p class="progress" aria-label="Board progress">${marked} / ${total} squares marked</p><div class="workspace-actions">${renderControlGroup("Board history", `${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoDisabled })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoDisabled })}`, "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
+  return `<div class="workspace-bar"><p class="progress" aria-label="Board progress">${marked} / ${total} possibilities noted</p><div class="workspace-actions">${renderControlGroup("Board history", `${renderButton({ id: "undo", label: "Undo", icon: "undo", disabled: undoDisabled })}${renderButton({ id: "redo", label: "Redo", icon: "redo", disabled: redoDisabled })}`, "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
 }
 
 export function renderGridWorkspace({ categories, activeGridId, toolbar = "", grids }: { categories: { id: string; label: string }[]; activeGridId: string; toolbar?: string; grids: string }): string {
-  return `<div class="board-workspace">${toolbar}${renderTabs(categories, activeGridId)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · use arrow keys to move within the active grid</p><section class="grids" aria-label="Logic grids">${grids}</section></div>`;
+  return `<div class="board-workspace">${toolbar}${renderTabs(categories, activeGridId)}<p class="legend"><span class="legend-mark yes">✓</span> match <span class="legend-mark no">×</span> rule out <span class="legend-mark unknown"></span> undecided <span class="legend-tip">Use arrow keys within a grid.</span></p><section class="grids" aria-label="Logic grids">${grids}</section></div>`;
 }
 
 function clueIsRelated(clue: string, category: Category): boolean {
