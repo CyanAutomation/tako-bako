@@ -119,3 +119,21 @@ export function loadBoard(puzzleId: string): Board {
 export function saveBoard(puzzleId: string, board: Board): void {
   localStorage.setItem(`tako-bako.board.${puzzleId}`, JSON.stringify(board));
 }
+
+/** Restores only clue IDs that belong to the puzzle currently being displayed. */
+export function loadUsedClues(puzzleId: string, clueIds: readonly string[]): Set<string> {
+  try {
+    const saved = localStorage.getItem(`tako-bako.clues.${puzzleId}`);
+    if (!saved) return new Set();
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return new Set();
+    const validClueIds = new Set(clueIds);
+    return new Set(parsed.filter((clueId): clueId is string => typeof clueId === "string" && validClueIds.has(clueId)));
+  } catch {
+    return new Set();
+  }
+}
+
+export function saveUsedClues(puzzleId: string, clueIds: ReadonlySet<string>): void {
+  localStorage.setItem(`tako-bako.clues.${puzzleId}`, JSON.stringify([...clueIds]));
+}

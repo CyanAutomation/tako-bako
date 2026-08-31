@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answerFromBoard, boardProgress, cycleMark, loadBoard, markBoard, parsePuzzle, squareKey, type Mark } from "./puzzle";
+import { answerFromBoard, boardProgress, cycleMark, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveUsedClues, squareKey, type Mark } from "./puzzle";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -130,5 +130,24 @@ describe("loadBoard", () => {
     });
 
     expect(loadBoard("dojo-day")).toEqual({ safe: "yes" });
+  });
+});
+
+describe("used clue persistence", () => {
+  it("restores only known clue IDs for the current puzzle", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify(["clue-1", "stale", 42]),
+    });
+
+    expect(loadUsedClues("dojo-day", ["clue-1", "clue-2"])).toEqual(new Set(["clue-1"]));
+  });
+
+  it("stores the used clue IDs independently from the puzzle board", () => {
+    const setItem = vi.fn();
+    vi.stubGlobal("localStorage", { setItem });
+
+    saveUsedClues("dojo-day", new Set(["clue-2", "clue-1"]));
+
+    expect(setItem).toHaveBeenCalledWith("tako-bako.clues.dojo-day", JSON.stringify(["clue-2", "clue-1"]));
   });
 });

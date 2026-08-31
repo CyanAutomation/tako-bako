@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabId, renderButton, renderGridCard, renderTabs } from "./ui";
+import { nextTabId, renderButton, renderGridCard, renderSelect, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -39,8 +39,18 @@ describe("shared UI primitives", () => {
     expect(renderButton({ id: "undo", label: "Undo", icon: "↶" })).toContain('class="button button--icon"');
   });
 
+  it("uses a shared labelled select control for compact settings", () => {
+    const markup = renderSelect({ id: "difficulty", label: "Difficulty", ariaLabel: "Puzzle difficulty", selectedId: "3", options: [
+      { id: "", label: "Any" }, { id: "3", label: "Level 3" },
+    ] });
+
+    expect(markup).toContain('<label class="select-control">Difficulty');
+    expect(markup).toContain('id="difficulty" aria-label="Puzzle difficulty"');
+    expect(markup).toContain('<option value="3" selected>Level 3</option>');
+  });
+
   it("uses a shared grid-card primitive without hiding desktop panels", () => {
-    const markup = renderGridCard({ id: "weight", label: "Tournament order × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
+    const markup = renderGridCard({ id: "weight", label: "Judoka × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
 
     expect(markup).toContain('id="grid-weight"');
     expect(markup).toContain('class="grid-card is-active is-unlocked"');
