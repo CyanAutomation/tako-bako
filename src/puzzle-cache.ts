@@ -24,7 +24,7 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
     const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Malformed cache entry");
     const entry = value as Partial<CachedPuzzle<T>>;
-    if (typeof entry.expiresAt !== "number" || entry.expiresAt <= now || !("value" in entry)) throw new TypeError("Expired cache entry");
+    if (typeof entry.expiresAt !== "number" || entry.expiresAt < now || !("value" in entry)) throw new TypeError("Expired cache entry");
     return entry.value as T;
   } catch {
     storage.removeItem(key);
