@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabId, renderButton, renderGridCard, renderSelect, renderTabs } from "./ui";
+import { nextTabId, renderButton, renderDialog, renderGridCard, renderSelect, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -37,6 +37,29 @@ describe("shared UI primitives", () => {
   it("uses a shared button primitive for regular and icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     expect(renderButton({ id: "undo", label: "Undo", icon: "↶" })).toContain('class="button button--icon"');
+  });
+
+  it("renders typed state and data attributes without a raw attribute string", () => {
+    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "🔒", pressed: false, data: { gridLock: "weight" } });
+
+    expect(markup).toContain('aria-pressed="false"');
+    expect(markup).toContain('data-grid-lock="weight"');
+    expect(markup).not.toContain("attributes=");
+  });
+
+  it("renders a reusable accessible dialog with labelled actions", () => {
+    const markup = renderDialog({
+      id: "reset-grid",
+      eyebrow: "Reset grid",
+      title: "Clear Weight?",
+      description: "This clears every mark.",
+      actions: '<button id="cancel">Cancel</button>',
+    });
+
+    expect(markup).toContain('<dialog id="reset-grid" class="confirm-modal" open');
+    expect(markup).toContain('aria-modal="true"');
+    expect(markup).toContain('aria-labelledby="reset-grid-title"');
+    expect(markup).toContain('aria-describedby="reset-grid-description"');
   });
 
   it("uses a shared labelled select control for compact settings", () => {

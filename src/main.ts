@@ -1,6 +1,6 @@
 import "./style.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Mark, type Puzzle } from "./puzzle";
-import { nextTabId, renderButton, renderGridCard, renderSelect, renderTabs } from "./ui";
+import { nextTabId, renderButton, renderDialog, renderGridCard, renderSelect, renderTabs } from "./ui";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -18,6 +18,9 @@ let activeGridId: string | undefined;
 let unlockedGridId: string | undefined;
 let usedClueIds = new Set<string>();
 let pendingResetGridId: string | undefined;
+let resetReturnFocusSelector: string | undefined;
+let cluesOpen = true;
+let settingsOpen = false;
 
 const markSymbol: Record<Mark, string> = { unknown: "", yes: "✓", no: "×" };
 const markName: Record<Mark, string> = { unknown: "unknown", yes: "yes", no: "no" };
@@ -111,6 +114,27 @@ function resetGrid(categoryId: string): void {
   pendingResetGridId = undefined;
   message = "Grid reset. Your previous marks are available with Undo.";
   render();
+  restoreResetFocus();
+}
+
+function restoreResetFocus(): void {
+  const selector = resetReturnFocusSelector;
+  resetReturnFocusSelector = undefined;
+  if (!selector) return;
+  requestAnimationFrame(() => root.querySelector<HTMLButtonElement>(selector)?.focus());
+}
+
+function openResetDialog(categoryId: string, returnFocusId: string): void {
+  pendingResetGridId = categoryId;
+  resetReturnFocusSelector = `#${CSS.escape(returnFocusId)}`;
+  render();
+  root.querySelector<HTMLButtonElement>("#cancel-grid-reset")?.focus();
+}
+
+function dismissResetDialog(): void {
+  pendingResetGridId = undefined;
+  render();
+  restoreResetFocus();
 }
 
 async function checkAnswer(): Promise<void> {
@@ -175,7 +199,7 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     label: `${base.label} × ${category.label}`,
     active: category.id === activeGridId,
     locked,
-    controls: `${renderButton({ id: `grid-lock-${category.id}`, label: locked ? `Unlock ${category.label} grid` : `Lock ${category.label} grid`, icon: locked ? "🔒" : "🔓", attributes: `data-grid-lock="${escapeHtml(category.id)}" aria-pressed="${!locked}"` })}${renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "↺", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), attributes: `data-grid-reset="${escapeHtml(category.id)}"` })}`,
+    controls: `${renderButton({ id: `grid-lock-${category.id}`, label: locked ? `Unlock ${category.label} grid` : `Lock ${category.label} grid`, icon: locked ? "🔒" : "🔓", pressed: !locked, data: { gridLock: category.id } })}${renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "↺", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id } })}`,
     content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
   });
 }
@@ -184,7 +208,7 @@ function renderResetModal(current: Puzzle): string {
   if (!pendingResetGridId) return "";
   const category = current.spec.categories.find(candidate => candidate.id === pendingResetGridId);
   if (!category) return "";
-  return `<div class="modal-backdrop"><section class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="reset-grid-title" aria-describedby="reset-grid-description"><p class="eyebrow">Reset grid</p><h2 id="reset-grid-title">Clear ${escapeHtml(category.label)}?</h2><p id="reset-grid-description">This clears every tick and cross in this grid. You can still use Undo afterwards.</p><div class="modal-actions">${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Reset grid", variant: "danger" })}</div></section></div>`;
+  return `<div class="modal-backdrop">${renderDialog({ id: "reset-grid", eyebrow: "Reset grid", title: `Clear ${category.label}?`, description: "This clears every tick and cross in this grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Reset grid", variant: "danger" })}` })}</div>`;
 }
 
 function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][number]): boolean {
@@ -193,7 +217,7 @@ function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][numb
 }
 
 function renderClues(current: Puzzle, activeCategory: Puzzle["spec"]["categories"][number]): string {
-  return `<aside class="clues" aria-labelledby="clues-title"><details class="clue-drawer" open><summary><span><span class="eyebrow">Sensei’s notes</span><strong>Clues</strong></span><span class="clue-count">${current.clues.length} clues</span></summary><div class="clue-content"><p class="eyebrow">Sensei’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint">Clues mentioning ${escapeHtml(activeCategory.label)} are highlighted.</p><ol>${current.clues.map((clue, index) => `<li class="${clueIsRelated(clue.text, activeCategory) ? "is-related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`).join("")}</ol></div></details></aside>`;
+  return `<aside class="clues" aria-labelledby="clues-title"><details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Sensei’s notes</span><strong>Clues</strong></span><span class="clue-count">${current.clues.length} clues</span></summary><div class="clue-content"><p class="eyebrow">Sensei’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint">Clues mentioning ${escapeHtml(activeCategory.label)} are highlighted.</p><ol>${current.clues.map((clue, index) => `<li class="${clueIsRelated(clue.text, activeCategory) ? "is-related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`).join("")}</ol></div></details></aside>`;
 }
 
 function renderDifficultyPicker(): string {
@@ -216,7 +240,7 @@ function renderPuzzle(current: Puzzle): string {
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
   const progress = boardProgress(board, current.spec);
-  return `<main><section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(current.spec.title)}</h1><p class="status" role="status">${escapeHtml(message)}</p></div><span class="difficulty" title="${escapeHtml(current.difficulty.modelVersion)}">Level ${current.difficulty.level}: ${escapeHtml(current.difficulty.label)}</span></section><section class="workspace"><div class="board-workspace"><div class="workspace-bar"><p class="progress" aria-label="Board progress">${progress.marked} / ${progress.total} squares marked</p><div class="workspace-actions"><div class="history-controls" aria-label="Board history">${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoStack.length === 0 || loading })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoStack.length === 0 || loading })}</div>${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: loading || !canCheck })}</div></div>${renderTabs(categories, activeCategory.id)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · choose or unlock a grid to mark it</p><section class="grids" aria-label="Logic grids">${grids}</section></div>${renderClues(current, activeCategory)}</section><details class="puzzle-settings"><summary>Puzzle settings</summary><div><label class="seed-entry">Seed <input id="seed-input" value="${escapeHtml(current.seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label><label class="assist"><input id="assist-toggle" type="checkbox" ${assist ? "checked" : ""}> Auto-eliminate on ✓</label></div></details></main>${renderResetModal(current)}`;
+  return `<main><section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(current.spec.title)}</h1><p class="status" role="status">${escapeHtml(message)}</p></div><span class="difficulty" title="${escapeHtml(current.difficulty.modelVersion)}">Level ${current.difficulty.level}: ${escapeHtml(current.difficulty.label)}</span></section><section class="workspace"><div class="board-workspace"><div class="workspace-bar"><p class="progress" aria-label="Board progress">${progress.marked} / ${progress.total} squares marked</p><div class="workspace-actions"><div class="history-controls" aria-label="Board history">${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoStack.length === 0 || loading })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoStack.length === 0 || loading })}</div>${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: loading || !canCheck })}</div></div>${renderTabs(categories, activeCategory.id)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · choose or unlock a grid to mark it</p><section class="grids" aria-label="Logic grids">${grids}</section></div>${renderClues(current, activeCategory)}</section><details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Puzzle settings</summary><div><label class="seed-entry">Seed <input id="seed-input" value="${escapeHtml(current.seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label><label class="assist"><input id="assist-toggle" type="checkbox" ${assist ? "checked" : ""}> Auto-eliminate on ✓</label></div></details></main>${renderResetModal(current)}`;
 }
 
 function render(): void {
@@ -241,8 +265,7 @@ root.addEventListener("click", event => {
   if (button.id === "undo") restoreBoard(undoStack, redoStack);
   if (button.id === "redo") restoreBoard(redoStack, undoStack);
   if (button.id === "cancel-grid-reset") {
-    pendingResetGridId = undefined;
-    render();
+    dismissResetDialog();
   }
   if (button.id === "confirm-grid-reset" && pendingResetGridId) resetGrid(pendingResetGridId);
   if (button.id === "share-puzzle") void sharePuzzle();
@@ -257,9 +280,7 @@ root.addEventListener("click", event => {
     render();
   }
   if (button.dataset.gridReset) {
-    pendingResetGridId = button.dataset.gridReset;
-    render();
-    root.querySelector<HTMLButtonElement>("#cancel-grid-reset")?.focus();
+    openResetDialog(button.dataset.gridReset, button.id);
   }
   if (button.dataset.clueId) {
     const clueId = button.dataset.clueId;
@@ -288,6 +309,24 @@ root.addEventListener("click", event => {
 });
 
 root.addEventListener("keydown", event => {
+  if (pendingResetGridId) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      dismissResetDialog();
+      return;
+    }
+    if (event.key === "Tab") {
+      const dialog = root.querySelector<HTMLDialogElement>("#reset-grid");
+      const focusable = [...(dialog?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") ?? [])];
+      if (focusable.length > 0) {
+        const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
+        const nextIndex = event.shiftKey ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1) : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+        event.preventDefault();
+        focusable[nextIndex]?.focus();
+      }
+      return;
+    }
+  }
   const button = (event.target as Element).closest<HTMLButtonElement>("button[data-grid-tab]");
   if (!button || !puzzle || !button.dataset.gridTab) return;
   const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
@@ -296,6 +335,12 @@ root.addEventListener("keydown", event => {
   event.preventDefault();
   selectGrid(nextGridId, true);
 });
+
+root.addEventListener("toggle", event => {
+  const details = event.target as HTMLDetailsElement;
+  if (details.classList.contains("clue-drawer")) cluesOpen = details.open;
+  if (details.classList.contains("puzzle-settings")) settingsOpen = details.open;
+}, true);
 
 root.addEventListener("change", event => {
   const input = event.target as HTMLInputElement;
