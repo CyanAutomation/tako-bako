@@ -95,7 +95,10 @@ describe("puzzle proxy", () => {
 
     expect(result).toMatchObject({ statusCode: 200 });
     expect(result.headers.get("cache-control")).toContain("s-maxage=300");
+    expect(result.headers.get("cache-control")).toContain("stale-while-revalidate=3600");
     expect(result.headers.get("vercel-cdn-cache-control")).toContain("s-maxage=300");
+    expect(result.headers.get("x-tako-bako-cache-policy")).toBe("edge-5m-swr-1h");
+    expect(result.headers.get("server-timing")).toMatch(/^yokaiba;dur=\d+$/);
     expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-generate-123");
   });
 

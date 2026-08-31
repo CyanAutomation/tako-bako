@@ -9,7 +9,7 @@ const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
+const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=3600";
 
 type Operation = "generate" | "verify";
 
@@ -157,6 +157,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("cdn-cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("vercel-cdn-cache-control", PUZZLE_CACHE_CONTROL);
+    response.setHeader("x-tako-bako-cache-policy", "edge-5m-swr-1h");
+    response.setHeader("server-timing", `yokaiba;dur=${Date.now() - startedAt}`);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
     logMetric("generate", "success", 200, startedAt);
