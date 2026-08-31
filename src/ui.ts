@@ -7,7 +7,7 @@ export interface ButtonOptions {
   id?: string;
   label: string;
   icon?: IconName;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "assist";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
   pressed?: boolean;
@@ -84,7 +84,7 @@ export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, characte
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
 export function renderButton({ id, label, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
-  const classes = icon ? "button button--icon" : `button button--${variant}`;
+  const classes = icon ? `button button--icon button--${variant}` : `button button--${variant}`;
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
   const accessibleName = icon ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : "";
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
@@ -156,7 +156,7 @@ export function renderSelect({ id, label, ariaLabel, options, selectedId, classN
   return `<label class="${escapeHtml(className)}">${escapeHtml(label)} <select id="${escapeHtml(id)}"${ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : ""}>${entries}</select></label>`;
 }
 
-/** A reusable labelled working-grid container for desktop stacks and mobile panels. */
+/** A reusable labelled working-grid container shown by the selected workspace tab. */
 export function renderGridCard({ id, label, active, locked, controls, content }: GridCardOptions): string {
   return `<section id="grid-${escapeHtml(id)}" role="tabpanel" aria-label="${escapeHtml(label)}" class="grid-card ${active ? "is-active" : ""} ${locked ? "is-locked" : "is-unlocked"}" data-grid-card="${escapeHtml(id)}"><div class="grid-card-header"><h3>${escapeHtml(label).replace(" × ", ' <span>×</span> ')}</h3><div class="grid-card-controls">${controls}</div></div>${content}</section>`;
 }
