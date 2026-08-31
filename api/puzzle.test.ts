@@ -18,7 +18,7 @@ describe("puzzle proxy", () => {
 
   it("forwards a signed completion check to Yokaiba", async () => {
     const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ correct: true }), {
-      status: 200, headers: { "content-type": "application/json" },
+      status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-verify-123" },
     }));
     vi.stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
@@ -30,6 +30,7 @@ describe("puzzle proxy", () => {
       body: JSON.stringify({ puzzleToken: "signed-token", answer: { assignments: { club: ["Lions", "Wolves"] } } }),
     }));
     expect(result).toMatchObject({ statusCode: 200, body: { correct: true } });
+    expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-verify-123");
   });
 
   it("rejects an incomplete completion check before contacting Yokaiba", async () => {
@@ -83,7 +84,7 @@ describe("puzzle proxy", () => {
 
   it("caches deterministic generated puzzles at the CDN", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), {
-      status: 200, headers: { "content-type": "application/json" },
+      status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123" },
     })));
     const { response, result } = responseRecorder();
 
@@ -92,6 +93,7 @@ describe("puzzle proxy", () => {
     expect(result).toMatchObject({ statusCode: 200 });
     expect(result.headers.get("cache-control")).toContain("s-maxage=300");
     expect(result.headers.get("vercel-cdn-cache-control")).toContain("s-maxage=300");
+    expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-generate-123");
   });
 
   it("reports an upstream timeout distinctly and emits structured telemetry", async () => {
