@@ -14,7 +14,10 @@ function responseRecorder() {
 }
 
 describe("puzzle proxy", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   it("forwards a signed completion check to Yokaiba", async () => {
     const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ correct: true }), {
@@ -94,6 +97,16 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("cache-control")).toContain("s-maxage=300");
     expect(result.headers.get("vercel-cdn-cache-control")).toContain("s-maxage=300");
     expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-generate-123");
+  });
+
+  it("emits a structured success metric", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), { status: 200, headers: { "content-type": "application/json" } })));
+    const metric = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { response } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
+
+    expect(metric).toHaveBeenCalledWith("tako_bako_api_metric", expect.objectContaining({ operation: "generate", outcome: "success", status: 200, durationMs: expect.any(Number) }));
   });
 
   it("reports an upstream timeout distinctly and emits structured telemetry", async () => {
