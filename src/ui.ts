@@ -6,13 +6,31 @@ export interface TabItem {
 export interface ButtonOptions {
   id?: string;
   label: string;
-  icon?: string;
+  icon?: IconName;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
   pressed?: boolean;
   /** Application data hooks, emitted as escaped kebab-case data attributes. */
   data?: Record<string, string>;
+}
+
+/** Icons belong to one small rounded-stroke family so browser emoji never leak into the UI. */
+export type IconName = "share" | "undo" | "redo" | "reset" | "lock" | "unlock" | "check" | "sparkle";
+
+const iconPaths: Record<IconName, string> = {
+  share: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+  undo: '<path d="M9 7 5 11l4 4"/><path d="M5 11h8a6 6 0 0 1 6 6"/>',
+  redo: '<path d="m15 7 4 4-4 4"/><path d="M19 11h-8a6 6 0 0 0-6 6"/>',
+  reset: '<path d="M19 11a7 7 0 1 1-2-5"/><path d="M19 4v5h-5"/>',
+  lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  unlock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M16 10V7a4 4 0 0 0-7-2.7"/>',
+  check: '<path d="m5 12 4 4L19 6"/>',
+  sparkle: '<path d="m12 3 .8 5.2L18 9l-5.2.8L12 15l-.8-5.2L6 9l5.2-.8L12 3Z"/><path d="m19 15 .4 2.6L22 18l-2.6.4L19 21l-.4-2.6L16 18l2.6-.4L19 15Z"/>',
+};
+
+export function renderIcon(icon: IconName): string {
+  return `<svg class="icon icon--${icon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[icon]}</svg>`;
 }
 
 export interface DialogOptions {
@@ -71,7 +89,7 @@ export function renderButton({ id, label, icon, variant = "secondary", disabled 
   const accessibleName = icon ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : "";
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
   const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
-  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `<span aria-hidden="true">${escapeHtml(icon)}</span>` : escapeHtml(label)}</button>`;
+  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? renderIcon(icon) : escapeHtml(label)}</button>`;
 }
 
 /** A consistent live message banner for loading, progress, and error feedback. */
