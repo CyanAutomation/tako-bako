@@ -108,7 +108,10 @@ export function nextGridCellKey({ categoryId, rows, columns, key, keyName }: { c
   if (rowIndex < 0 || columnIndex < 0) return undefined;
   const nextRow = keyName === "ArrowUp" ? Math.max(0, rowIndex - 1) : keyName === "ArrowDown" ? Math.min(rows.length - 1, rowIndex + 1) : rowIndex;
   const nextColumn = keyName === "ArrowLeft" ? Math.max(0, columnIndex - 1) : keyName === "ArrowRight" ? Math.min(columns.length - 1, columnIndex + 1) : columnIndex;
-  return [categoryId, rows[nextRow], columns[nextColumn]].map(encodeURIComponent).join("|");
+  const nextRowValue = rows[nextRow];
+  const nextColumnValue = columns[nextColumn];
+  if (!nextRowValue || !nextColumnValue) return undefined;
+  return [categoryId, nextRowValue, nextColumnValue].map(encodeURIComponent).join("|");
 }
 
 /** A compact visual label for counts and puzzle metadata. */
