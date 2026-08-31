@@ -1,6 +1,6 @@
 import "./style.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
-import { dailySeed, DAILY_TIME_ZONE } from "./daily";
+import { dailySeed } from "./daily";
 import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
 import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
 
@@ -17,7 +17,6 @@ let redoStack: Board[] = [];
 let assist = localStorage.getItem("tako-bako.assist") === "on";
 let difficultyLevel = difficultyFromUrl();
 let activeGridId: string | undefined;
-let unlockedGridId: string | undefined;
 let usedClueIds = new Set<string>();
 let pendingResetGridId: string | undefined;
 let resetReturnFocusSelector: string | undefined;
@@ -74,7 +73,6 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     undoStack = [];
     redoStack = [];
     activeGridId = data.spec.categories.find(category => category.id !== data.spec.baseCategory)?.id;
-    unlockedGridId = activeGridId;
     const base = data.spec.categories.find(category => category.id === data.spec.baseCategory);
     const active = data.spec.categories.find(category => category.id === activeGridId);
     activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
@@ -202,13 +200,12 @@ async function sharePuzzle(): Promise<void> {
 }
 
 function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle["spec"]["categories"][number]): string {
-  const locked = category.id !== unlockedGridId;
   const header = category.values.map(value => `<th scope="col">${escapeHtml(value)}</th>`).join("");
   const rows = base.values.map(row => {
     const cells = category.values.map(column => {
       const key = squareKey(category.id, row, column);
       const mark = board[key] ?? "unknown";
-      return renderGridCell({ key, row, column, mark, disabled: locked, tabIndex: key === activeCellKey ? 0 : -1 });
+      return renderGridCell({ key, row, column, mark, tabIndex: key === activeCellKey ? 0 : -1 });
     }).join("");
     return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
@@ -216,8 +213,8 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     id: category.id,
     label: `${base.label} × ${category.label}`,
     active: category.id === activeGridId,
-    locked,
-    controls: `${renderButton({ id: `grid-lock-${category.id}`, label: locked ? `Unlock ${category.label} grid` : `Lock ${category.label} grid`, icon: locked ? "🔒" : "🔓", pressed: !locked, data: { gridLock: category.id } })}${renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "↺", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id } })}`,
+    locked: false,
+    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "reset", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id } }),
     content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
   });
 }
@@ -253,7 +250,7 @@ function renderPuzzle(current: Puzzle): string {
 }
 
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true">竹</span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Judo logic puzzles</p><small>Blank → tick → cross</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "↗" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: `Daily dojo (${DAILY_TIME_ZONE})`, disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true">柔</div><h1>Dojo doors are open</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Try again", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy Yokaiba puzzle table</span><span>Shareable puzzles, gentle assists, and optional solution checking.</span></footer></div>`;
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true"><span class="brand-face">•ᴗ•</span></span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Tournament Order</p><small>A cosy judo logic table</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Daily tournament", disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", variant: "primary", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true"><span>•ᴗ•</span></div><p class="eyebrow">Tournament Order</p><h1>Your puzzle table is ready</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Start puzzle", variant: "primary", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy tournament table</span><span>Take your time. Every deduction is saved.</span></footer></div>`;
 }
 
 function focusGridCell(key: string): void {
@@ -281,7 +278,7 @@ function updateBoardView(previous: Board, current: Puzzle): void {
     const cell = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
     if (!cell) continue;
     cell.className = `mark mark-${mark}`;
-    cell.setAttribute("aria-label", gridCellLabel(row, column, mark, category.id !== unlockedGridId));
+    cell.setAttribute("aria-label", gridCellLabel(row, column, mark));
     const symbol = cell.querySelector("span");
     if (symbol) symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
   }
@@ -300,7 +297,6 @@ function updateBoardView(previous: Board, current: Puzzle): void {
 function selectGrid(gridId: string, focus = false): void {
   if (!puzzle || activeGridId === gridId) return;
   activeGridId = gridId;
-  unlockedGridId = gridId;
   const base = puzzle.spec.categories.find(category => category.id === puzzle!.spec.baseCategory);
   const category = puzzle.spec.categories.find(candidate => candidate.id === gridId);
   activeCellKey = base && category ? squareKey(category.id, base.values[0]!, category.values[0]!) : undefined;
@@ -325,16 +321,6 @@ root.addEventListener("click", event => {
   if (button.dataset.gridTab) {
     selectGrid(button.dataset.gridTab);
   }
-  if (button.dataset.gridLock) {
-    const gridId = button.dataset.gridLock;
-    unlockedGridId = unlockedGridId === gridId ? undefined : gridId;
-    activeGridId = gridId;
-    const base = puzzle?.spec.categories.find(category => category.id === puzzle!.spec.baseCategory);
-    const category = puzzle?.spec.categories.find(candidate => candidate.id === gridId);
-    activeCellKey = base && category && unlockedGridId ? squareKey(category.id, base.values[0]!, category.values[0]!) : undefined;
-    message = unlockedGridId ? "Grid unlocked for marking." : "All grids are locked.";
-    render();
-  }
   if (button.dataset.gridReset) {
     openResetDialog(button.dataset.gridReset, button.id);
   }
@@ -356,7 +342,7 @@ root.addEventListener("click", event => {
     const categoryId = button.dataset.square.split("|")[0];
     const category = current.spec.categories.find(candidate => candidate.id === categoryId);
     const base = current.spec.categories.find(candidate => candidate.id === current.spec.baseCategory);
-    if (!category || !base || category.id !== unlockedGridId) return;
+    if (!category || !base) return;
     const key = button.dataset.square;
     const previous = board;
     saveCurrentBoard(markBoard(board, key, category, base, assist));
