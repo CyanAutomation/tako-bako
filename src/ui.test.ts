@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -32,6 +32,16 @@ describe("shared UI primitives", () => {
     expect(nextTabId(tabs, "club", "ArrowLeft")).toBe("tatami");
     expect(nextTabId(tabs, "weight", "Home")).toBe("club");
     expect(nextTabId(tabs, "weight", "End")).toBe("tatami");
+  });
+
+  it("moves a grid cell with arrow keys while staying within its grid", () => {
+    const options = { categoryId: "club", rows: ["Aki", "Ben"], columns: ["Lions", "Wolves"] };
+
+    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowRight" })).toBe("club|Aki|Wolves");
+    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowUp" })).toBe("club|Aki|Lions");
+    expect(nextGridCellKey({ ...options, key: "club|Ben|Wolves", keyName: "ArrowDown" })).toBe("club|Ben|Wolves");
+    expect(nextGridCellKey({ ...options, key: "club|Ben|Lions", keyName: "ArrowUp" })).toBe("club|Aki|Lions");
+    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" })).toBeUndefined();
   });
 
   it("uses a shared button primitive for regular and icon actions", () => {
@@ -86,6 +96,7 @@ describe("shared UI primitives", () => {
     expect(renderStatus({ message: "Ready", tone: "success" })).toContain('class="status status--success" role="status">Ready');
     expect(renderPanel({ tag: "aside", className: "clues", labelledBy: "clues-title", content: "Notes" })).toBe('<aside class="clues" aria-labelledby="clues-title">Notes</aside>');
     expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "yes" })).toContain('aria-label="Aki, Lions: yes. Select to change."');
+    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", tabIndex: 0 })).toContain('tabindex="0"');
     expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", disabled: true })).toContain(" Grid locked.\" disabled");
     expect(renderBadge("3 clues", "clue-count")).toBe('<span class="clue-count">3 clues</span>');
     expect(renderControlGroup("Board history", "buttons", "history-controls")).toBe('<div class="history-controls" aria-label="Board history">buttons</div>');
