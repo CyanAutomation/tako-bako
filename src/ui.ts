@@ -59,9 +59,10 @@ export interface GridCellOptions {
   column: string;
   mark: "unknown" | "yes" | "no";
   disabled?: boolean;
+  tabIndex?: number;
 }
 
-const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
+export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
 export function renderButton({ id, label, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
@@ -85,10 +86,32 @@ export function renderPanel({ tag = "section", className, labelledBy, content }:
 }
 
 /** A standard three-state puzzle-grid control with a descriptive accessible name. */
-export function renderGridCell({ key, row, column, mark, disabled = false }: GridCellOptions): string {
+export function renderGridCell({ key, row, column, mark, disabled = false, tabIndex }: GridCellOptions): string {
   const symbols = { unknown: "", yes: "✓", no: "×" };
+  const tabIndexAttribute = disabled ? "" : ` tabindex="${tabIndex ?? -1}"`;
+  return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(gridCellLabel(row, column, mark, disabled))}"${tabIndexAttribute}${disabled ? " disabled" : ""}><span aria-hidden="true">${symbols[mark]}</span></button></td>`;
+}
+
+/** Returns the accessible description shared by rendered and incrementally updated grid cells. */
+export function gridCellLabel(row: string, column: string, mark: GridCellOptions["mark"], disabled = false): string {
   const names = { unknown: "unknown", yes: "yes", no: "no" };
-  return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(`${row}, ${column}: ${names[mark]}.${disabled ? " Grid locked." : " Select to change."}`)}"${disabled ? " disabled" : ""}><span aria-hidden="true">${symbols[mark]}</span></button></td>`;
+  return `${row}, ${column}: ${names[mark]}.${disabled ? " Grid locked." : " Select to change."}`;
+}
+
+/** Finds the next cell for bounded arrow-key movement inside one puzzle grid. */
+export function nextGridCellKey({ categoryId, rows, columns, key, keyName }: { categoryId: string; rows: readonly string[]; columns: readonly string[]; key: string; keyName: string }): string | undefined {
+  if (!/^Arrow(Up|Down|Left|Right)$/.test(keyName)) return undefined;
+  const [id, encodedRow, encodedColumn] = key.split("|");
+  if (id !== categoryId || !encodedRow || !encodedColumn) return undefined;
+  const rowIndex = rows.indexOf(decodeURIComponent(encodedRow));
+  const columnIndex = columns.indexOf(decodeURIComponent(encodedColumn));
+  if (rowIndex < 0 || columnIndex < 0) return undefined;
+  const nextRow = keyName === "ArrowUp" ? Math.max(0, rowIndex - 1) : keyName === "ArrowDown" ? Math.min(rows.length - 1, rowIndex + 1) : rowIndex;
+  const nextColumn = keyName === "ArrowLeft" ? Math.max(0, columnIndex - 1) : keyName === "ArrowRight" ? Math.min(columns.length - 1, columnIndex + 1) : columnIndex;
+  const nextRowValue = rows[nextRow];
+  const nextColumnValue = columns[nextColumn];
+  if (!nextRowValue || !nextColumnValue) return undefined;
+  return [categoryId, nextRowValue, nextColumnValue].map(encodeURIComponent).join("|");
 }
 
 /** A compact visual label for counts and puzzle metadata. */

@@ -1,7 +1,8 @@
 import "./style.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
 import { dailySeed, DAILY_TIME_ZONE } from "./daily";
-import { nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
+import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -22,6 +23,7 @@ let pendingResetGridId: string | undefined;
 let resetReturnFocusSelector: string | undefined;
 let cluesOpen = true;
 let settingsOpen = false;
+let activeCellKey: string | undefined;
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
@@ -73,6 +75,9 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     redoStack = [];
     activeGridId = data.spec.categories.find(category => category.id !== data.spec.baseCategory)?.id;
     unlockedGridId = activeGridId;
+    const base = data.spec.categories.find(category => category.id === data.spec.baseCategory);
+    const active = data.spec.categories.find(category => category.id === activeGridId);
+    activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
     usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
     // Keep the requested seed in the URL: Yokaiba may derive a different
     // internal seed while searching for the chosen difficulty level.
@@ -203,7 +208,7 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     const cells = category.values.map(column => {
       const key = squareKey(category.id, row, column);
       const mark = board[key] ?? "unknown";
-      return renderGridCell({ key, row, column, mark, disabled: locked });
+      return renderGridCell({ key, row, column, mark, disabled: locked, tabIndex: key === activeCellKey ? 0 : -1 });
     }).join("");
     return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
@@ -222,20 +227,6 @@ function renderResetModal(current: Puzzle): string {
   const category = current.spec.categories.find(candidate => candidate.id === pendingResetGridId);
   if (!category) return "";
   return `<div class="modal-backdrop">${renderDialog({ id: "reset-grid", eyebrow: "Reset grid", title: `Clear ${category.label}?`, description: "This clears every tick and cross in this grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Reset grid", variant: "danger" })}` })}</div>`;
-}
-
-function clueIsRelated(clue: string, category: Puzzle["spec"]["categories"][number]): boolean {
-  const normalised = clue.toLocaleLowerCase();
-  return category.values.some(value => normalised.includes(value.toLocaleLowerCase()));
-}
-
-function renderClues(current: Puzzle, activeCategory: Puzzle["spec"]["categories"][number]): string {
-  return renderPanel({
-    tag: "aside",
-    className: "clues",
-    labelledBy: "clues-title",
-    content: `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Sensei’s notes</span><strong>Clues</strong></span>${renderBadge(`${current.clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Sensei’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint">Clues mentioning ${escapeHtml(activeCategory.label)} are highlighted.</p><ol>${current.clues.map((clue, index) => `<li class="${clueIsRelated(clue.text, activeCategory) ? "is-related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`).join("")}</ol></div></details>`,
-  });
 }
 
 function renderDifficultyPicker(): string {
@@ -258,17 +249,61 @@ function renderPuzzle(current: Puzzle): string {
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
   const progress = boardProgress(board, current.spec);
-  return `<main><section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(current.spec.title)}</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}</div>${renderBadge(`Level ${current.difficulty.level}: ${current.difficulty.label}`, "difficulty")}</section><section class="workspace"><div class="board-workspace"><div class="workspace-bar"><p class="progress" aria-label="Board progress">${progress.marked} / ${progress.total} squares marked</p><div class="workspace-actions">${renderControlGroup("Board history", `${renderButton({ id: "undo", label: "Undo", icon: "↶", disabled: undoStack.length === 0 || loading })}${renderButton({ id: "redo", label: "Redo", icon: "↷", disabled: redoStack.length === 0 || loading })}`, "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: loading || !canCheck })}</div></div>${renderTabs(categories, activeCategory.id)}<p class="legend"><span class="legend-mark yes">✓</span> yes <span class="legend-mark no">×</span> no <span class="legend-mark unknown"></span> unknown · choose or unlock a grid to mark it</p><section class="grids" aria-label="Logic grids">${grids}</section></div>${renderClues(current, activeCategory)}</section><details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Puzzle settings</summary><div><label class="seed-entry">Seed <input id="seed-input" value="${escapeHtml(current.seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label><label class="assist"><input id="assist-toggle" type="checkbox" ${assist ? "checked" : ""}> Auto-eliminate on ✓</label></div></details></main>${renderResetModal(current)}`;
+  return `<main>${renderPuzzleHeader({ title: current.spec.title, difficulty: `Level ${current.difficulty.level}: ${current.difficulty.label}`, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, redoDisabled: redoStack.length === 0 || loading, checkDisabled: loading || !canCheck }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds })}</section>${renderPuzzleSettings({ seed: current.seed, assist, settingsOpen })}</main>${renderResetModal(current)}`;
 }
 
 function render(): void {
   root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark" aria-hidden="true">竹</span><span>TAKO<br>BAKO</span></a><div class="header-copy"><p>Judo logic puzzles</p><small>Blank → tick → cross</small></div><div class="header-actions">${puzzle ? renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "↗" }) : ""}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: `Daily dojo (${DAILY_TIME_ZONE})`, disabled: loading })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : "New puzzle", disabled: loading })}</div></header>${puzzle ? renderPuzzle(puzzle) : `<main class="empty-state"><div class="pixel-knot" aria-hidden="true">柔</div><h1>Dojo doors are open</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "retry", label: loading ? "Loading…" : "Try again", disabled: loading })}</main>`}<footer><span>TAKO BAKO · a cosy Yokaiba puzzle table</span><span>Shareable puzzles, gentle assists, and optional solution checking.</span></footer></div>`;
 }
 
+function focusGridCell(key: string): void {
+  const current = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(activeCellKey ?? "")}"]`);
+  const next = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
+  if (!next || next.disabled) return;
+  current?.setAttribute("tabindex", "-1");
+  next.setAttribute("tabindex", "0");
+  activeCellKey = key;
+  next.focus();
+}
+
+/** Updates only the cells and board controls changed by a mark, preserving the live grid DOM. */
+function updateBoardView(previous: Board, current: Puzzle): void {
+  const base = current.spec.categories.find(category => category.id === current.spec.baseCategory);
+  if (!base) return;
+  const changedKeys = new Set([...Object.keys(previous), ...Object.keys(board)].filter(key => previous[key] !== board[key]));
+  for (const key of changedKeys) {
+    const [, encodedRow, encodedColumn] = key.split("|");
+    const category = current.spec.categories.find(candidate => candidate.id === key.split("|")[0]);
+    if (!category || !encodedRow || !encodedColumn || category.id === base.id) continue;
+    const row = decodeURIComponent(encodedRow);
+    const column = decodeURIComponent(encodedColumn);
+    const mark = board[key] ?? "unknown";
+    const cell = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
+    if (!cell) continue;
+    cell.className = `mark mark-${mark}`;
+    cell.setAttribute("aria-label", gridCellLabel(row, column, mark, category.id !== unlockedGridId));
+    const symbol = cell.querySelector("span");
+    if (symbol) symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
+  }
+  const progress = boardProgress(board, current.spec);
+  const progressElement = root.querySelector<HTMLElement>(".progress");
+  if (progressElement) progressElement.textContent = `${progress.marked} / ${progress.total} squares marked`;
+  const check = root.querySelector<HTMLButtonElement>("#check-solution");
+  if (check) check.disabled = loading || !current.puzzleToken || !answerFromBoard(board, current.spec);
+  for (const category of current.spec.categories) {
+    if (category.id === base.id) continue;
+    const reset = root.querySelector<HTMLButtonElement>(`#grid-reset-${CSS.escape(category.id)}`);
+    if (reset) reset.disabled = !Object.keys(board).some(key => key.split("|")[0] === category.id);
+  }
+}
+
 function selectGrid(gridId: string, focus = false): void {
   if (!puzzle || activeGridId === gridId) return;
   activeGridId = gridId;
   unlockedGridId = gridId;
+  const base = puzzle.spec.categories.find(category => category.id === puzzle!.spec.baseCategory);
+  const category = puzzle.spec.categories.find(candidate => candidate.id === gridId);
+  activeCellKey = base && category ? squareKey(category.id, base.values[0]!, category.values[0]!) : undefined;
   message = "Grid selected and ready for marking.";
   render();
   if (focus) root.querySelector<HTMLButtonElement>(`[data-grid-tab="${CSS.escape(gridId)}"]`)?.focus();
@@ -294,6 +329,9 @@ root.addEventListener("click", event => {
     const gridId = button.dataset.gridLock;
     unlockedGridId = unlockedGridId === gridId ? undefined : gridId;
     activeGridId = gridId;
+    const base = puzzle?.spec.categories.find(category => category.id === puzzle!.spec.baseCategory);
+    const category = puzzle?.spec.categories.find(candidate => candidate.id === gridId);
+    activeCellKey = base && category && unlockedGridId ? squareKey(category.id, base.values[0]!, category.values[0]!) : undefined;
     message = unlockedGridId ? "Grid unlocked for marking." : "All grids are locked.";
     render();
   }
@@ -320,9 +358,10 @@ root.addEventListener("click", event => {
     const base = current.spec.categories.find(candidate => candidate.id === current.spec.baseCategory);
     if (!category || !base || category.id !== unlockedGridId) return;
     const key = button.dataset.square;
+    const previous = board;
     saveCurrentBoard(markBoard(board, key, category, base, assist));
-    render();
-    root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`)?.focus();
+    updateBoardView(previous, current);
+    focusGridCell(key);
   }
 });
 
@@ -345,10 +384,23 @@ root.addEventListener("keydown", event => {
       return;
     }
   }
-  const button = (event.target as Element).closest<HTMLButtonElement>("button[data-grid-tab]");
-  if (!button || !puzzle || !button.dataset.gridTab) return;
+  const cell = (event.target as Element).closest<HTMLButtonElement>("button[data-square]");
+  if (cell && puzzle && !cell.disabled && cell.dataset.square) {
+    const category = puzzle.spec.categories.find(candidate => candidate.id === cell.dataset.square!.split("|")[0]);
+    const base = puzzle.spec.categories.find(candidate => candidate.id === puzzle!.spec.baseCategory);
+    if (category && base) {
+      const nextKey = nextGridCellKey({ categoryId: category.id, rows: base.values, columns: category.values, key: cell.dataset.square, keyName: event.key });
+      if (nextKey) {
+        event.preventDefault();
+        focusGridCell(nextKey);
+        return;
+      }
+    }
+  }
+  const tab = (event.target as Element).closest<HTMLButtonElement>("button[data-grid-tab]");
+  if (!tab || !puzzle || !tab.dataset.gridTab) return;
   const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
-  const nextGridId = nextTabId(categories, button.dataset.gridTab, event.key);
+  const nextGridId = nextTabId(categories, tab.dataset.gridTab, event.key);
   if (!nextGridId) return;
   event.preventDefault();
   selectGrid(nextGridId, true);
