@@ -16,12 +16,11 @@ export interface ButtonOptions {
 }
 
 /** Icons belong to one small rounded-stroke family so browser emoji never leak into the UI. */
-export type IconName = "share" | "undo" | "redo" | "reset" | "lock" | "unlock" | "check" | "sparkle";
+export type IconName = "share" | "undo" | "reset" | "lock" | "unlock" | "check" | "sparkle";
 
 const iconPaths: Record<IconName, string> = {
   share: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
   undo: '<path d="M9 7 5 11l4 4"/><path d="M5 11h8a6 6 0 0 1 6 6"/>',
-  redo: '<path d="m15 7 4 4-4 4"/><path d="M19 11h-8a6 6 0 0 0-6 6"/>',
   reset: '<path d="M19 11a7 7 0 1 1-2-5"/><path d="M19 4v5h-5"/>',
   lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   unlock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M16 10V7a4 4 0 0 0-7-2.7"/>',
