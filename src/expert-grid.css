@@ -1,0 +1,6 @@
+/* Five-column expert boards remain usable on narrow screens without shrinking
+   headings into illegibility. */
+.table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}

@@ -39,4 +39,13 @@ describe("puzzle session cache", () => {
     expect(loadPuzzleFromCache(storage, "bad", undefined, 10_000)).toBeUndefined();
     expect(storage.getItem(puzzleCacheKey("bad", undefined))).toBeNull();
   });
+
+  it("keeps identically seeded scenarios in separate cache entries", () => {
+    const storage = new MemoryStorage();
+    savePuzzleToCache(storage, "shared-seed", 5, { id: "tournament" }, 10_000, "tournament-order-v1");
+    savePuzzleToCache(storage, "shared-seed", 5, { id: "championship" }, 10_000, "championship-circuit-v1");
+
+    expect(loadPuzzleFromCache(storage, "shared-seed", 5, 10_001, "tournament-order-v1")).toEqual({ id: "tournament" });
+    expect(loadPuzzleFromCache(storage, "shared-seed", 5, 10_001, "championship-circuit-v1")).toEqual({ id: "championship" });
+  });
 });
