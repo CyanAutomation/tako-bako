@@ -7,11 +7,11 @@ import "@fontsource/roboto-slab/latin-700.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
 import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
-import { DEFAULT_SCENARIO_ID, isScenarioId, scenarios, type ScenarioId } from "./scenarios";
+import { DEFAULT_SCENARIO_ID, isScenarioId, scenarioIdFromUrl, scenarios, type ScenarioId } from "./scenarios";
 import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
-import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
-import mascotUrl from "./brand/tako-bako-mascot.png";
-import markUrl from "./brand/tako-bako-mark.png";
+import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
+import mascotUrl from "./brand/tako-bako-mascot-512.png";
+import markUrl from "./brand/tako-bako-mark-512.png";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("Application root is missing");
@@ -53,7 +53,7 @@ function difficultyFromUrl(): number | undefined {
 
 function templateFromUrl(): ScenarioId {
   const template = new URL(window.location.href).searchParams.get("template");
-  return isScenarioId(template) ? template : DEFAULT_SCENARIO_ID;
+  return scenarioIdFromUrl(template) ?? DEFAULT_SCENARIO_ID;
 }
 
 function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none"): void {
@@ -268,6 +268,7 @@ function renderDifficultyPicker(): string {
 }
 
 function renderScenarioPicker(): string {
+  const scenario = scenarios.find(candidate => candidate.id === templateId) ?? scenarios[0];
   return renderSelect({
     id: "scenario-select",
     label: "Puzzle scenario",
@@ -275,11 +276,11 @@ function renderScenarioPicker(): string {
     options: scenarios.map(scenario => ({ id: scenario.id, label: scenario.label })),
     selectedId: templateId,
     className: "difficulty-select",
-  });
+  }) + `<p class="challenge-description">${escapeHtml(scenario.description)}</p>`;
 }
 
 function renderChallengeOptions(): string {
-  return `<details class="challenge-options" ${challengeOptionsOpen ? "open" : ""}><summary>Choose challenge</summary><div>${renderScenarioPicker()}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Play today’s challenge", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div></details>`;
+  return renderDisclosure({ className: "challenge-options", summary: "Choose challenge", open: challengeOptionsOpen, content: `${renderScenarioPicker()}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Play today’s challenge", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label>` });
 }
 
 function renderPuzzle(current: Puzzle): string {
@@ -332,6 +333,8 @@ function updateBoardView(previous: Board, current: Puzzle): void {
   if (progressElement) progressElement.textContent = `${progress.marked} / ${progress.total} squares marked`;
   const check = root.querySelector<HTMLButtonElement>("#check-solution");
   if (check) check.disabled = loading || !current.puzzleToken || !answerFromBoard(board, current.spec);
+  const undo = root.querySelector<HTMLButtonElement>("#undo");
+  if (undo) undo.disabled = loading || undoStack.length === 0;
   for (const category of current.spec.categories) {
     if (category.id === base.id) continue;
     const reset = root.querySelector<HTMLButtonElement>(`#grid-reset-${CSS.escape(category.id)}`);

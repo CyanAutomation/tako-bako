@@ -8,6 +8,7 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('2 / 16 possibilities noted');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
+    expect(toolbar).toContain('Finish one ✓ in every row and column to check.');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).not.toContain('assist-toggle');
   });
@@ -19,5 +20,6 @@ describe("puzzle UI sections", () => {
     expect(settings).toContain('id="assist-toggle"');
     expect(settings).toContain('aria-label="Auto-eliminate is on"');
     expect(settings).toContain('aria-pressed="true"');
+    expect(settings).toContain('class="disclosure puzzle-settings" open');
   });
 });
