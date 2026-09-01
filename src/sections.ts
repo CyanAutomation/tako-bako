@@ -1,12 +1,13 @@
 import type { Category } from "./puzzle";
-import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderPanel, renderStatus, renderTabs } from "./ui";
+import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderDisclosure, renderPanel, renderStatus, renderTabs } from "./ui";
 
 export function renderPuzzleHeader({ title, difficulty, message }: { title: string; difficulty: string; message: string }): string {
   return `<section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(title)}</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}</div>${renderBadge(difficulty, "difficulty")}</section>`;
 }
 
 export function renderBoardToolbar({ marked, total, undoDisabled, checkDisabled }: { marked: number; total: number; undoDisabled: boolean; checkDisabled: boolean }): string {
-  return `<div class="workspace-bar"><p class="progress" aria-label="Board progress">${marked} / ${total} possibilities noted</p><div class="workspace-actions">${renderControlGroup("Board tools", renderButton({ id: "undo", label: "Undo last mark", icon: "undo", disabled: undoDisabled }), "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
+  const checkHint = checkDisabled ? "Finish one ✓ in every row and column to check." : "Your board is ready to check.";
+  return `<div class="workspace-bar"><div><p class="progress" aria-label="Board progress">${marked} / ${total} possibilities noted</p><p class="check-hint">${checkHint}</p></div><div class="workspace-actions">${renderControlGroup("Board tools", renderButton({ id: "undo", label: "Undo last mark", icon: "undo", disabled: undoDisabled }), "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
 }
 
 export function renderGridWorkspace({ categories, activeGridId, toolbar = "", grids }: { categories: { id: string; label: string }[]; activeGridId: string; toolbar?: string; grids: string }): string {
@@ -27,5 +28,5 @@ export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds 
 
 export function renderPuzzleSettings({ seed, settingsOpen, assist }: { seed: string; settingsOpen: boolean; assist: boolean }): string {
   const assistLabel = `Auto-eliminate is ${assist ? "on" : "off"}`;
-  return `<details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Board settings</summary><div><p class="setting-copy">Assist automatically rules out the other choices after a confirmed match.</p>${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist })}<label class="seed-entry">Shared puzzle <input id="seed-input" value="${escapeHtml(seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label></div></details>`;
+  return renderDisclosure({ className: "puzzle-settings", summary: "Board settings", open: settingsOpen, content: `<p class="setting-copy">Assist automatically rules out the other choices after a confirmed match.</p>${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist })}<label class="seed-entry">Shared puzzle <input id="seed-input" value="${escapeHtml(seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label>` });
 }
