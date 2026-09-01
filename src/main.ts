@@ -1,4 +1,5 @@
 import "./style.css";
+import "./expert-grid.css";
 import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-700.css";
 import "@fontsource/roboto-slab/latin-600.css";
@@ -6,6 +7,7 @@ import "@fontsource/roboto-slab/latin-700.css";
 import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
 import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
+import { DEFAULT_SCENARIO_ID, isScenarioId, scenarios, type ScenarioId } from "./scenarios";
 import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
 import { gridCellLabel, nextGridCellKey, nextTabId, renderButton, renderDialog, renderGridCard, renderGridCell, renderSelect, renderStatus } from "./ui";
 import mascotUrl from "./brand/tako-bako-mascot.png";
@@ -22,6 +24,7 @@ let message = "Choose a challenge when you are ready.";
 let undoStack: Board[] = [];
 let assist = localStorage.getItem("tako-bako.assist") === "on";
 let difficultyLevel = difficultyFromUrl();
+let templateId: ScenarioId = templateFromUrl();
 let activeGridId: string | undefined;
 let usedClueIds = new Set<string>();
 let pendingResetGridId: string | undefined;
@@ -48,10 +51,16 @@ function difficultyFromUrl(): number | undefined {
   return level && /^[1-5]$/.test(level) ? Number(level) : undefined;
 }
 
+function templateFromUrl(): ScenarioId {
+  const template = new URL(window.location.href).searchParams.get("template");
+  return isScenarioId(template) ? template : DEFAULT_SCENARIO_ID;
+}
+
 function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none"): void {
   if (mode === "none") return;
   const url = new URL(window.location.href);
   url.searchParams.set("seed", seed);
+  if (templateId === DEFAULT_SCENARIO_ID) url.searchParams.delete("template"); else url.searchParams.set("template", templateId);
   if (difficultyLevel) url.searchParams.set("difficulty", String(difficultyLevel)); else url.searchParams.delete("difficulty");
   window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
@@ -64,15 +73,15 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   const fetchId = ++currentFetchId;
   render();
   try {
-    const parameters = new URLSearchParams({ seed, ...(difficultyLevel ? { difficultyLevel: String(difficultyLevel) } : {}) });
+    const parameters = new URLSearchParams({ seed, templateId, ...(difficultyLevel ? { difficultyLevel: String(difficultyLevel) } : {}) });
     const endpoint = `/api/puzzle?${parameters}`;
     let data: Puzzle | undefined;
-    const cached = loadPuzzleFromCache<unknown>(sessionStorage, seed, difficultyLevel);
+    const cached = loadPuzzleFromCache<unknown>(sessionStorage, seed, difficultyLevel, Date.now(), templateId);
     if (cached) {
       try {
         data = parsePuzzle(cached);
       } catch {
-        sessionStorage.removeItem(puzzleCacheKey(seed, difficultyLevel));
+        sessionStorage.removeItem(puzzleCacheKey(seed, difficultyLevel, templateId));
       }
     }
     if (!data) {
@@ -80,7 +89,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
       if (!result.ok) throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
       try {
         data = parsePuzzle(await result.json());
-        savePuzzleToCache(sessionStorage, seed, difficultyLevel, data);
+        savePuzzleToCache(sessionStorage, seed, difficultyLevel, data, Date.now(), templateId);
       } catch (error) {
         console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
         throw error;
@@ -258,8 +267,19 @@ function renderDifficultyPicker(): string {
   });
 }
 
+function renderScenarioPicker(): string {
+  return renderSelect({
+    id: "scenario-select",
+    label: "Puzzle scenario",
+    ariaLabel: "Puzzle scenario",
+    options: scenarios.map(scenario => ({ id: scenario.id, label: scenario.label })),
+    selectedId: templateId,
+    className: "difficulty-select",
+  });
+}
+
 function renderChallengeOptions(): string {
-  return `<details class="challenge-options" ${challengeOptionsOpen ? "open" : ""}><summary>Choose challenge</summary><div>${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Play today’s challenge", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div></details>`;
+  return `<details class="challenge-options" ${challengeOptionsOpen ? "open" : ""}><summary>Choose challenge</summary><div>${renderScenarioPicker()}${renderDifficultyPicker()}${renderButton({ id: "daily-puzzle", label: "Play today’s challenge", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div></details>`;
 }
 
 function renderPuzzle(current: Puzzle): string {
@@ -271,7 +291,7 @@ function renderPuzzle(current: Puzzle): string {
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
   const progress = boardProgress(board, current.spec);
-  return `<main>${renderPuzzleHeader({ title: current.spec.title, difficulty: `Level ${current.difficulty.level}: ${current.difficulty.label}`, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds })}</section>${renderPuzzleSettings({ seed: current.seed, settingsOpen, assist })}</main>${renderResetModal(current)}${renderNewChallengeModal()}`;
+  return `<main>${renderPuzzleHeader({ title: current.spec.title, difficulty: `Level ${current.difficulty.level}: ${current.difficulty.label}`, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds })}</section>${renderPuzzleSettings({ seed: current.requestedSeed, settingsOpen, assist })}</main>${renderResetModal(current)}${renderNewChallengeModal()}`;
 }
 
 function render(): void {
@@ -459,6 +479,12 @@ root.addEventListener("change", event => {
     selectGrid(input.value);
     return;
   }
+  if (input.id === "scenario-select") {
+    if (!isScenarioId(input.value)) return;
+    templateId = input.value;
+    void fetchPuzzle(seedFromUrl() ?? newSeed(), "push");
+    return;
+  }
   if (input.id !== "difficulty-select") return;
   if (input.id === "difficulty-select") {
     difficultyLevel = input.value ? Number(input.value) : undefined;
@@ -470,6 +496,7 @@ root.addEventListener("change", event => {
 
 window.addEventListener("popstate", () => {
   difficultyLevel = difficultyFromUrl();
+  templateId = templateFromUrl();
   void fetchPuzzle(seedFromUrl() ?? newSeed(), "none");
 });
 

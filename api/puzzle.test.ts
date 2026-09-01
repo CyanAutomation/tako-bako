@@ -102,6 +102,33 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-generate-123");
   });
 
+  it("forwards an allowlisted expanded template to Yokaiba", async () => {
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "champion" }), {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "champion-day", templateId: "championship-circuit-v1", difficultyLevel: "5" } } as never, response as never);
+
+    expect(result.statusCode).toBe(200);
+    expect(upstream).toHaveBeenCalledWith(
+      "https://yokaiba.scheimann.workers.dev/v1/puzzles/generate?templateId=championship-circuit-v1&seed=champion-day&difficultyLevel=5",
+      expect.anything(),
+    );
+  });
+
+  it("rejects a template that is not in the public scenario allowlist", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day", templateId: "unknown-v1" } } as never, response as never);
+
+    expect(result).toMatchObject({ statusCode: 400, body: { error: "An available puzzle scenario is required" } });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it("emits a structured success metric", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), { status: 200, headers: { "content-type": "application/json" } })));
     const metric = vi.spyOn(console, "info").mockImplementation(() => undefined);
