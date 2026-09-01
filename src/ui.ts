@@ -40,6 +40,13 @@ export interface DialogOptions {
   actions: string;
 }
 
+export interface DisclosureOptions {
+  className: string;
+  summary: string;
+  content: string;
+  open?: boolean;
+}
+
 export interface SelectOptions {
   id: string;
   label: string;
@@ -147,6 +154,11 @@ export function renderDialog({ id, eyebrow, title, description, actions }: Dialo
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
   return `<dialog id="${escapeHtml(id)}" class="confirm-modal" open aria-modal="true" aria-labelledby="${escapeHtml(titleId)}" aria-describedby="${escapeHtml(descriptionId)}">${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ""}<h2 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h2><p id="${escapeHtml(descriptionId)}">${escapeHtml(description)}</p><div class="modal-actions">${actions}</div></dialog>`;
+}
+
+/** A consistent expandable shell for secondary controls and supporting panels. */
+export function renderDisclosure({ className, summary, content, open = false }: DisclosureOptions): string {
+  return `<details class="disclosure ${escapeHtml(className)}"${open ? " open" : ""}><summary>${summary}</summary><div class="disclosure-content">${content}</div></details>`;
 }
 
 /** A reusable native select with a visible label for compact configuration controls. */
