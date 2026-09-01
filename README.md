@@ -14,8 +14,11 @@ Run the full quality gate with `npm run check`.
 ## Deployment
 
 `vercel.json` builds the Vite app and serves `dist`. The same-origin `/api/puzzle`
-Vercel function requests a `tournament-order-v1` puzzle from Yokaiba, so browser
-CORS configuration is not required. Import the repository into Vercel with Git
+Vercel function requests an allowlisted Yokaiba scenario, so browser CORS
+configuration is not required. Players can choose Tournament Order, Open Division,
+or Championship Circuit; the last is a denser 5×5, three-grid expert puzzle.
+Shared links retain the requested seed and selected scenario even when Yokaiba uses
+a derived replay seed for difficulty selection. Import the repository into Vercel with Git
 integration: pushes to `main` deploy production and pull requests deploy previews.
 
 ## Puzzle verification

@@ -9,6 +9,8 @@ export interface Category {
 export interface Puzzle {
   id: string;
   seed: string;
+  requestedSeed: string;
+  templateId: string;
   puzzleToken?: string;
   clues: { id: string; text: string }[];
   difficulty: { level: number; label: string; modelVersion: string };
@@ -52,7 +54,11 @@ export function parsePuzzle(value: unknown): Puzzle {
   const base = categories.find(category => category.id === spec.baseCategory);
   if (!base || new Set(categories.map(category => category.id)).size !== categories.length || categories.some(category => category.values.length !== base.values.length)) throw new Error("invalid puzzle response");
   if ("puzzleToken" in value && typeof value.puzzleToken !== "string") throw new Error("invalid puzzle response");
-  return { id: value.id, seed: value.seed, ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}), clues, difficulty: { level, label: difficulty.label, modelVersion: difficulty.modelVersion }, spec: { id: spec.id, title: spec.title, baseCategory: spec.baseCategory, categories } };
+  const requestedSeed = value.requestedSeed === undefined ? value.seed : value.requestedSeed;
+  if (typeof requestedSeed !== "string" || requestedSeed.length === 0 || requestedSeed.length > MAX_TEXT_LENGTH) throw new Error("invalid puzzle response");
+  const templateId = value.templateId === undefined ? spec.id : value.templateId;
+  if (typeof templateId !== "string" || templateId.length === 0 || templateId.length > MAX_TEXT_LENGTH) throw new Error("invalid puzzle response");
+  return { id: value.id, seed: value.seed, requestedSeed, templateId, ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}), clues, difficulty: { level, label: difficulty.label, modelVersion: difficulty.modelVersion }, spec: { id: spec.id, title: spec.title, baseCategory: spec.baseCategory, categories } };
 }
 
 export function squareKey(categoryId: string, row: string, column: string): string {
