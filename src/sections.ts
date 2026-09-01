@@ -5,9 +5,8 @@ export function renderPuzzleHeader({ title, difficulty, message }: { title: stri
   return `<section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(title)}</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}</div>${renderBadge(difficulty, "difficulty")}</section>`;
 }
 
-export function renderBoardToolbar({ marked, total, assist, undoDisabled, redoDisabled, checkDisabled }: { marked: number; total: number; assist: boolean; undoDisabled: boolean; redoDisabled: boolean; checkDisabled: boolean }): string {
-  const assistLabel = `Auto-eliminate is ${assist ? "on" : "off"}`;
-  return `<div class="workspace-bar"><p class="progress" aria-label="Board progress">${marked} / ${total} possibilities noted</p><div class="workspace-actions">${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist })}${renderControlGroup("Board history", `${renderButton({ id: "undo", label: "Undo", icon: "undo", disabled: undoDisabled })}${renderButton({ id: "redo", label: "Redo", icon: "redo", disabled: redoDisabled })}`, "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
+export function renderBoardToolbar({ marked, total, undoDisabled, checkDisabled }: { marked: number; total: number; undoDisabled: boolean; checkDisabled: boolean }): string {
+  return `<div class="workspace-bar"><p class="progress" aria-label="Board progress">${marked} / ${total} possibilities noted</p><div class="workspace-actions">${renderControlGroup("Board tools", renderButton({ id: "undo", label: "Undo last mark", icon: "undo", disabled: undoDisabled }), "history-controls")}${renderButton({ id: "check-solution", label: "Check solution", variant: "primary", disabled: checkDisabled })}</div></div>`;
 }
 
 export function renderGridWorkspace({ categories, activeGridId, toolbar = "", grids }: { categories: { id: string; label: string }[]; activeGridId: string; toolbar?: string; grids: string }): string {
@@ -26,6 +25,7 @@ export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds 
   });
 }
 
-export function renderPuzzleSettings({ seed, settingsOpen }: { seed: string; settingsOpen: boolean }): string {
-  return `<details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Puzzle settings</summary><div><label class="seed-entry">Puzzle seed <input id="seed-input" value="${escapeHtml(seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label></div></details>`;
+export function renderPuzzleSettings({ seed, settingsOpen, assist }: { seed: string; settingsOpen: boolean; assist: boolean }): string {
+  const assistLabel = `Auto-eliminate is ${assist ? "on" : "off"}`;
+  return `<details class="puzzle-settings" ${settingsOpen ? "open" : ""}><summary>Board settings</summary><div><p class="setting-copy">Assist automatically rules out the other choices after a confirmed match.</p>${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist })}<label class="seed-entry">Shared puzzle <input id="seed-input" value="${escapeHtml(seed)}" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-seed", label: "Open" })}</label></div></details>`;
 }
