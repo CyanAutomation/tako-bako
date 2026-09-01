@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 
 const YOKAIBA_ORIGIN = "https://yokaiba.scheimann.workers.dev";
 const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;
@@ -126,9 +127,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
   const seed = typeof request.query.seed === "string" ? request.query.seed : "";
   const startedAt = Date.now();
+  const templateId = typeof request.query.templateId === "string" ? request.query.templateId : DEFAULT_SCENARIO_ID;
   const difficultyLevel = typeof request.query.difficultyLevel === "string" ? request.query.difficultyLevel : undefined;
   if (!SEED_PATTERN.test(seed)) {
     response.status(400).json({ error: "A valid puzzle seed is required" });
+    logMetric("generate", "invalid_request", 400, startedAt);
+    return;
+  }
+  if (!isScenarioId(templateId)) {
+    response.status(400).json({ error: "An available puzzle scenario is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
@@ -138,7 +145,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return;
   }
   try {
-    const parameters = new URLSearchParams({ templateId: "tournament-order-v1", seed });
+    const parameters = new URLSearchParams({ templateId, seed });
     if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);

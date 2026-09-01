@@ -58,6 +58,27 @@ describe("parsePuzzle", () => {
     expect(puzzle.puzzleToken).toBe("signed-token");
   });
 
+  it("retains Yokaiba's requested seed and accepts a five-by-five expert puzzle", () => {
+    const puzzle = parsePuzzle({
+      id: "championship-circuit-v1:replay-seed", seed: "replay-seed", requestedSeed: "shared-seed", templateId: "championship-circuit-v1", clues: [{ id: "distance", text: "Gold and Tatami 2 were two places apart.", constraint: { kind: "distance" } }],
+      difficulty: { level: 5, label: "Very hard", modelVersion: "yokaiba-difficulty-v3", evidence: { clueStructure: {} } },
+      spec: {
+        id: "championship-circuit-v1", title: "Championship Circuit", baseCategory: "judoka",
+        categories: [
+          { id: "judoka", label: "Judoka", values: ["Aki", "Hana", "Kenji", "Mika", "Sora"] },
+          { id: "weight", label: "Weight", values: ["-60 kg", "-66 kg", "-73 kg", "-81 kg", "+81 kg"] },
+          { id: "tatami", label: "Tatami", values: ["Tatami 1", "Tatami 2", "Tatami 3", "Tatami 4", "Tatami 5"] },
+          { id: "medal", label: "Medal", values: ["Gold", "Silver", "Bronze", "Finalist", "Quarter-finalist"] },
+        ],
+      },
+    });
+
+    expect(puzzle.requestedSeed).toBe("shared-seed");
+    expect(puzzle.templateId).toBe("championship-circuit-v1");
+    expect(puzzle.spec.categories).toHaveLength(4);
+    expect(boardProgress({}, puzzle.spec)).toEqual({ marked: 0, total: 75 });
+  });
+
   it("rejects a malformed response before it reaches the board", () => {
     expect(() => parsePuzzle({ id: "missing everything" })).toThrow("invalid puzzle response");
   });

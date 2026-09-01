@@ -1,4 +1,4 @@
-const CACHE_PREFIX = "tako-bako.puzzle.v1";
+const CACHE_PREFIX = "tako-bako.puzzle.v2";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
 
 export interface SessionStorageLike {
@@ -13,13 +13,13 @@ interface CachedPuzzle<T> {
 }
 
 /** Returns the stable session-cache key for one shareable puzzle variant. */
-export function puzzleCacheKey(seed: string, difficulty: number | undefined): string {
-  return `${CACHE_PREFIX}:${seed}:${difficulty ?? "any"}`;
+export function puzzleCacheKey(seed: string, difficulty: number | undefined, templateId = "tournament-order-v1"): string {
+  return `${CACHE_PREFIX}:${templateId}:${seed}:${difficulty ?? "any"}`;
 }
 
 /** Reads a short-lived parsed puzzle, removing entries that cannot be trusted. */
-export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, now = Date.now()): T | undefined {
-  const key = puzzleCacheKey(seed, difficulty);
+export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, now = Date.now(), templateId = "tournament-order-v1"): T | undefined {
+  const key = puzzleCacheKey(seed, difficulty, templateId);
   try {
     const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Malformed cache entry");
@@ -33,9 +33,9 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
 }
 
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
-export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, now = Date.now()): void {
+export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, now = Date.now(), templateId = "tournament-order-v1"): void {
   try {
-    storage.setItem(puzzleCacheKey(seed, difficulty), JSON.stringify({ expiresAt: now + CACHE_TTL_MS, value } satisfies CachedPuzzle<T>));
+    storage.setItem(puzzleCacheKey(seed, difficulty, templateId), JSON.stringify({ expiresAt: now + CACHE_TTL_MS, value } satisfies CachedPuzzle<T>));
   } catch {
     // Private browsing or quota failures should never block play.
   }
