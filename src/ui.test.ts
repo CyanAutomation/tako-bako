@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -79,6 +79,12 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('aria-modal="true"');
     expect(markup).toContain('aria-labelledby="reset-grid-title"');
     expect(markup).toContain('aria-describedby="reset-grid-description"');
+  });
+
+  it("uses a shared disclosure shell for expandable controls and panels", () => {
+    const markup = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices", open: true });
+
+    expect(markup).toBe('<details class="disclosure challenge-options" open><summary>Choose challenge</summary><div class="disclosure-content">Choices</div></details>');
   });
 
   it("uses a shared labelled select control for compact settings", () => {

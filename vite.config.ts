@@ -9,7 +9,8 @@ export default defineConfig({
         rewrite: path => {
           const url = new URL(path, "http://localhost");
           const seed = url.searchParams.get("seed") ?? "";
-          const parameters = new URLSearchParams({ templateId: "tournament-order-v1", seed });
+          const templateId = url.searchParams.get("templateId") ?? "tournament-order-v1";
+          const parameters = new URLSearchParams({ templateId, seed });
           const difficultyLevel = url.searchParams.get("difficultyLevel");
           if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
           return `/v1/puzzles/generate?${parameters}`;
