@@ -47,6 +47,13 @@ export function firstAvailableCourse(completed: readonly string[]): Course {
   return courses.find(course => !completedIds.has(course.id)) ?? courses.at(-1)!;
 }
 
+/** Compact, player-facing progress copy used wherever the active course is surfaced. */
+export function courseProgressLabel(course: Course, completed: ReadonlySet<string>): string {
+  const completedInTier = courses.filter(candidate => candidate.tier === course.tier && completed.has(candidate.id)).length;
+  const tierLabel = `${course.tier[0]!.toUpperCase()}${course.tier.slice(1)}`;
+  return `${tierLabel} · ${completedInTier}/5 complete`;
+}
+
 export function puzzleParametersForCourse(course: Course): { templateId: Course["templateId"]; difficultyLevel: Course["difficultyLevel"] } {
   return { templateId: course.templateId, difficultyLevel: course.difficultyLevel };
 }

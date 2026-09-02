@@ -8,10 +8,14 @@ export interface ButtonOptions {
   label: string;
   ariaLabel?: string;
   icon?: IconName;
+  /** Use an icon next to a visible label rather than turning the control into an icon-only button. */
+  iconPlacement?: "start";
   variant?: "primary" | "secondary" | "danger" | "assist";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
   pressed?: boolean;
+  /** State exposed by controls that open or close a related region. */
+  expanded?: boolean;
   /** Application data hooks, emitted as escaped kebab-case data attributes. */
   data?: Record<string, string>;
 }
@@ -38,7 +42,10 @@ export interface DialogOptions {
   eyebrow?: string;
   title: string;
   description: string;
+  /** Optional dialog body for richer, reusable picker dialogs. */
+  content?: string;
   actions: string;
+  className?: string;
 }
 
 export interface DisclosureOptions {
@@ -90,13 +97,15 @@ export interface GridCellOptions {
 export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
-export function renderButton({ id, label, ariaLabel, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
-  const classes = icon ? `button button--icon button--${variant}` : `button button--${variant}`;
+export function renderButton({ id, label, ariaLabel, icon, iconPlacement, variant = "secondary", disabled = false, pressed, expanded, data }: ButtonOptions): string {
+  const iconOnly = Boolean(icon && iconPlacement !== "start");
+  const classes = iconOnly ? `button button--icon button--${variant}` : icon ? `button button--with-icon button--${variant}` : `button button--${variant}`;
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
   const accessibleName = icon ? ` aria-label="${escapeHtml(ariaLabel ?? label)}" title="${escapeHtml(label)}"` : ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : "";
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
+  const expandedAttribute = expanded === undefined ? "" : ` aria-expanded="${expanded}"`;
   const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
-  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? renderIcon(icon) : escapeHtml(label)}</button>`;
+  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${expandedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `${renderIcon(icon)}${iconOnly ? "" : `<span>${escapeHtml(label)}</span>`}` : escapeHtml(label)}</button>`;
 }
 
 /** A consistent live message banner for loading, progress, and error feedback. */
@@ -151,10 +160,11 @@ export function renderControlGroup(label: string, controls: string, className = 
 }
 
 /** A reusable, labelled native dialog. The caller owns its open state and actions. */
-export function renderDialog({ id, eyebrow, title, description, actions }: DialogOptions): string {
+export function renderDialog({ id, eyebrow, title, description, content, actions, className = "" }: DialogOptions): string {
   const titleId = `${id}-title`;
   const descriptionId = `${id}-description`;
-  return `<dialog id="${escapeHtml(id)}" class="confirm-modal" open aria-modal="true" aria-labelledby="${escapeHtml(titleId)}" aria-describedby="${escapeHtml(descriptionId)}">${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ""}<h2 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h2><p id="${escapeHtml(descriptionId)}">${escapeHtml(description)}</p><div class="modal-actions">${actions}</div></dialog>`;
+  const classes = ["confirm-modal", className].filter(Boolean).map(escapeHtml).join(" ");
+  return `<dialog id="${escapeHtml(id)}" class="${classes}" open aria-modal="true" aria-labelledby="${escapeHtml(titleId)}" aria-describedby="${escapeHtml(descriptionId)}">${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ""}<h2 id="${escapeHtml(titleId)}">${escapeHtml(title)}</h2><p id="${escapeHtml(descriptionId)}">${escapeHtml(description)}</p>${content ? `<div class="dialog-content">${content}</div>` : ""}<div class="modal-actions">${actions}</div></dialog>`;
 }
 
 /** A consistent expandable shell for secondary controls and supporting panels. */
