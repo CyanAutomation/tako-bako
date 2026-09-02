@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderBoardToolbar, renderCluePanel, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
+import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, renderPuzzleSettings } from "./sections";
 
 describe("puzzle UI sections", () => {
   it("composes the puzzle heading and board toolbar from shared primitives", () => {
@@ -21,5 +21,14 @@ describe("puzzle UI sections", () => {
     expect(settings).toContain('aria-label="Auto-eliminate is on"');
     expect(settings).toContain('aria-pressed="true"');
     expect(settings).toContain('class="disclosure puzzle-settings" open');
+  });
+
+  it("renders the Puzzle Challenge path with completed, current, and locked course states", () => {
+    const markup = renderCurriculum({ completed: new Set(["beginner-1"]), currentCourseId: "beginner-2" });
+    expect(markup).toContain('Puzzle Challenge');
+    expect(markup).toContain('data-course="beginner-1"');
+    expect(markup).toContain('data-course="beginner-2"');
+    expect(markup).toMatch(/course--locked[\s\S]*disabled[\s\S]*data-course="beginner-3"/);
+    expect(markup).toContain('aria-label="Beginner Level 2"');
   });
 });
