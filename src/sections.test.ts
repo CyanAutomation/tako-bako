@@ -13,6 +13,8 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('id="assist-toggle"');
     expect(toolbar).toContain('Auto-eliminate: on');
     expect(toolbar).toContain('class="board-state-controls"');
+    expect(toolbar).toContain('class="readiness-meter"');
+    expect(toolbar).toContain('aria-label="2 of 16 possibilities noted"');
   });
 
   it("composes workspace and clues without page-level markup", () => {
@@ -36,5 +38,13 @@ describe("puzzle UI sections", () => {
     expect(markup).toContain('data-course="beginner-2"');
     expect(markup).toMatch(/course--locked[\s\S]*disabled[\s\S]*data-course="beginner-3"/);
     expect(markup).toContain('aria-label="Beginner Level 2"');
+    expect(markup).toContain('class="course-stamp course-stamp--complete"');
+    expect(markup).toContain('class="course-stamp course-stamp--current"');
+  });
+
+  it("makes the active clue context explicit with a reusable category chip", () => {
+    const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set() });
+
+    expect(markup).toContain('class="category-chip">Club</span>');
   });
 });
