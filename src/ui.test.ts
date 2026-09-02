@@ -56,6 +56,9 @@ describe("shared UI primitives", () => {
     expect(iconButton).toContain('<svg');
     expect(iconButton).toContain('aria-hidden="true"');
     expect(iconButton).not.toContain("↶");
+    const labelledIconButton = renderButton({ id: "assist", label: "Auto-eliminate: on", icon: "sparkle", iconPlacement: "start", pressed: true });
+    expect(labelledIconButton).toContain('class="button button--with-icon button--secondary"');
+    expect(labelledIconButton).toContain('<span>Auto-eliminate: on</span>');
   });
 
   it("renders typed state and data attributes without a raw attribute string", () => {
@@ -79,6 +82,9 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('aria-modal="true"');
     expect(markup).toContain('aria-labelledby="reset-grid-title"');
     expect(markup).toContain('aria-describedby="reset-grid-description"');
+    const picker = renderDialog({ id: "picker", title: "Pick", description: "Choose one.", content: "<section>choices</section>", actions: "<button>Close</button>", className: "course-dialog" });
+    expect(picker).toContain('class="confirm-modal course-dialog"');
+    expect(picker).toContain('<div class="dialog-content"><section>choices</section></div>');
   });
 
   it("uses a shared disclosure shell for expandable controls and panels", () => {
