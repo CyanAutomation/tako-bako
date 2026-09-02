@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { courseFor, firstAvailableCourse, nextCourse, puzzleParametersForCourse } from "./curriculum";
+import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse } from "./curriculum";
 
 describe("Puzzle Challenge curriculum", () => {
   it("maps each player-facing tier and level to the calibrated Yokaiba template", () => {
@@ -20,5 +20,10 @@ describe("Puzzle Challenge curriculum", () => {
 
   it("keeps generator parameters behind the player-facing curriculum", () => {
     expect(puzzleParametersForCourse(courseFor("intermediate", 2)!)).toEqual({ templateId: "open-division-v2", difficultyLevel: 2 });
+  });
+
+  it("summarises current-tier progress for the compact header status", () => {
+    expect(courseProgressLabel(courseFor("beginner", 3)!, new Set(["beginner-1", "beginner-2"]))).toBe("Beginner · 2/5 complete");
+    expect(courseProgressLabel(courseFor("advanced", 1)!, new Set(["beginner-1", "intermediate-1"]))).toBe("Advanced · 0/5 complete");
   });
 });
