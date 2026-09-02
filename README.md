@@ -13,7 +13,7 @@ Run the full quality gate with `npm run check`, which executes linting, tests, a
 
 ## How to Play
 
-Tako Bako presents logic grid puzzles with several categories of clues. For example, "The cat owner lives next door to the fish keeper" or "The Swiss plays tennis." Players deduce the correct assignments using two tools:
+Tako Bako presents logic grid puzzles with several categories of clues. For example, "The cat owner lives next door to the fish keeper" or "The Swiss plays tennis." Players deduce the correct assignments using these tools:
 
 1. **Mark** -- Click a cell to place your current guess about what belongs there (e.g., a person assigned to a house number).
 2. **Eliminate** -- Right-click a cell to mark it as impossible, narrowing down options without committing to an answer.
