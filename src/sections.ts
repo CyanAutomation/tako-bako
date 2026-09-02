@@ -1,5 +1,18 @@
 import type { Category } from "./puzzle";
+import { courses, TIERS, type CourseId } from "./curriculum";
 import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderDisclosure, renderPanel, renderStatus, renderTabs } from "./ui";
+
+export function renderCurriculum({ completed, currentCourseId }: { completed: ReadonlySet<string>; currentCourseId: CourseId }): string {
+  return `<section class="curriculum" aria-labelledby="curriculum-title"><div class="curriculum-heading"><div><p class="eyebrow">Your route through the dojo</p><h2 id="curriculum-title">Puzzle Challenge</h2></div><p>Complete each level to unlock the next.</p></div><div class="curriculum-tiers">${TIERS.map(tier => {
+    const tierCourses = courses.filter(course => course.tier === tier);
+    const title = `${tier[0]!.toUpperCase()}${tier.slice(1)}`;
+    return `<section class="curriculum-tier curriculum-tier--${tier}" aria-label="${title} levels"><h3>${title}</h3><p>${escapeHtml(tierCourses[0]!.description)}</p><ol>${tierCourses.map((course, index) => {
+      const unlocked = index === 0 ? tier === "beginner" || completed.has(courses[courses.findIndex(candidate => candidate.id === course.id) - 1]!.id) : completed.has(tierCourses[index - 1]!.id);
+      const state = completed.has(course.id) ? "complete" : course.id === currentCourseId ? "current" : unlocked ? "available" : "locked";
+      return `<li class="course course--${state}">${renderButton({ label: `Level ${course.level}`, ariaLabel: course.label, variant: course.id === currentCourseId ? "primary" : "secondary", disabled: !unlocked, data: { course: course.id } })}<span>${state === "complete" ? "Complete" : state === "current" ? "Current" : state === "locked" ? "Locked" : "Available"}</span></li>`;
+    }).join("")}</ol></section>`;
+  }).join("")}</div></section>`;
+}
 
 export function renderPuzzleHeader({ title, difficulty, message }: { title: string; difficulty: string; message: string }): string {
   return `<section class="puzzle-heading"><div><p class="eyebrow">Yokaiba logic dojo</p><h1>${escapeHtml(title)}</h1>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}</div>${renderBadge(difficulty, "difficulty")}</section>`;

@@ -6,6 +6,7 @@ export interface TabItem {
 export interface ButtonOptions {
   id?: string;
   label: string;
+  ariaLabel?: string;
   icon?: IconName;
   variant?: "primary" | "secondary" | "danger" | "assist";
   disabled?: boolean;
@@ -89,10 +90,10 @@ export interface GridCellOptions {
 export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
-export function renderButton({ id, label, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
+export function renderButton({ id, label, ariaLabel, icon, variant = "secondary", disabled = false, pressed, data }: ButtonOptions): string {
   const classes = icon ? `button button--icon button--${variant}` : `button button--${variant}`;
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
-  const accessibleName = icon ? ` aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : "";
+  const accessibleName = icon ? ` aria-label="${escapeHtml(ariaLabel ?? label)}" title="${escapeHtml(label)}"` : ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : "";
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
   const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
   return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? renderIcon(icon) : escapeHtml(label)}</button>`;
