@@ -23,6 +23,7 @@ let puzzle: Puzzle | null = null;
 let board: Board = {};
 let loading = false;
 let message = "Choose a challenge when you are ready.";
+let difficultyUnavailable = false;
 let undoStack: Board[] = [];
 let assist = localStorage.getItem("tako-bako.assist") === "on";
 type PlayMode = "challenge" | "shared";
@@ -47,6 +48,12 @@ const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({
 
 function newSeed(): string {
   return crypto.randomUUID();
+}
+
+class DifficultyUnavailableError extends Error {
+  constructor() {
+    super("This seed cannot produce the selected difficulty. Try another puzzle.");
+  }
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -114,6 +121,7 @@ let currentFetchId = 0;
 
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
   loading = true;
+  difficultyUnavailable = false;
   message = "Sensei is arranging the puzzle tiles…";
   const fetchId = ++currentFetchId;
   render();
@@ -131,7 +139,10 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     }
     if (!data) {
       const result = await fetch(endpoint);
-      if (!result.ok) throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
+      if (!result.ok) {
+        if (result.status === 422) throw new DifficultyUnavailableError();
+        throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
+      }
       try {
         data = parsePuzzle(await result.json());
         savePuzzleToCache(sessionStorage, seed, difficultyLevel, data, Date.now(), templateId);
@@ -156,6 +167,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   } catch (error) {
     if (fetchId !== currentFetchId) return;
     puzzle = null;
+    difficultyUnavailable = error instanceof DifficultyUnavailableError;
     message = error instanceof Error ? error.message : "The puzzle could not be collected. Please try again.";
   } finally {
     if (fetchId === currentFetchId) {
@@ -340,8 +352,13 @@ function renderPuzzle(current: Puzzle): string {
   return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
 }
 
+function renderLandingAction(): string {
+  if (difficultyUnavailable) return renderButton({ id: "try-another-puzzle", label: "Try another puzzle", variant: "primary", disabled: loading });
+  return renderButton({ id: "start-puzzle", label: loading ? "Preparing challenge…" : `Start ${activeCourse.label}`, variant: "primary", disabled: loading });
+}
+
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Course", expanded: challengeOptionsOpen })}<details class="action-menu"><summary>Actions</summary><div>${renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? `Restart ${activeCourse.label}` : "New shared puzzle", variant: "secondary", disabled: loading })}</div></details></div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba logic dojo</p><h1>A small puzzle.<br>A satisfying solve.</h1><p>Work through a clear course of logic puzzles, from your first mark to advanced multi-grid deduction.</p>${renderStatus({ message, tone: message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderButton({ id: "start-puzzle", label: loading ? "Preparing challenge…" : `Start ${activeCourse.label}`, variant: "primary", disabled: loading })}${renderMascotNote({ title: "Ready for a tiny triumph?", copy: "Start with one thoughtful mark. I’ll be cheering from the dojo shelf." })}</section>${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}</main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}`;
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Course", expanded: challengeOptionsOpen })}<details class="action-menu"><summary>Actions</summary><div>${renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? `Restart ${activeCourse.label}` : "New shared puzzle", variant: "secondary", disabled: loading })}</div></details></div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba logic dojo</p><h1>A small puzzle.<br>A satisfying solve.</h1><p>Work through a clear course of logic puzzles, from your first mark to advanced multi-grid deduction.</p>${renderStatus({ message, tone: difficultyUnavailable || message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderLandingAction()}${renderMascotNote({ title: "Ready for a tiny triumph?", copy: "Start with one thoughtful mark. I’ll be cheering from the dojo shelf." })}</section>${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}</main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}`;
 }
 
 function focusGridCell(key: string): void {
@@ -406,6 +423,7 @@ root.addEventListener("click", event => {
   const button = (event.target as Element).closest<HTMLButtonElement>("button");
   if (!button || button.disabled) return;
   if (button.id === "start-puzzle") startCourse(activeCourse);
+  if (button.id === "try-another-puzzle") void fetchPuzzle(newSeed(), "push");
   if (button.id === "new-puzzle") {
     if (Object.keys(board).length === 0) {
       if (playMode === "challenge") startCourse(activeCourse); else void fetchPuzzle(newSeed(), "push");

@@ -39,7 +39,7 @@ Build output goes to the `dist` directory. The TypeScript compiler runs separate
 
 ## Deployment
 
-`vercel.json` builds the Vite app and serves `dist`. The same-origin `/api/puzzle` Vercel function requests an allowlisted Yokaiba scenario, so browser CORS configuration is not required. Shared links retain the requested seed and selected scenario even when Yokaiba uses a derived replay seed for difficulty selection. Import the repository into Vercel with Git integration: pushes to `main` deploy production; pull requests deploy previews.
+`vercel.json` builds the Vite app and serves `dist`. The same-origin `/api/puzzle` Vercel function requests an allowlisted Yokaiba scenario, so browser CORS configuration is not required. Shared links retain the exact requested seed and selected scenario. If that seed has no deterministic clue strategy for the chosen difficulty, Yokaiba returns `difficulty_unavailable` and Tako Bako offers a new seed while keeping the scenario and level. Import the repository into Vercel with Git integration: pushes to `main` deploy production; pull requests deploy previews.
 
 ## Configuration
 
