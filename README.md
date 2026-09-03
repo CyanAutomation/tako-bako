@@ -2,11 +2,23 @@
 
 A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy 16-bit aesthetic. Solve deduction puzzles by placing clues on a grid and eliminating impossibilities until only one solution remains.
 
-## Installation
+## Getting Started
 
-1. Install dependencies: `npm install`
-2. Start the development server: `npm run dev`
-3. Open the app: navigate to `http://localhost:5173` in your browser
+Prerequisites: Node.js 20+.
+
+1. Install dependencies:
+
+   ```sh
+   npm install
+   ```
+
+2. Start the development server:
+
+   ```sh
+   npm run dev
+   ```
+
+3. Open the app: navigate to `http://localhost:5173` in your browser.
 
 ## How to Play
 
@@ -19,16 +31,11 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 Three scenarios are available: Tournament Order (a compact 4x4 warm-up), Open Division (a broader 5x5 challenge), and Championship Circuit (an expert 5x5 puzzle with three grids).
 
-The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses 1–4, Intermediate 5–8, and Advanced 9–12.
+The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses 1-4, Intermediate 5-8, and Advanced 9-12.
 
 ## Development
 
-Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layers.
-
-```sh
-npm install
-npm run dev
-```
+Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layer.
 
 Use individual commands during active development:
 
