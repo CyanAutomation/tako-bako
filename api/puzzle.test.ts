@@ -184,6 +184,24 @@ describe("puzzle proxy", () => {
     expect(metric).toHaveBeenCalledWith("tako_bako_api_metric", expect.objectContaining({ operation: "generate", outcome: "difficulty_unavailable", status: 422 }));
   });
 
+  it("does not consume an unrecognized Yokaiba 422 response while inspecting it", async () => {
+    const upstreamResponse = new Response(JSON.stringify({
+      error: { code: "invalid_template", message: "unknown template" },
+    }), {
+      status: 422, headers: { "content-type": "application/json" },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(upstreamResponse));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day", difficultyLevel: "3" } } as never, response as never);
+
+    expect(result).toMatchObject({
+      statusCode: 502,
+      body: { error: "Yokaiba is unavailable. Please try again." },
+    });
+    expect(upstreamResponse.bodyUsed).toBe(false);
+  });
+
   it("uses a fallback error when a Yokaiba rate limit contains malformed JSON", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not valid JSON", {
       status: 429, headers: { "content-type": "application/json", "retry-after": "30" },
