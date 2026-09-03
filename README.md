@@ -4,7 +4,7 @@ A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy
 
 ## Getting Started
 
-Prerequisites: Node.js 20+.
+Prerequisites: Node.js 20.19+ or 22.12+ (matching Vite's supported runtime).
 
 1. Install dependencies:
 
