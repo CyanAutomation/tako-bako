@@ -94,7 +94,8 @@ async function forwardDifficultyUnavailable(upstream: Response, response: Vercel
   if (upstream.status !== 422 || !isJson(upstream)) return false;
   let body: unknown;
   try {
-    body = await upstream.json();
+    // Inspect a clone so callers can still handle an unrecognized 422 response.
+    body = await upstream.clone().json();
   } catch {
     return false;
   }
