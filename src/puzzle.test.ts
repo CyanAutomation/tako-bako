@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answerFromBoard, boardProgress, cycleMark, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveUsedClues, squareKey, type Mark } from "./puzzle";
+import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveUsedClues, squareKey, type Mark } from "./puzzle";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -166,6 +166,14 @@ describe("boardProgress", () => {
 
   it("does not count stale marks from another puzzle category", () => {
     expect(boardProgress({ [squareKey("stale", "Aki", "Lions")]: "yes" }, spec)).toEqual({ marked: 0, total: 8 });
+  });
+
+  it("counts placed matches separately from general notes", () => {
+    expect(boardSolveProgress({
+      [squareKey("club", "Aki", "Lions")]: "yes",
+      [squareKey("club", "Ben", "Wolves")]: "yes",
+      [squareKey("weight", "Ben", "-66 kg")]: "no",
+    }, spec)).toEqual({ matches: 2, total: 4 });
   });
 });
 
