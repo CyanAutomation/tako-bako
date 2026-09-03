@@ -100,6 +100,13 @@ export interface GridCellOptions {
   tabIndex?: number;
 }
 
+export interface LevelCardOptions {
+  courseId: string;
+  label: string;
+  level: number;
+  state: "complete" | "current" | "available" | "locked";
+}
+
 export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
@@ -158,6 +165,12 @@ export function nextGridCellKey({ categoryId, rows, columns, key, keyName }: { c
 /** A compact visual label for counts and puzzle metadata. */
 export function renderBadge(label: string, className = "badge"): string {
   return `<span class="${escapeHtml(className)}">${escapeHtml(label)}</span>`;
+}
+
+/** A consistent progression tile with an explicit visual and accessible state. */
+export function renderLevelCard({ courseId, label, level, state }: LevelCardOptions): string {
+  const stateLabel = state === "complete" ? "Complete" : state === "current" ? "Current" : state === "available" ? "Ready" : "Locked";
+  return `<li class="course course--${state}">${renderButton({ label: String(level), ariaLabel: `${label}, ${state}`, variant: state === "current" ? "primary" : "secondary", disabled: state === "locked", data: { course: courseId } })}<span class="course-state" aria-hidden="true">${stateLabel}</span></li>`;
 }
 
 /** Groups related controls under one accessible label. */
