@@ -1,15 +1,15 @@
 export const TIERS = ["beginner", "intermediate", "advanced"] as const;
 
 export type Tier = typeof TIERS[number];
-export type CourseId = `${Tier}-${1 | 2 | 3 | 4 | 5}`;
+export type CourseId = `${Tier}-${1 | 2 | 3 | 4}`;
 
 export interface Course {
   id: CourseId;
   tier: Tier;
-  level: 1 | 2 | 3 | 4 | 5;
+  level: 1 | 2 | 3 | 4;
   label: string;
   templateId: "tournament-order-v1" | "open-division-v2" | "championship-circuit-v2";
-  difficultyLevel: 1 | 2 | 3 | 4 | 5;
+  difficultyLevel: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   description: string;
 }
 
@@ -19,14 +19,19 @@ const tierDetails: Record<Tier, Pick<Course, "templateId" | "description">> = {
   advanced: { templateId: "championship-circuit-v2", description: "A dense 5×5 challenge across three working grids." },
 };
 
-const levels = [1, 2, 3, 4, 5] as const;
+const levels = [1, 2, 3, 4] as const;
+const yokaibaLevels: Record<Tier, readonly Course["difficultyLevel"][]> = {
+  beginner: [1, 2, 3, 4],
+  intermediate: [5, 6, 7, 8],
+  advanced: [9, 10, 11, 12],
+};
 
 export const courses: readonly Course[] = TIERS.flatMap(tier => levels.map(level => ({
   id: `${tier}-${level}` as CourseId,
   tier,
   level,
   label: `${tier[0]!.toUpperCase()}${tier.slice(1)} Level ${level}`,
-  difficultyLevel: level,
+  difficultyLevel: yokaibaLevels[tier][level - 1]!,
   ...tierDetails[tier],
 })));
 
@@ -51,7 +56,7 @@ export function firstAvailableCourse(completed: readonly string[]): Course {
 export function courseProgressLabel(course: Course, completed: ReadonlySet<string>): string {
   const completedInTier = courses.filter(candidate => candidate.tier === course.tier && completed.has(candidate.id)).length;
   const tierLabel = `${course.tier[0]!.toUpperCase()}${course.tier.slice(1)}`;
-  return `${tierLabel} · ${completedInTier}/5 complete`;
+  return `${tierLabel} · ${completedInTier}/4 complete`;
 }
 
 export function puzzleParametersForCourse(course: Course): { templateId: Course["templateId"]; difficultyLevel: Course["difficultyLevel"] } {
