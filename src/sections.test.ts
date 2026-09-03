@@ -31,15 +31,20 @@ describe("puzzle UI sections", () => {
     expect(markup).not.toContain('Mark clue 2 as unused');
   });
 
-  it("renders the Puzzle Challenge path with completed, current, and locked course states", () => {
+  it("renders the Puzzle Challenge path with stateful tiles and compact tier information", () => {
     const markup = renderCurriculum({ completed: new Set(["beginner-1"]), currentCourseId: "beginner-2" });
     expect(markup).toContain('Puzzle Challenge');
     expect(markup).toContain('data-course="beginner-1"');
     expect(markup).toContain('data-course="beginner-2"');
     expect(markup).toMatch(/course--locked[\s\S]*disabled[\s\S]*data-course="beginner-3"/);
-    expect(markup).toContain('aria-label="Beginner Level 2"');
-    expect(markup).toContain('class="course-stamp course-stamp--complete"');
-    expect(markup).toContain('class="course-stamp course-stamp--current"');
+    expect(markup).toContain('aria-label="Beginner Level 2, current"');
+    expect(markup).toContain('class="course course--complete"');
+    expect(markup).toContain('class="course course--current"');
+    expect(markup).not.toContain('course-stamp');
+    expect(markup).not.toContain('class="course-state"');
+    expect(markup).toContain('class="info-disclosure"');
+    expect(markup).toContain('More information about Beginner');
+    expect(markup).toContain('A compact 4×4 introduction to logic-grid deduction.');
   });
 
   it("makes the active clue context explicit with a reusable category chip", () => {
