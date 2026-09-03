@@ -4,17 +4,17 @@ import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorksp
 describe("puzzle UI sections", () => {
   it("composes the puzzle heading and board toolbar from shared primitives", () => {
     expect(renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" })).toContain('<h1>Tournament Order</h1>');
-    const toolbar = renderBoardToolbar({ marked: 2, total: 16, undoDisabled: false, checkDisabled: true, assist: true });
-    expect(toolbar).toContain('2 / 16 possibilities noted');
+    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, assist: true });
+    expect(toolbar).toContain('2 / 4 matches placed');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
-    expect(toolbar).toContain('Finish one ✓ in every row and column to check.');
+    expect(toolbar).toContain('Place one match in every row and column to check.');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
-    expect(toolbar).toContain('Auto-eliminate: on');
+    expect(toolbar).toContain('Fill rule-outs: on');
     expect(toolbar).toContain('class="board-state-controls"');
     expect(toolbar).toContain('class="readiness-meter"');
-    expect(toolbar).toContain('aria-label="2 of 16 possibilities noted"');
+    expect(toolbar).toContain('aria-label="2 of 4 matches placed"');
   });
 
   it("composes workspace and clues without page-level markup", () => {
@@ -40,8 +40,8 @@ describe("puzzle UI sections", () => {
     expect(markup).toContain('aria-label="Beginner Level 2, current"');
     expect(markup).toContain('class="course course--complete"');
     expect(markup).toContain('class="course course--current"');
-    expect(markup).not.toContain('course-stamp');
-    expect(markup).not.toContain('class="course-state"');
+    expect(markup).toContain('class="course-state"');
+    expect(markup).toContain('Complete');
     expect(markup).toContain('class="info-disclosure"');
     expect(markup).toContain('More information about Beginner');
     expect(markup).toContain('A compact 4×4 introduction to logic-grid deduction.');

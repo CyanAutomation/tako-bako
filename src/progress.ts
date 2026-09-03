@@ -35,6 +35,11 @@ export function completeCourse(progress: ChallengeProgress, courseId: CourseId):
   return { version: 1, completed: [...progress.completed, courseId] };
 }
 
+/** Starts Puzzle Challenge again without touching saved boards or shared puzzles. */
+export function resetProgress(): ChallengeProgress {
+  return emptyProgress();
+}
+
 export function isCourseUnlocked(progress: ChallengeProgress, courseId: CourseId): boolean {
   const index = courses.findIndex(course => course.id === courseId);
   return index === 0 || (index > 0 && progress.completed.includes(courses[index - 1]!.id));

@@ -115,6 +115,18 @@ export function boardProgress(board: Board, spec: Puzzle["spec"]): { marked: num
   };
 }
 
+/** Counts affirmative matches separately from tentative notes and rule-outs. */
+export function boardSolveProgress(board: Board, spec: Puzzle["spec"]): { matches: number; total: number } {
+  const base = spec.categories.find(category => category.id === spec.baseCategory);
+  if (!base) return { matches: 0, total: 0 };
+  const categories = spec.categories.filter(category => category.id !== base.id);
+  const validKeys = new Set(categories.flatMap(category => base.values.flatMap(row => category.values.map(column => squareKey(category.id, row, column)))));
+  return {
+    matches: Object.entries(board).filter(([key, mark]) => validKeys.has(key) && mark === "yes").length,
+    total: categories.length * base.values.length,
+  };
+}
+
 export function loadBoard(puzzleId: string): Board {
   try {
     const saved = localStorage.getItem(`tako-bako.board.${puzzleId}`);
