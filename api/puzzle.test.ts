@@ -164,6 +164,26 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("preserves Yokaiba's deterministic difficulty-unavailable response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: "difficulty_unavailable", message: "no matching strategy" },
+    }), {
+      status: 422, headers: { "content-type": "application/json", "x-request-id": "yokaiba-difficulty-422" },
+    })));
+    const metric = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day", difficultyLevel: "3" } } as never, response as never);
+
+    expect(result).toMatchObject({
+      statusCode: 422,
+      body: { code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle." },
+    });
+    expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-difficulty-422");
+    expect(result.headers.get("cache-control")).toBe("no-store");
+    expect(metric).toHaveBeenCalledWith("tako_bako_api_metric", expect.objectContaining({ operation: "generate", outcome: "difficulty_unavailable", status: 422 }));
+  });
+
   it("uses a fallback error when a Yokaiba rate limit contains malformed JSON", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not valid JSON", {
       status: 429, headers: { "content-type": "application/json", "retry-after": "30" },
