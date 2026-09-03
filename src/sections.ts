@@ -1,6 +1,6 @@
 import type { Category } from "./puzzle";
 import { courses, TIERS, type CourseId } from "./curriculum";
-import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderPanel, renderStatus, renderTabs } from "./ui";
+import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderInfoDisclosure, renderPanel, renderStatus, renderTabs } from "./ui";
 
 export type ClueFilter = "all" | "remaining" | "used";
 
@@ -8,11 +8,11 @@ export function renderCurriculum({ completed, currentCourseId, showHeading = tru
   return `<section class="curriculum"${showHeading ? ' aria-labelledby="curriculum-title"' : ""}>${showHeading ? '<div class="curriculum-heading"><div><p class="eyebrow">Your route through the dojo</p><h2 id="curriculum-title">Puzzle Challenge</h2></div><p>Complete each level to unlock the next.</p></div>' : ""}<div class="curriculum-tiers">${TIERS.map(tier => {
     const tierCourses = courses.filter(course => course.tier === tier);
     const title = `${tier[0]!.toUpperCase()}${tier.slice(1)}`;
-    return `<section class="curriculum-tier curriculum-tier--${tier}" aria-label="${title} levels"><h3>${title}</h3><p>${escapeHtml(tierCourses[0]!.description)}</p><ol>${tierCourses.map((course, index) => {
+    const description = escapeHtml(tierCourses[0]!.description);
+    return `<section class="curriculum-tier curriculum-tier--${tier}" aria-label="${title} levels"><div class="curriculum-tier-heading"><h3>${title}</h3>${renderInfoDisclosure({ id: `${tier}-info`, label: `More information about ${title}`, content: `<p>${description}</p>` })}</div><ol>${tierCourses.map((course, index) => {
       const unlocked = index === 0 ? tier === "beginner" || completed.has(courses[courses.findIndex(candidate => candidate.id === course.id) - 1]!.id) : completed.has(tierCourses[index - 1]!.id);
       const state = completed.has(course.id) ? "complete" : course.id === currentCourseId ? "current" : unlocked ? "available" : "locked";
-      const stamp = state === "complete" ? "✓" : state === "current" ? "✦" : state === "available" ? "•" : "";
-      return `<li class="course course--${state}">${renderButton({ label: `Level ${course.level}`, ariaLabel: course.label, variant: course.id === currentCourseId ? "primary" : "secondary", disabled: !unlocked, data: { course: course.id } })}<span class="course-stamp course-stamp--${state}" aria-label="${state}">${stamp}</span><span class="course-state">${state === "complete" ? "Complete" : state === "current" ? "Current" : state === "locked" ? "Locked" : "Ready"}</span></li>`;
+      return `<li class="course course--${state}">${renderButton({ label: String(course.level), ariaLabel: `${course.label}, ${state}`, variant: course.id === currentCourseId ? "primary" : "secondary", disabled: !unlocked, data: { course: course.id } })}</li>`;
     }).join("")}</ol></section>`;
   }).join("")}</div></section>`;
 }
@@ -30,7 +30,7 @@ export function renderBoardToolbar({ marked, total, undoDisabled, checkDisabled,
 }
 
 export function renderGridWorkspace({ categories, activeGridId, toolbar = "", grids }: { categories: { id: string; label: string }[]; activeGridId: string; toolbar?: string; grids: string }): string {
-  return `<div class="board-workspace">${toolbar}${renderTabs(categories, activeGridId)}<p class="legend"><span class="legend-mark yes">✓</span> match <span class="legend-mark no">×</span> rule out <span class="legend-mark unknown"></span> undecided <span class="legend-tip">Use arrow keys within a grid.</span></p><section class="grids" aria-label="Logic grids">${grids}</section></div>`;
+  return `<div class="board-workspace">${toolbar}${renderTabs(categories, activeGridId)}<p class="legend"><span class="legend-mark yes">✓</span> match <span class="legend-mark no">×</span> rule out <span class="legend-mark unknown"></span> undecided <span class="legend-tip">Click to cycle marks · use arrow keys to move.</span></p><section class="grids" aria-label="Logic grids">${grids}</section></div>`;
 }
 
 function clueIsRelated(clue: string, category: Category): boolean {

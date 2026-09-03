@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -91,6 +91,14 @@ describe("shared UI primitives", () => {
     const markup = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices", open: true });
 
     expect(markup).toBe('<details class="disclosure challenge-options" open><summary>Choose challenge</summary><div class="disclosure-content">Choices</div></details>');
+  });
+
+  it("renders a compact, accessible information disclosure", () => {
+    const markup = renderInfoDisclosure({ id: "beginner-info", label: "More information about Beginner", content: "A compact introduction." });
+
+    expect(markup).toContain('class="info-disclosure"');
+    expect(markup).toContain('<summary aria-label="More information about Beginner" title="More information about Beginner">i</summary>');
+    expect(markup).toContain('<div class="info-disclosure__content">A compact introduction.</div>');
   });
 
   it("uses a shared labelled select control for compact settings", () => {
