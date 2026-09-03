@@ -4,14 +4,14 @@ import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-700.css";
 import "@fontsource/roboto-slab/latin-600.css";
 import "@fontsource/roboto-slab/latin-700.css";
-import { answerFromBoard, boardProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
+import { answerFromBoard, boardSolveProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
 import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
-import { completeCourse, loadProgress, saveProgress, shouldAdvanceProgress } from "./progress";
+import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderGridCard, renderGridCell, renderStatus } from "./ui";
+import { gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
 import mascotUrl from "./brand/tako-bako-mascot-512.png";
 import markUrl from "./brand/tako-bako-mark-512.png";
 
@@ -22,7 +22,7 @@ const root = app;
 let puzzle: Puzzle | null = null;
 let board: Board = {};
 let loading = false;
-let message = "Choose a challenge when you are ready.";
+let message = "Choose your next puzzle when you are ready.";
 let difficultyUnavailable = false;
 let undoStack: Board[] = [];
 let assist = localStorage.getItem("tako-bako.assist") === "on";
@@ -37,6 +37,7 @@ let activeGridId: string | undefined;
 let usedClueIds = new Set<string>();
 let pendingResetGridId: string | undefined;
 let pendingNewChallenge = false;
+let pendingProgressReset = false;
 let pendingCelebration = false;
 let resetReturnFocusSelector: string | undefined;
 let cluesOpen = !window.matchMedia("(max-width: 860px)").matches;
@@ -122,7 +123,7 @@ let currentFetchId = 0;
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
   loading = true;
   difficultyUnavailable = false;
-  message = "Sensei is arranging the puzzle tiles…";
+  message = "Tako is setting the puzzle tiles…";
   const fetchId = ++currentFetchId;
   render();
   try {
@@ -249,7 +250,7 @@ async function checkAnswer(): Promise<void> {
     return;
   }
   loading = true;
-  message = "Sensei is checking your deductions…";
+  message = "Tako is checking your deductions…";
   render();
   try {
     const result = await fetch("/api/puzzle", {
@@ -319,22 +320,32 @@ function renderNewChallengeModal(): string {
   return `<div class="modal-backdrop">${renderDialog({ id: "new-challenge", eyebrow: "New challenge", title: "Leave this puzzle?", description: "Your marks are saved, but you will start a different puzzle.", actions: `${renderButton({ id: "cancel-new-challenge", label: "Keep solving" })}${renderButton({ id: "confirm-new-challenge", label: "Start new challenge", variant: "primary" })}` })}</div>`;
 }
 
+function renderProgressResetModal(): string {
+  if (!pendingProgressReset) return "";
+  return `<div class="modal-backdrop">${renderDialog({ id: "reset-progress", eyebrow: "Puzzle Challenge progress", title: "Reset your route through the dojo?", description: "This relocks Puzzle Challenge levels and returns you to Beginner Level 1. Saved boards and shared puzzle links stay untouched.", actions: `${renderButton({ id: "cancel-progress-reset", label: "Keep my progress" })}${renderButton({ id: "confirm-progress-reset", label: "Reset progress", variant: "danger" })}` })}</div>`;
+}
+
 function renderMascotNote({ title, copy, mood = "ready" }: { title: string; copy: string; mood?: "ready" | "celebrate" }): string {
-  return `<aside class="mascot-note mascot-note--${mood}" aria-label="Tako Bako note"><img src="${mascotUrl}" alt="Tako Bako mascot"><div><p class="eyebrow">Tako Bako says</p><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div></aside>`;
+  return `<aside class="mascot-note mascot-note--${mood}" aria-label="A note from Tako"><img src="${mascotUrl}" alt="Tako, the Tako Bako mascot"><div><p class="eyebrow">A note from Tako</p><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div></aside>`;
 }
 
 function renderCelebrationModal(): string {
   if (!pendingCelebration) return "";
   const next = playMode === "challenge" ? nextCourse(activeCourse) : undefined;
   const title = playMode === "challenge" ? "A fresh stamp for your book!" : "Puzzle solved!";
-  const copy = next ? `${next.label} is ready whenever you are.` : playMode === "challenge" ? "Your Puzzle Challenge course is complete. Wonderful work!" : "Your deductions were spot on. Share the puzzle or try a new one.";
+  const copy = next ? `${next.label} is ready when you are.` : playMode === "challenge" ? "Your Puzzle Challenge route is complete. Omedetou!" : "Every match is in place. Share this puzzle or start another.";
   const actions = next ? `${renderButton({ id: "celebration-close", label: "Keep exploring" })}${renderButton({ id: "celebration-continue", label: `Start ${next.label}`, variant: "primary" })}` : renderButton({ id: "celebration-close", label: "Keep exploring", variant: "primary" });
-  return `<div class="modal-backdrop celebration-backdrop">${renderDialog({ id: "celebration", className: "celebration-dialog", eyebrow: "Solved!", title, description: copy, content: renderMascotNote({ title: "Excellent deduction!", copy: "A little focus, a little logic, and every tile found its place.", mood: "celebrate" }), actions })}</div>`;
+  return `<div class="modal-backdrop celebration-backdrop">${renderDialog({ id: "celebration", className: "celebration-dialog", eyebrow: "Solved!", title, description: copy, content: renderMascotNote({ title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" }), actions })}</div>`;
+}
+
+function renderProgressManagement(): string {
+  const completed = progress.completed.length;
+  return `<section class="progress-management" aria-label="Puzzle Challenge progress"><div><p class="eyebrow">Your progress</p><strong>${completed} of 12 levels complete</strong><p>Reset your route without erasing saved boards.</p></div>${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</section>`;
 }
 
 function renderChallengeOptions(): string {
   if (!challengeOptionsOpen) return "";
-  const content = `${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id, showHeading: false })}<div class="challenge-extras"><p>Today’s Puzzle Challenge uses your current course level and can unlock the next one.</p>${renderButton({ id: "daily-puzzle", label: "Play today’s challenge", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div>`;
+  const content = `${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id, showHeading: false })}<div class="challenge-extras"><p>Today’s Puzzle Challenge follows your current level and can unlock the next one.</p>${renderButton({ id: "daily-puzzle", label: "Play today’s puzzle", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div>${renderProgressManagement()}`;
   return `<div class="modal-backdrop course-menu-backdrop">${renderDialog({ id: "challenge-menu-dialog", className: "course-dialog", eyebrow: "Your route through the dojo", title: "Puzzle Challenge", description: "Complete each level to unlock the next.", content, actions: `${renderButton({ id: "close-challenge-menu", label: "Close" })}` })}</div>`;
 }
 
@@ -346,10 +357,10 @@ function renderPuzzle(current: Puzzle): string {
   activeGridId = activeCategory.id;
   const grids = categories.map(category => boardGrid(category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
-  const progress = boardProgress(board, current.spec);
+  const progress = boardSolveProgress(board, current.spec);
   const title = playMode === "challenge" ? activeCourse.label : current.spec.title;
   const courseLabel = playMode === "challenge" ? `${activeCourse.tier[0]!.toUpperCase()}${activeCourse.tier.slice(1)} · Level ${activeCourse.level}` : `Shared · Level ${current.difficulty.level}`;
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ marked: progress.marked, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
+  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
 }
 
 function renderLandingAction(): string {
@@ -358,7 +369,8 @@ function renderLandingAction(): string {
 }
 
 function render(): void {
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Course", expanded: challengeOptionsOpen })}<details class="action-menu"><summary>Actions</summary><div>${renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? `Restart ${activeCourse.label}` : "New shared puzzle", variant: "secondary", disabled: loading })}</div></details></div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba logic dojo</p><h1>A small puzzle.<br>A satisfying solve.</h1><p>Work through a clear course of logic puzzles, from your first mark to advanced multi-grid deduction.</p>${renderStatus({ message, tone: difficultyUnavailable || message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderLandingAction()}${renderMascotNote({ title: "Ready for a tiny triumph?", copy: "Start with one thoughtful mark. I’ll be cheering from the dojo shelf." })}</section>${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}</main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}`;
+  const actionMenu = renderDisclosure({ className: "action-menu", summary: "Actions", content: `${renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? `Restart ${activeCourse.label}` : "New shared puzzle", variant: "secondary", disabled: loading })}` });
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Course", expanded: challengeOptionsOpen })}${actionMenu}</div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear route from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message, tone: difficultyUnavailable || message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderLandingAction()}${renderMascotNote({ title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." })}</section><div class="landing-route">${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}${renderProgressManagement()}</div></main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}${renderProgressResetModal()}`;
 }
 
 function focusGridCell(key: string): void {
@@ -390,13 +402,13 @@ function updateBoardView(previous: Board, current: Puzzle): void {
     const symbol = cell.querySelector("span");
     if (symbol) symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
   }
-  const progress = boardProgress(board, current.spec);
+  const progress = boardSolveProgress(board, current.spec);
   const progressElement = root.querySelector<HTMLElement>(".progress");
-  if (progressElement) progressElement.textContent = `${progress.marked} / ${progress.total} possibilities noted`;
+  if (progressElement) progressElement.textContent = `${progress.matches} / ${progress.total} matches placed`;
   const readinessMeter = root.querySelector<HTMLElement>(".readiness-meter");
-  if (readinessMeter) readinessMeter.setAttribute("aria-label", `${progress.marked} of ${progress.total} possibilities noted`);
+  if (readinessMeter) readinessMeter.setAttribute("aria-label", `${progress.matches} of ${progress.total} matches placed`);
   const readinessFill = root.querySelector<HTMLElement>(".readiness-meter__bar > span");
-  if (readinessFill) readinessFill.style.width = `${Math.round((progress.marked / progress.total) * 100)}%`;
+  if (readinessFill) readinessFill.style.width = `${progress.total === 0 ? 0 : Math.round((progress.matches / progress.total) * 100)}%`;
   const check = root.querySelector<HTMLButtonElement>("#check-solution");
   if (check) check.disabled = loading || !current.puzzleToken || !answerFromBoard(board, current.spec);
   const undo = root.querySelector<HTMLButtonElement>("#undo");
@@ -445,6 +457,38 @@ root.addEventListener("click", event => {
     pendingNewChallenge = false;
     render();
     root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
+  }
+  if (button.id === "open-progress-reset") {
+    pendingProgressReset = true;
+    render();
+    root.querySelector<HTMLButtonElement>("#cancel-progress-reset")?.focus();
+    return;
+  }
+  if (button.id === "cancel-progress-reset") {
+    pendingProgressReset = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
+    return;
+  }
+  if (button.id === "confirm-progress-reset") {
+    currentFetchId += 1;
+    loading = false;
+    difficultyUnavailable = false;
+    progress = resetProgress();
+    saveProgress(localStorage, progress);
+    activeCourse = firstAvailableCourse(progress.completed);
+    ({ templateId, difficultyLevel } = puzzleParametersForCourse(activeCourse));
+    puzzle = null;
+    board = {};
+    undoStack = [];
+    usedClueIds = new Set();
+    playMode = "challenge";
+    challengeOptionsOpen = false;
+    pendingProgressReset = false;
+    window.history.pushState({}, "", window.location.pathname);
+    message = "Your dojo route has been reset. Beginner Level 1 is ready.";
+    render();
+    return;
   }
   if (button.id === "confirm-new-challenge") {
     pendingNewChallenge = false;
@@ -545,7 +589,7 @@ root.addEventListener("keydown", event => {
     }
     return;
   }
-  if (pendingResetGridId || pendingNewChallenge) {
+  if (pendingResetGridId || pendingNewChallenge || pendingProgressReset) {
     if (event.key === "Escape") {
       event.preventDefault();
       if (pendingResetGridId) dismissResetDialog();
@@ -554,10 +598,16 @@ root.addEventListener("keydown", event => {
         render();
         root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
       }
+      if (pendingProgressReset) {
+        pendingProgressReset = false;
+        render();
+        root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
+      }
       return;
     }
     if (event.key === "Tab") {
-      const dialog = root.querySelector<HTMLDialogElement>(pendingResetGridId ? "#reset-grid" : "#new-challenge");
+      const dialogId = pendingResetGridId ? "#reset-grid" : pendingNewChallenge ? "#new-challenge" : "#reset-progress";
+      const dialog = root.querySelector<HTMLDialogElement>(dialogId);
       const focusable = [...(dialog?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") ?? [])];
       if (focusable.length > 0) {
         const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
