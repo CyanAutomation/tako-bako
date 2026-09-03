@@ -5,16 +5,16 @@ describe("puzzle UI sections", () => {
   it("composes the puzzle heading and board toolbar from shared primitives", () => {
     expect(renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" })).toContain('<h1>Tournament Order</h1>');
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, assist: true });
-    expect(toolbar).toContain('2 / 4 matches placed');
+    expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
-    expect(toolbar).toContain('Place one match in every row and column to check.');
+    expect(toolbar).toContain('Find one match in every row and column, then check your solution.');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
-    expect(toolbar).toContain('Fill rule-outs: on');
+    expect(toolbar).toContain('Auto elimination: on');
     expect(toolbar).toContain('class="board-state-controls"');
     expect(toolbar).toContain('class="readiness-meter"');
-    expect(toolbar).toContain('aria-label="2 of 4 matches placed"');
+    expect(toolbar).toContain('aria-label="2 of 4 matches found"');
   });
 
   it("composes workspace and clues without page-level markup", () => {
@@ -27,13 +27,14 @@ describe("puzzle UI sections", () => {
     const markup = renderCluePanel({ clues, activeCategory: { id: "club", label: "Club", values: ["Lions", "Wolves"] }, cluesOpen: true, usedClueIds: new Set(["two"]), clueFilter: "remaining" });
 
     expect(markup).toContain('data-clue-filter="remaining"');
+    expect(markup).toContain('>Unmarked</button>');
     expect(markup).toContain('Mark clue 1 as used');
     expect(markup).not.toContain('Mark clue 2 as unused');
   });
 
   it("renders the Puzzle Challenge path with stateful tiles and compact tier information", () => {
     const markup = renderCurriculum({ completed: new Set(["beginner-1"]), currentCourseId: "beginner-2" });
-    expect(markup).toContain('Puzzle Challenge');
+    expect(markup).toContain('Your Puzzle Challenge');
     expect(markup).toContain('data-course="beginner-1"');
     expect(markup).toContain('data-course="beginner-2"');
     expect(markup).toMatch(/course--locked[\s\S]*disabled[\s\S]*data-course="beginner-3"/);

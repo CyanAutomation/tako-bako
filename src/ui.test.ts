@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -59,6 +59,16 @@ describe("shared UI primitives", () => {
     const labelledIconButton = renderButton({ id: "assist", label: "Auto-eliminate: on", icon: "sparkle", iconPlacement: "start", pressed: true });
     expect(labelledIconButton).toContain('class="button button--with-icon button--secondary"');
     expect(labelledIconButton).toContain('<span>Auto-eliminate: on</span>');
+  });
+
+  it("renders each Puzzle Challenge level through one stateful card primitive", () => {
+    const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "locked" });
+
+    expect(markup).toContain('class="course course--locked"');
+    expect(markup).toContain('data-course="beginner-2"');
+    expect(markup).toContain('aria-label="Beginner Level 2, locked"');
+    expect(markup).toContain('disabled');
+    expect(markup).toContain('>Locked</span>');
   });
 
   it("renders typed state and data attributes without a raw attribute string", () => {
