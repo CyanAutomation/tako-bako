@@ -55,6 +55,12 @@ export interface DisclosureOptions {
   open?: boolean;
 }
 
+export interface InfoDisclosureOptions {
+  id: string;
+  label: string;
+  content: string;
+}
+
 export interface SelectOptions {
   id: string;
   label: string;
@@ -170,6 +176,11 @@ export function renderDialog({ id, eyebrow, title, description, content, actions
 /** A consistent expandable shell for secondary controls and supporting panels. */
 export function renderDisclosure({ className, summary, content, open = false }: DisclosureOptions): string {
   return `<details class="disclosure ${escapeHtml(className)}"${open ? " open" : ""}><summary>${summary}</summary><div class="disclosure-content">${content}</div></details>`;
+}
+
+/** A compact native disclosure for optional explanatory copy beside a heading. */
+export function renderInfoDisclosure({ id, label, content }: InfoDisclosureOptions): string {
+  return `<details id="${escapeHtml(id)}" class="info-disclosure"><summary aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}">i</summary><div class="info-disclosure__content">${content}</div></details>`;
 }
 
 /** A reusable native select with a visible label for compact configuration controls. */
