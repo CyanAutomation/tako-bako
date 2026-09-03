@@ -90,6 +90,22 @@ function forwardUpstreamRequestId(upstream: Response, response: VercelResponse):
   if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
 }
 
+async function forwardDifficultyUnavailable(upstream: Response, response: VercelResponse, startedAt: number): Promise<boolean> {
+  if (upstream.status !== 422 || !isJson(upstream)) return false;
+  let body: unknown;
+  try {
+    body = await upstream.json();
+  } catch {
+    return false;
+  }
+  const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
+  if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
+  response.setHeader("cache-control", "no-store");
+  response.status(422).json({ code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle." });
+  logMetric("generate", "difficulty_unavailable", 422, startedAt);
+  return true;
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET" && request.method !== "POST") {
     response.setHeader("allow", "GET, POST");
@@ -150,6 +166,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);
     if (await forwardRateLimit(upstream, response, "generate", startedAt)) return;
+    if (await forwardDifficultyUnavailable(upstream, response, startedAt)) return;
     if (!upstream.ok) {
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
       logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
