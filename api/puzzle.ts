@@ -92,13 +92,14 @@ function forwardUpstreamRequestId(upstream: Response, response: VercelResponse):
 
 async function forwardDifficultyUnavailable(upstream: Response, response: VercelResponse, startedAt: number): Promise<boolean> {
   if (upstream.status !== 422 || !isJson(upstream)) return false;
+  let body: unknown;
   try {
-    const body: unknown = await upstream.json();
-    const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
-    if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
+    body = await upstream.json();
   } catch {
     return false;
   }
+  const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
+  if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
   response.setHeader("cache-control", "no-store");
   response.status(422).json({ code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle." });
   logMetric("generate", "difficulty_unavailable", 422, startedAt);
