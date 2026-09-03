@@ -19,6 +19,8 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 Three scenarios are available: Tournament Order (a compact 4x4 warm-up), Open Division (a broader 5x5 challenge), and Championship Circuit (an expert 5x5 puzzle with three grids).
 
+The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses 1–4, Intermediate 5–8, and Advanced 9–12.
+
 ## Development
 
 Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layers.
