@@ -156,8 +156,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
-  if (difficultyLevel !== undefined && !/^[1-5]$/.test(difficultyLevel)) {
-    response.status(400).json({ error: "A difficulty level from 1 to 5 is required" });
+  if (difficultyLevel !== undefined && !/^(?:[1-9]|1[0-2])$/.test(difficultyLevel)) {
+    response.status(400).json({ error: "A difficulty level from 1 to 12 is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }

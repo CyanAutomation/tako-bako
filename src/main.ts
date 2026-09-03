@@ -79,7 +79,7 @@ function seedFromUrl(): string | undefined {
 
 function difficultyFromUrl(): number | undefined {
   const level = new URL(window.location.href).searchParams.get("difficulty");
-  return level && /^[1-5]$/.test(level) ? Number(level) : undefined;
+  return level && /^(?:[1-9]|1[0-2])$/.test(level) ? Number(level) : undefined;
 }
 
 function templateFromUrl(): ScenarioId {

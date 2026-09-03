@@ -109,11 +109,11 @@ describe("puzzle proxy", () => {
     vi.stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
 
-    await handler({ method: "GET", query: { seed: "champion-day", templateId: "championship-circuit-v2", difficultyLevel: "5" } } as never, response as never);
+    await handler({ method: "GET", query: { seed: "champion-day", templateId: "championship-circuit-v2", difficultyLevel: "12" } } as never, response as never);
 
     expect(result.statusCode).toBe(200);
     expect(upstream).toHaveBeenCalledWith(
-      "https://yokaiba.scheimann.workers.dev/v1/puzzles/generate?templateId=championship-circuit-v2&seed=champion-day&difficultyLevel=5",
+      "https://yokaiba.scheimann.workers.dev/v1/puzzles/generate?templateId=championship-circuit-v2&seed=champion-day&difficultyLevel=12",
       expect.anything(),
     );
   });
