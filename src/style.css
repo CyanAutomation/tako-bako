@@ -410,9 +410,9 @@ main:not(.landing-state) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.85rem;
+  gap: 1rem;
   margin-bottom: 0.85rem;
-  padding: 0.55rem;
+  padding: 0.7rem 0.8rem;
   background: var(--surface);
   border: var(--border);
 }
@@ -446,10 +446,21 @@ main:not(.landing-state) {
 .grid-picker {
   display: none;
 }
-.grid-tabs {
+.grid-navigation {
   display: flex;
+  align-items: stretch;
   gap: 0.35rem;
   margin-bottom: 0.75rem;
+}
+.grid-navigation > .button--icon {
+  flex: 0 0 auto;
+  align-self: stretch;
+  height: auto;
+}
+.grid-tabs {
+  display: flex;
+  flex: 1;
+  gap: 0.35rem;
   padding: 0.2rem 0;
   overflow-x: auto;
 }
@@ -457,8 +468,8 @@ main:not(.landing-state) {
   flex: 1 0 max-content;
   padding: 0.55rem 0.75rem;
   color: var(--navy);
-  background: var(--surface);
-  border: 2px solid var(--line);
+  background: transparent;
+  border: 1px solid var(--line);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -468,38 +479,38 @@ main:not(.landing-state) {
   border-color: var(--ink);
   box-shadow: 2px 2px 0 var(--rust);
 }
-.legend {
+.legend.legend--quiet {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
   margin: 0 0 0.75rem;
-  color: var(--navy);
+  color: var(--muted);
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
 }
-.legend-mark {
+.legend--quiet .legend-mark {
   display: inline-grid;
   width: 1.2rem;
   height: 1.2rem;
   place-items: center;
   margin-left: 0.15rem;
-  border: var(--border);
-  font-size: 1rem;
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
   line-height: 1;
 }
-.legend-mark.yes {
+.legend--quiet .legend-mark.yes {
   color: var(--jade);
   background: var(--jade-light);
 }
-.legend-mark.no {
+.legend--quiet .legend-mark.no {
   color: var(--paper);
   background: var(--rust);
 }
-.legend-mark.unknown {
+.legend--quiet .legend-mark.unknown {
   background: var(--paper);
 }
-.legend-tip {
+.legend--quiet .legend-tip {
   margin-left: 0.2rem;
   color: var(--muted);
 }
@@ -521,15 +532,15 @@ main:not(.landing-state) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.85rem;
+  gap: 1rem;
   color: var(--paper);
   background: var(--navy);
   border-bottom: var(--heavy);
 }
 .grid-card h3 {
   margin: 0;
-  padding: 0.7rem 0.85rem;
-  font-size: 0.85rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
 }
 .grid-card h3 span {
   color: var(--gold);
@@ -618,10 +629,10 @@ td {
 .clues {
   position: sticky;
   top: 1rem;
-  background: var(--paper);
-  border: var(--heavy);
+  background: color-mix(in srgb, var(--paper) 88%, var(--surface));
+  border: 2px solid var(--line);
   border-radius: var(--panel-radius);
-  box-shadow: var(--card-shadow);
+  box-shadow: 2px 2px 0 #17222e40;
 }
 .clue-drawer > summary {
   display: none;
@@ -1184,24 +1195,28 @@ footer {
   border-top: 2px solid var(--line);
 }
 
-/* Shared state controls: reversible actions are grouped; completion remains distinct. */
-.board-state-controls {
+/* Fixed board-action hierarchy: utility → toggle → primary. Reset uses utility too. */
+.board-actions {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.18rem;
-  background: var(--jade-light);
-  border: var(--border);
+  gap: 0.45rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid color-mix(in srgb, var(--line) 58%, transparent);
 }
-.board-state-controls .button--icon {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+.board-actions .button--icon {
+  width: 2.5rem;
+  height: 2.5rem;
 }
-.board-state-controls .button--icon:hover:not(:disabled) {
-  color: var(--ink);
+.board-actions [data-action-role="utility"],
+.grid-card-controls [data-action-role="utility"] {
+  color: var(--navy);
   background: var(--paper);
-  border-color: var(--ink);
+}
+.board-actions [data-action-role="toggle"] {
+  border-color: var(--jade);
+}
+.board-actions [data-action-role="primary"] {
+  box-shadow: 3px 3px 0 var(--rust);
 }
 .clue-filters {
   display: flex;
@@ -1647,12 +1662,9 @@ footer {
 .course--locked .course-state {
   color: #756b54;
 }
-.clues li.is-related {
-  margin-inline: -0.4rem;
-  padding: 0.3rem 0.4rem;
-  background: color-mix(in srgb, var(--jade-light) 55%, var(--paper));
-  border-left: 3px solid var(--jade);
-  border-radius: var(--control-radius);
+.clues .clue-item--related {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 @media (max-width: 760px) {
@@ -1688,7 +1700,10 @@ footer {
   .check-hint {
     max-width: none;
   }
-  .clues li.is-related {
-    margin-inline: -0.2rem;
+  .board-actions {
+    padding-left: 0.65rem;
+  }
+  .grid-card h3 {
+    padding: 0.7rem 0.75rem;
   }
 }
