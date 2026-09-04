@@ -22,8 +22,11 @@ describe("shared UI primitives", () => {
     const markup = renderTabs(tabs, "weight");
 
     expect(markup).toContain('class="grid-picker"');
+    expect(markup).toContain('class="grid-navigation"');
     expect(markup).toContain('class="grid-tabs"');
-    expect(markup).not.toContain("hidden");
+    expect(markup).toContain('id="previous-grid"');
+    expect(markup).toContain('id="next-grid"');
+    expect(markup).not.toContain(" hidden");
   });
 
   it("moves through tabs with the standard arrow, Home, and End keys", () => {

@@ -303,7 +303,7 @@ function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle[
     label: `${base.label} × ${category.label}`,
     active: category.id === activeGridId,
     locked: false,
-    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "reset", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id } }),
+    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "reset", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id, actionRole: "utility" } }),
     content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
   });
 }
@@ -528,6 +528,12 @@ root.addEventListener("click", event => {
   }
   if (button.dataset.gridTab) {
     selectGrid(button.dataset.gridTab);
+  }
+  if (button.dataset.gridDirection && puzzle) {
+    const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
+    const nextGridId = nextTabId(categories, activeGridId ?? "", button.dataset.gridDirection === "next" ? "ArrowRight" : "ArrowLeft");
+    if (nextGridId) selectGrid(nextGridId, true);
+    return;
   }
   if (button.dataset.gridReset) {
     openResetDialog(button.dataset.gridReset, button.id);
