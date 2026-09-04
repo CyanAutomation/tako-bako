@@ -21,7 +21,7 @@ export interface ButtonOptions {
 }
 
 /** Icons belong to one small rounded-stroke family so browser emoji never leak into the UI. */
-export type IconName = "share" | "undo" | "reset" | "lock" | "unlock" | "check" | "sparkle";
+export type IconName = "share" | "undo" | "reset" | "lock" | "unlock" | "check" | "sparkle" | "arrow-left" | "arrow-right";
 
 const iconPaths: Record<IconName, string> = {
   share: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
@@ -31,6 +31,8 @@ const iconPaths: Record<IconName, string> = {
   unlock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M16 10V7a4 4 0 0 0-7-2.7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   sparkle: '<path d="m12 3 .8 5.2L18 9l-5.2.8L12 15l-.8-5.2L6 9l5.2-.8L12 3Z"/><path d="m19 15 .4 2.6L22 18l-2.6.4L19 21l-.4-2.6L16 18l2.6-.4L19 15Z"/>',
+  "arrow-left": '<path d="m14 5-7 7 7 7"/><path d="M7 12h11"/>',
+  "arrow-right": '<path d="m10 5 7 7-7 7"/><path d="M17 12H6"/>',
 };
 
 export function renderIcon(icon: IconName): string {
@@ -210,7 +212,12 @@ export function renderGridCard({ id, label, active, locked, controls, content }:
 /** Renders a complete ARIA tablist with roving tab focus. */
 export function renderTabs(tabs: TabItem[], activeId: string): string {
   const buttons = tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
-  return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>`;
+  const activeIndex = tabs.findIndex(tab => tab.id === activeId);
+  const previous = activeIndex > 0 ? tabs[activeIndex - 1] : undefined;
+  const next = activeIndex >= 0 ? tabs[activeIndex + 1] : undefined;
+  const previousButton = renderButton({ id: "previous-grid", label: "Previous grid", ariaLabel: previous ? `Show ${previous.label} grid` : "No previous grid", icon: "arrow-left", disabled: !previous, data: { gridDirection: "previous" } });
+  const nextButton = renderButton({ id: "next-grid", label: "Next grid", ariaLabel: next ? `Show ${next.label} grid` : "No next grid", icon: "arrow-right", disabled: !next, data: { gridDirection: "next" } });
+  return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-navigation">${previousButton}<div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>${nextButton}</div>`;
 }
 
 /** Returns the next tab for the ARIA tab keyboard commands, wrapping at either end. */
