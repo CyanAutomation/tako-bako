@@ -95,10 +95,21 @@ describe("parsePuzzle", () => {
     })).toThrow("invalid puzzle response");
   });
 
-  it("rejects a difficulty outside the supported range", () => {
+  it("accepts the full Yokaiba 1–12 difficulty scale", () => {
+    expect(parsePuzzle({
+      id: "advanced", seed: "advanced", clues: [],
+      difficulty: { level: 12, label: "Expert", modelVersion: "v4" },
+      spec: { id: "advanced", title: "Advanced", baseCategory: "person", categories: [
+        { id: "person", label: "Person", values: ["A", "B"] },
+        { id: "colour", label: "Colour", values: ["Red", "Blue"] },
+      ] },
+    }).difficulty.level).toBe(12);
+  });
+
+  it("rejects a difficulty outside the supported Yokaiba range", () => {
     expect(() => parsePuzzle({
       id: "bad-difficulty", seed: "bad-difficulty", clues: [],
-      difficulty: { level: 6, label: "Impossible", modelVersion: "v1" },
+      difficulty: { level: 13, label: "Impossible", modelVersion: "v1" },
       spec: { id: "test", title: "Test", baseCategory: "judoka", categories: [
         { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
         { id: "club", label: "Club", values: ["Lions", "Wolves"] },

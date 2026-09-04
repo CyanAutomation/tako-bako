@@ -90,6 +90,26 @@ function forwardUpstreamRequestId(upstream: Response, response: VercelResponse):
   if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
 }
 
+function forwardEtag(upstream: Response, response: VercelResponse): void {
+  const etag = upstream.headers.get("etag");
+  if (etag) response.setHeader("etag", etag);
+}
+
+/** Preserve standard quota signals when Yokaiba can provide them. */
+function forwardRateLimitHeaders(upstream: Response, response: VercelResponse): void {
+  for (const header of ["ratelimit-limit", "ratelimit-policy", "ratelimit-remaining", "ratelimit-reset"]) {
+    const value = upstream.headers.get(header);
+    if (value) response.setHeader(header, value);
+  }
+}
+
+function availableDifficultyLevels(body: unknown): number[] | undefined {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const levels = (body as Record<string, unknown>).availableDifficultyLevels;
+  if (!Array.isArray(levels) || !levels.every(level => typeof level === "number" && Number.isInteger(level) && level >= 1 && level <= 12)) return undefined;
+  return [...new Set(levels)].sort((left, right) => left - right);
+}
+
 async function forwardDifficultyUnavailable(upstream: Response, response: VercelResponse, startedAt: number): Promise<boolean> {
   if (upstream.status !== 422 || !isJson(upstream)) return false;
   let body: unknown;
@@ -102,7 +122,11 @@ async function forwardDifficultyUnavailable(upstream: Response, response: Vercel
   const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
   if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
   response.setHeader("cache-control", "no-store");
-  response.status(422).json({ code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle." });
+  response.status(422).json({
+    code: "difficulty_unavailable",
+    error: "This seed cannot produce the selected difficulty. Try another puzzle.",
+    ...(availableDifficultyLevels(body) ? { availableDifficultyLevels: availableDifficultyLevels(body) } : {}),
+  });
   logMetric("generate", "difficulty_unavailable", 422, startedAt);
   return true;
 }
@@ -128,6 +152,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
         body: JSON.stringify(completion),
       });
       forwardUpstreamRequestId(upstream, response);
+      forwardRateLimitHeaders(upstream, response);
       if (await forwardRateLimit(upstream, response, "verify", startedAt)) return;
       if (!upstream.ok || !isJson(upstream)) {
         response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
@@ -166,6 +191,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
     if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);
+    forwardEtag(upstream, response);
+    forwardRateLimitHeaders(upstream, response);
     if (await forwardRateLimit(upstream, response, "generate", startedAt)) return;
     if (await forwardDifficultyUnavailable(upstream, response, startedAt)) return;
     if (!upstream.ok) {

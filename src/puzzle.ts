@@ -40,7 +40,7 @@ export function parsePuzzle(value: unknown): Puzzle {
   }
   const { difficulty, spec } = value;
   const level = difficulty.level;
-  if (typeof level !== "number" || !Number.isInteger(level) || level < 1 || level > 5 || typeof difficulty.label !== "string" || difficulty.label.length === 0 || difficulty.label.length > MAX_TEXT_LENGTH || typeof difficulty.modelVersion !== "string" || difficulty.modelVersion.length === 0 || difficulty.modelVersion.length > MAX_TEXT_LENGTH || typeof spec.id !== "string" || spec.id.length === 0 || spec.id.length > MAX_TEXT_LENGTH || typeof spec.title !== "string" || spec.title.length === 0 || spec.title.length > MAX_TEXT_LENGTH || typeof spec.baseCategory !== "string" || spec.baseCategory.length === 0 || spec.baseCategory.length > MAX_TEXT_LENGTH || !Array.isArray(spec.categories) || spec.categories.length < 2 || spec.categories.length > MAX_CATEGORIES) {
+  if (typeof level !== "number" || !Number.isInteger(level) || level < 1 || level > 12 || typeof difficulty.label !== "string" || difficulty.label.length === 0 || difficulty.label.length > MAX_TEXT_LENGTH || typeof difficulty.modelVersion !== "string" || difficulty.modelVersion.length === 0 || difficulty.modelVersion.length > MAX_TEXT_LENGTH || typeof spec.id !== "string" || spec.id.length === 0 || spec.id.length > MAX_TEXT_LENGTH || typeof spec.title !== "string" || spec.title.length === 0 || spec.title.length > MAX_TEXT_LENGTH || typeof spec.baseCategory !== "string" || spec.baseCategory.length === 0 || spec.baseCategory.length > MAX_TEXT_LENGTH || !Array.isArray(spec.categories) || spec.categories.length < 2 || spec.categories.length > MAX_CATEGORIES) {
     throw new Error("invalid puzzle response");
   }
   const clues = value.clues.map(clue => {
