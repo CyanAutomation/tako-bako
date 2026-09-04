@@ -11,14 +11,19 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('Find one match in every row and column, then check your solution.');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
-    expect(toolbar).toContain('Auto elimination: on');
-    expect(toolbar).toContain('class="board-state-controls"');
+    expect(toolbar).toContain('aria-label="Auto elimination: on"');
+    expect(toolbar).toContain('class="board-actions"');
+    expect(toolbar).toContain('data-action-role="utility"');
+    expect(toolbar).toContain('data-action-role="toggle"');
+    expect(toolbar).toContain('data-action-role="primary"');
     expect(toolbar).toContain('class="readiness-meter"');
     expect(toolbar).toContain('aria-label="2 of 4 matches found"');
   });
 
   it("composes workspace and clues without page-level markup", () => {
-    expect(renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" })).toContain('aria-label="Logic grids"');
+    const workspace = renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" });
+    expect(workspace).toContain('aria-label="Logic grids"');
+    expect(workspace).toContain('class="legend legend--quiet"');
     expect(renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" })).toContain('Mark clue 1 as unused');
   });
 
@@ -30,6 +35,7 @@ describe("puzzle UI sections", () => {
     expect(markup).toContain('>Unmarked</button>');
     expect(markup).toContain('Mark clue 1 as used');
     expect(markup).not.toContain('Mark clue 2 as unused');
+    expect(markup).toContain('class="clue-item clue-item--related"');
   });
 
   it("renders the Puzzle Challenge path with stateful tiles and compact tier information", () => {
