@@ -87,7 +87,7 @@ describe("puzzle proxy", () => {
 
   it("caches deterministic generated puzzles at the CDN", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "dojo-day" }), {
-      status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123" },
+      status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123", etag: '"yokaiba-v1-cached"' },
     })));
     const { response, result } = responseRecorder();
 
@@ -100,6 +100,7 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("x-tako-bako-cache-policy")).toBe("edge-5m-swr-1h");
     expect(result.headers.get("server-timing")).toMatch(/^yokaiba;dur=\d+$/);
     expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-generate-123");
+    expect(result.headers.get("etag")).toBe('"yokaiba-v1-cached"');
   });
 
   it("forwards an allowlisted expanded template to Yokaiba", async () => {
@@ -153,7 +154,7 @@ describe("puzzle proxy", () => {
 
   it("forwards rate limits enforced by Yokaiba", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Slow down" }), {
-      status: 429, headers: { "content-type": "application/json", "retry-after": "30" },
+      status: 429, headers: { "content-type": "application/json", "retry-after": "30", "ratelimit-limit": "60", "ratelimit-remaining": "0", "ratelimit-reset": "999" },
     })));
     const { response, result } = responseRecorder();
 
@@ -161,12 +162,15 @@ describe("puzzle proxy", () => {
 
     expect(result).toMatchObject({ statusCode: 429, body: { error: "Slow down" } });
     expect(result.headers.get("retry-after")).toBe("30");
+    expect(result.headers.get("ratelimit-limit")).toBe("60");
+    expect(result.headers.get("ratelimit-remaining")).toBe("0");
+    expect(result.headers.get("ratelimit-reset")).toBe("999");
     expect(result.headers.get("cache-control")).toBe("no-store");
   });
 
   it("preserves Yokaiba's deterministic difficulty-unavailable response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      error: { code: "difficulty_unavailable", message: "no matching strategy" },
+      error: { code: "difficulty_unavailable", message: "no matching strategy" }, availableDifficultyLevels: [1, 2, 4],
     }), {
       status: 422, headers: { "content-type": "application/json", "x-request-id": "yokaiba-difficulty-422" },
     })));
@@ -177,7 +181,7 @@ describe("puzzle proxy", () => {
 
     expect(result).toMatchObject({
       statusCode: 422,
-      body: { code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle." },
+      body: { code: "difficulty_unavailable", error: "This seed cannot produce the selected difficulty. Try another puzzle.", availableDifficultyLevels: [1, 2, 4] },
     });
     expect(result.headers.get("x-yokaiba-request-id")).toBe("yokaiba-difficulty-422");
     expect(result.headers.get("cache-control")).toBe("no-store");
