@@ -52,8 +52,10 @@ function newSeed(): string {
 }
 
 class DifficultyUnavailableError extends Error {
-  constructor() {
-    super("This seed cannot produce the selected difficulty. Try another puzzle.");
+  constructor(availableLevels: number[] = []) {
+    super(availableLevels.length
+      ? `This seed cannot produce the selected difficulty. It can make Level${availableLevels.length === 1 ? "" : "s"} ${availableLevels.join(", ")}. Try another puzzle.`
+      : "This seed cannot produce the selected difficulty. Try another puzzle.");
   }
 }
 
@@ -141,7 +143,13 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     if (!data) {
       const result = await fetch(endpoint);
       if (!result.ok) {
-        if (result.status === 422) throw new DifficultyUnavailableError();
+        if (result.status === 422) {
+          const error = await result.json().catch(() => undefined) as { availableDifficultyLevels?: unknown } | undefined;
+          const levels = Array.isArray(error?.availableDifficultyLevels) && error.availableDifficultyLevels.every(level => typeof level === "number" && Number.isInteger(level) && level >= 1 && level <= 12)
+            ? [...new Set(error.availableDifficultyLevels)].sort((left, right) => left - right)
+            : [];
+          throw new DifficultyUnavailableError(levels);
+        }
         throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
       }
       try {
