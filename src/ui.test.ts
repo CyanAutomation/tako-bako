@@ -52,7 +52,7 @@ describe("shared UI primitives", () => {
     expect(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" })).toBeUndefined();
   });
 
-  it("uses a shared button primitive that keeps icon-action labels visible by default", () => {
+  it("uses a shared button primitive for regular and custom SVG icon actions", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
     expect(iconButton).toContain('class="button button--with-icon button--secondary"');
@@ -83,12 +83,11 @@ describe("shared UI primitives", () => {
     expect(markup).toContain(">Current</span>");
   });
 
-  it("renders typed state and data attributes without a raw attribute string", () => {
-    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "lock", pressed: false, data: { gridLock: "weight" } });
+  it("exposes toggle-button state and safely encoded grid identifiers", () => {
+    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "lock", pressed: false, data: { gridLock: 'weight & "open"' } });
 
     expect(markup).toContain('aria-pressed="false"');
-    expect(markup).toContain('data-grid-lock="weight"');
-    expect(markup).not.toContain("attributes=");
+    expect(markup).toContain('data-grid-lock="weight &amp; &quot;open&quot;"');
   });
 
   it("renders a reusable accessible dialog with labelled actions", () => {
