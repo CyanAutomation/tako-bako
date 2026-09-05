@@ -8,8 +8,8 @@ export interface ButtonOptions {
   label: string;
   ariaLabel?: string;
   icon?: IconName;
-  /** Use an icon next to a visible label rather than turning the control into an icon-only button. */
-  iconPlacement?: "start";
+  /** Icon-only controls are reserved for compact, familiar navigation actions. */
+  iconOnly?: boolean;
   variant?: "primary" | "secondary" | "danger" | "assist";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
@@ -112,15 +112,15 @@ export interface LevelCardOptions {
 export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
-export function renderButton({ id, label, ariaLabel, icon, iconPlacement, variant = "secondary", disabled = false, pressed, expanded, data }: ButtonOptions): string {
-  const iconOnly = Boolean(icon && iconPlacement !== "start");
-  const classes = iconOnly ? `button button--icon button--${variant}` : icon ? `button button--with-icon button--${variant}` : `button button--${variant}`;
+export function renderButton({ id, label, ariaLabel, icon, iconOnly = false, variant = "secondary", disabled = false, pressed, expanded, data }: ButtonOptions): string {
+  const isIconOnly = Boolean(icon && iconOnly);
+  const classes = isIconOnly ? `button button--icon button--${variant}` : icon ? `button button--with-icon button--${variant}` : `button button--${variant}`;
   const idAttribute = id ? ` id="${escapeHtml(id)}"` : "";
   const accessibleName = icon ? ` aria-label="${escapeHtml(ariaLabel ?? label)}" title="${escapeHtml(label)}"` : ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : "";
   const pressedAttribute = pressed === undefined ? "" : ` aria-pressed="${pressed}"`;
   const expandedAttribute = expanded === undefined ? "" : ` aria-expanded="${expanded}"`;
   const dataAttributes = Object.entries(data ?? {}).map(([name, value]) => ` data-${name.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)}="${escapeHtml(value)}"`).join("");
-  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${expandedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `${renderIcon(icon)}${iconOnly ? "" : `<span>${escapeHtml(label)}</span>`}` : escapeHtml(label)}</button>`;
+  return `<button${idAttribute} class="${classes}"${accessibleName}${pressedAttribute}${expandedAttribute}${disabled ? " disabled" : ""}${dataAttributes}>${icon ? `${renderIcon(icon)}${isIconOnly ? "" : `<span>${escapeHtml(label)}</span>`}` : escapeHtml(label)}</button>`;
 }
 
 /** A consistent live message banner for loading, progress, and error feedback. */
@@ -172,7 +172,7 @@ export function renderBadge(label: string, className = "badge"): string {
 /** A consistent progression tile with an explicit visual and accessible state. */
 export function renderLevelCard({ courseId, label, level, state }: LevelCardOptions): string {
   const stateLabel = state === "complete" ? "Complete" : state === "current" ? "Current" : state === "available" ? "Ready" : "Locked";
-  return `<li class="course course--${state}">${renderButton({ label: String(level), ariaLabel: `${label}, ${state}`, variant: state === "current" ? "primary" : "secondary", disabled: state === "locked", data: { course: courseId } })}<span class="course-state" aria-hidden="true">${stateLabel}</span></li>`;
+  return `<li class="course course--${state}">${renderButton({ label: String(level), ariaLabel: `${label}, ${state}`, variant: state === "current" ? "primary" : "secondary", disabled: state === "locked" || state === "current", data: { course: courseId } })}<span class="course-state" aria-hidden="true">${stateLabel}</span></li>`;
 }
 
 /** Groups related controls under one accessible label. */
@@ -212,12 +212,7 @@ export function renderGridCard({ id, label, active, locked, controls, content }:
 /** Renders a complete ARIA tablist with roving tab focus. */
 export function renderTabs(tabs: TabItem[], activeId: string): string {
   const buttons = tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
-  const activeIndex = tabs.findIndex(tab => tab.id === activeId);
-  const previous = activeIndex > 0 ? tabs[activeIndex - 1] : undefined;
-  const next = activeIndex >= 0 ? tabs[activeIndex + 1] : undefined;
-  const previousButton = renderButton({ id: "previous-grid", label: "Previous grid", ariaLabel: previous ? `Show ${previous.label} grid` : "No previous grid", icon: "arrow-left", disabled: !previous, data: { gridDirection: "previous" } });
-  const nextButton = renderButton({ id: "next-grid", label: "Next grid", ariaLabel: next ? `Show ${next.label} grid` : "No next grid", icon: "arrow-right", disabled: !next, data: { gridDirection: "next" } });
-  return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-navigation">${previousButton}<div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div>${nextButton}</div>`;
+  return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-navigation"><div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div></div>`;
 }
 
 /** Returns the next tab for the ARIA tab keyboard commands, wrapping at either end. */
