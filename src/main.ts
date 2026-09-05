@@ -44,6 +44,7 @@ let cluesOpen = !window.matchMedia("(max-width: 860px)").matches;
 let clueFilter: ClueFilter = "all";
 let activeCellKey: string | undefined;
 let challengeOptionsOpen = false;
+let sharedPuzzleOpen = false;
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
@@ -172,7 +173,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     // Keep the requested seed in the URL: Yokaiba may derive a different
     // internal seed while searching for the chosen difficulty level.
     setPuzzleUrl(seed, urlMode);
-    message = "Mark each possibility: blank, yes, or no.";
+    message = "Mark each square: leave it blank, confirm a match ✓, or rule it out ×.";
   } catch (error) {
     if (fetchId !== currentFetchId) return;
     puzzle = null;
@@ -248,7 +249,7 @@ async function checkAnswer(): Promise<void> {
   if (!puzzle) return;
   const answer = answerFromBoard(board, puzzle.spec);
   if (!answer) {
-    message = "Finish one ✓ in every row and column before checking your solution.";
+    message = "Find one ✓ in each row and column before checking your deduction.";
     render();
     return;
   }
@@ -353,8 +354,15 @@ function renderProgressManagement(): string {
 
 function renderChallengeOptions(): string {
   if (!challengeOptionsOpen) return "";
-  const content = `${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id, showHeading: false })}<div class="challenge-extras"><p>Today’s puzzle follows your current level and can unlock the next one.</p>${renderButton({ id: "daily-puzzle", label: "Play today’s puzzle", disabled: loading })}<label class="seed-entry">Open a shared puzzle <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+">${renderButton({ id: "open-landing-seed", label: "Open" })}</label></div>${renderProgressManagement()}`;
+  const content = `${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id, showHeading: false })}<div class="challenge-extras"><p>Today’s puzzle matches your current level. Solve it to move forward.</p>${renderButton({ id: "daily-puzzle", label: "Play today’s puzzle", disabled: loading })}</div>`;
   return `<div class="modal-backdrop course-menu-backdrop">${renderDialog({ id: "challenge-menu-dialog", className: "course-dialog", eyebrow: "Your Puzzle Challenge", title: "Choose your next level", description: "Complete each level to unlock the next.", content, actions: `${renderButton({ id: "close-challenge-menu", label: "Close" })}` })}</div>`;
+}
+
+function renderSharedPuzzleModal(): string {
+  if (!sharedPuzzleOpen) return "";
+  const content = `<label class="seed-entry">Puzzle code <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+" autocomplete="off"></label>`;
+  const actions = `${renderButton({ id: "close-shared-puzzle", label: "Cancel" })}${renderButton({ id: "open-landing-seed", label: "Open puzzle", variant: "primary" })}`;
+  return `<div class="modal-backdrop">${renderDialog({ id: "shared-puzzle", eyebrow: "Shared puzzle", title: "Open a shared puzzle", description: "Paste the puzzle code from a friend’s link to pick up their exact challenge.", content, actions })}</div>`;
 }
 
 function renderPuzzle(current: Puzzle): string {
@@ -377,8 +385,8 @@ function renderLandingAction(): string {
 }
 
 function render(): void {
-  const actionMenu = renderDisclosure({ className: "action-menu", summary: "Actions", content: `${renderButton({ id: "share-puzzle", label: "Share puzzle", icon: "share" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? `Restart ${activeCourse.label}` : "New shared puzzle", variant: "secondary", disabled: loading })}` });
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Challenge", expanded: challengeOptionsOpen })}${actionMenu}</div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message, tone: difficultyUnavailable || message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderLandingAction()}${renderMascotNote({ title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." })}</section><div class="landing-route">${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}${renderProgressManagement()}</div></main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}${renderProgressResetModal()}`;
+  const actionMenu = renderDisclosure({ className: "action-menu", summary: "More", content: `${renderButton({ id: "open-shared-puzzle", label: "Open a shared puzzle" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? "Restart this level" : "New shared puzzle", disabled: loading })}<div class="action-menu__danger">${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</div>` });
+  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Challenge", expanded: challengeOptionsOpen })}${renderButton({ id: "share-puzzle", label: "Share", ariaLabel: "Share puzzle", icon: "share" })}${actionMenu}</div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message, tone: difficultyUnavailable || message.includes("could not") || message.includes("busy") ? "error" : "neutral" })}${renderLandingAction()}${renderMascotNote({ title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." })}</section><div class="landing-route">${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}${renderProgressManagement()}</div></main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}${renderSharedPuzzleModal()}${renderProgressResetModal()}`;
 }
 
 function focusGridCell(key: string): void {
@@ -472,6 +480,18 @@ root.addEventListener("click", event => {
     root.querySelector<HTMLButtonElement>("#cancel-progress-reset")?.focus();
     return;
   }
+  if (button.id === "open-shared-puzzle") {
+    sharedPuzzleOpen = true;
+    render();
+    root.querySelector<HTMLInputElement>("#landing-seed-input")?.focus();
+    return;
+  }
+  if (button.id === "close-shared-puzzle") {
+    sharedPuzzleOpen = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#open-shared-puzzle")?.focus();
+    return;
+  }
   if (button.id === "cancel-progress-reset") {
     pendingProgressReset = false;
     render();
@@ -529,19 +549,13 @@ root.addEventListener("click", event => {
   if (button.id === "assist-toggle") {
     assist = !assist;
     localStorage.setItem("tako-bako.assist", assist ? "on" : "off");
-    message = assist ? "Auto-elimination is on for new ✓ marks." : "Auto-elimination is off.";
+    message = assist ? "Smart marking is on. New ✓ marks will rule out the other squares in their row and column." : "Smart marking is off. You are in full control of every mark.";
     render();
     root.querySelector<HTMLButtonElement>("#assist-toggle")?.focus();
     return;
   }
   if (button.dataset.gridTab) {
     selectGrid(button.dataset.gridTab);
-  }
-  if (button.dataset.gridDirection && puzzle) {
-    const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
-    const nextGridId = nextTabId(categories, activeGridId ?? "", button.dataset.gridDirection === "next" ? "ArrowRight" : "ArrowLeft");
-    if (nextGridId) selectGrid(nextGridId, true);
-    return;
   }
   if (button.dataset.gridReset) {
     openResetDialog(button.dataset.gridReset, button.id);
@@ -563,7 +577,10 @@ root.addEventListener("click", event => {
     if (!/^[a-zA-Z0-9-]{1,128}$/.test(seed)) {
       message = "Use 1–128 letters, numbers, or hyphens for a challenge seed.";
       render();
-    } else openSharedPuzzle(seed);
+    } else {
+      sharedPuzzleOpen = false;
+      openSharedPuzzle(seed);
+    }
   }
   if (button.dataset.course) {
     const [tier, rawLevel] = button.dataset.course.split("-");
@@ -603,9 +620,14 @@ root.addEventListener("keydown", event => {
     }
     return;
   }
-  if (pendingResetGridId || pendingNewChallenge || pendingProgressReset) {
+  if (sharedPuzzleOpen || pendingResetGridId || pendingNewChallenge || pendingProgressReset) {
     if (event.key === "Escape") {
       event.preventDefault();
+      if (sharedPuzzleOpen) {
+        sharedPuzzleOpen = false;
+        render();
+        root.querySelector<HTMLButtonElement>("#open-shared-puzzle")?.focus();
+      }
       if (pendingResetGridId) dismissResetDialog();
       if (pendingNewChallenge) {
         pendingNewChallenge = false;
@@ -620,7 +642,7 @@ root.addEventListener("keydown", event => {
       return;
     }
     if (event.key === "Tab") {
-      const dialogId = pendingResetGridId ? "#reset-grid" : pendingNewChallenge ? "#new-challenge" : "#reset-progress";
+      const dialogId = sharedPuzzleOpen ? "#shared-puzzle" : pendingResetGridId ? "#reset-grid" : pendingNewChallenge ? "#new-challenge" : "#reset-progress";
       const dialog = root.querySelector<HTMLDialogElement>(dialogId);
       const focusable = [...(dialog?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") ?? [])];
       if (focusable.length > 0) {

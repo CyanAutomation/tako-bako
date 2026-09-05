@@ -8,10 +8,10 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
-    expect(toolbar).toContain('Find one match in every row and column, then check your solution.');
+    expect(toolbar).toContain('Find one match in each row and column. Then check your deduction.');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
-    expect(toolbar).toContain('aria-label="Auto elimination: on"');
+    expect(toolbar).toContain('aria-label="Smart marking: on"');
     expect(toolbar).toContain('class="board-actions"');
     expect(toolbar).toContain('data-action-role="utility"');
     expect(toolbar).toContain('data-action-role="toggle"');
@@ -52,6 +52,7 @@ describe("puzzle UI sections", () => {
     expect(markup).toContain('class="info-disclosure"');
     expect(markup).toContain('More information about Beginner');
     expect(markup).toContain('A compact 4×4 introduction to logic-grid deduction.');
+    expect(markup).toMatch(/course--current[\s\S]*disabled/);
   });
 
   it("makes the active clue context explicit with a reusable category chip", () => {
