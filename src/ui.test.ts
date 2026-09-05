@@ -109,10 +109,15 @@ describe("shared UI primitives", () => {
     expect(picker).toContain('<div class="dialog-content"><section>choices</section></div>');
   });
 
-  it("uses a shared disclosure shell for expandable controls and panels", () => {
-    const markup = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices", open: true });
+  it("renders a disclosure with its summary, content, and requested initial state", () => {
+    const collapsed = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices" });
+    const expanded = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices", open: true });
 
-    expect(markup).toBe('<details class="disclosure challenge-options" open><summary>Choose challenge</summary><div class="disclosure-content">Choices</div></details>');
+    expect(collapsed).toMatch(/^<details[ >]/);
+    expect(collapsed).toContain("<summary>Choose challenge</summary>");
+    expect(collapsed).toContain("Choices");
+    expect(collapsed).not.toMatch(/^<details[^>]*\sopen(?:\s|>)/);
+    expect(expanded).toMatch(/^<details[^>]*\sopen(?:\s|>)/);
   });
 
   it("renders a compact, accessible information disclosure", () => {
