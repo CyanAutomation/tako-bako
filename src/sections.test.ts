@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader } from "./sections";
 
 describe("puzzle UI sections", () => {
-  it("composes the puzzle heading and board toolbar from shared primitives", () => {
-    expect(renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" })).toContain('<h1>Tournament Order</h1>');
+  it("announces puzzle status and displays its difficulty in the header", () => {
+    const header = renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" });
+    expect(header).toContain('<h1>Tournament Order</h1>');
+    expect(header).toContain('role="status">Ready</p>');
+    expect(header).toContain("Level 3: Moderate");
+  });
+
+  it("labels the board actions and exposes their interaction roles", () => {
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, assist: true });
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
@@ -13,6 +19,7 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('id="assist-toggle"');
     expect(toolbar).toContain('aria-label="Smart marking: on"');
     expect(toolbar).toContain('class="board-actions"');
+    expect(toolbar).toContain('aria-label="Board actions"');
     expect(toolbar).toContain('data-action-role="utility"');
     expect(toolbar).toContain('data-action-role="toggle"');
     expect(toolbar).toContain('data-action-role="primary"');
@@ -20,11 +27,18 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('aria-label="2 of 4 matches found"');
   });
 
-  it("composes workspace and clues without page-level markup", () => {
+  it("labels the grid workspace for assistive technology", () => {
     const workspace = renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" });
     expect(workspace).toContain('aria-label="Logic grids"');
     expect(workspace).toContain('class="legend legend--quiet"');
-    expect(renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" })).toContain('Mark clue 1 as unused');
+  });
+
+  it("labels the clue panel and reports its clue count", () => {
+    const panel = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" });
+    expect(panel).toContain("<aside");
+    expect(panel).toContain('aria-labelledby="clues-title"');
+    expect(panel).toContain("1 clues");
+    expect(panel).toContain('Mark clue 1 as unused');
   });
 
   it("offers focused clue views without changing the original clue numbering", () => {

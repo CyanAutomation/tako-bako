@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextGridCellKey, nextTabId, renderBadge, renderButton, renderControlGroup, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderPanel, renderSelect, renderStatus, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSelect, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -143,13 +143,14 @@ describe("shared UI primitives", () => {
     expect(markup).not.toContain("hidden");
   });
 
-  it("renders shared status, panel, grid-cell, badge, and control-group primitives", () => {
-    expect(renderStatus({ message: "Ready", tone: "success" })).toContain('class="status status--success" role="status">Ready');
-    expect(renderPanel({ tag: "aside", className: "clues", labelledBy: "clues-title", content: "Notes" })).toBe('<aside class="clues" aria-labelledby="clues-title">Notes</aside>');
-    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "yes" })).toContain('aria-label="Aki, Lions: yes. Select to change."');
-    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", tabIndex: 0 })).toContain('tabindex="0"');
-    expect(renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", disabled: true })).toContain(" Grid locked.\" disabled");
-    expect(renderBadge("3 clues", "clue-count")).toBe('<span class="clue-count">3 clues</span>');
-    expect(renderControlGroup("Board history", "buttons", "history-controls")).toBe('<div class="history-controls" aria-label="Board history">buttons</div>');
+  it("gives grid cells an accessible name, a roving tab stop, and disabled semantics", () => {
+    const activeCell = renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "yes", tabIndex: 0 });
+    expect(activeCell).toContain('aria-label="Aki, Lions: yes. Select to change."');
+    expect(activeCell).toContain('tabindex="0"');
+
+    const disabledCell = renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", disabled: true });
+    expect(disabledCell).toContain('aria-label="Aki, Lions: unknown. Grid locked."');
+    expect(disabledCell).toContain(" disabled");
+    expect(disabledCell).not.toContain("tabindex=");
   });
 });
