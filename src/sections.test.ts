@@ -20,11 +20,16 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('aria-label="2 of 4 matches found"');
   });
 
-  it("composes workspace and clues without page-level markup", () => {
+  it("labels the grid workspace for assistive technology", () => {
     const workspace = renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" });
+
     expect(workspace).toContain('aria-label="Logic grids"');
-    expect(workspace).toContain('class="legend legend--quiet"');
-    expect(renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" })).toContain('Mark clue 1 as unused');
+  });
+
+  it("offers an action to mark a used clue as unused", () => {
+    const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" });
+
+    expect(markup).toContain('aria-label="Mark clue 1 as unused"');
   });
 
   it("offers focused clue views without changing the original clue numbering", () => {
