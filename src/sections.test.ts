@@ -2,8 +2,14 @@ import { describe, expect, it } from "vitest";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader } from "./sections";
 
 describe("puzzle UI sections", () => {
-  it("composes the puzzle heading and board toolbar from shared primitives", () => {
-    expect(renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" })).toContain('<h1>Tournament Order</h1>');
+  it("announces puzzle status and displays its difficulty in the header", () => {
+    const header = renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Ready" });
+    expect(header).toContain('<h1>Tournament Order</h1>');
+    expect(header).toContain('role="status">Ready</p>');
+    expect(header).toContain("Level 3: Moderate");
+  });
+
+  it("labels the board actions and exposes their interaction roles", () => {
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, assist: true });
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
@@ -13,6 +19,7 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('id="assist-toggle"');
     expect(toolbar).toContain('aria-label="Smart marking: on"');
     expect(toolbar).toContain('class="board-actions"');
+    expect(toolbar).toContain('aria-label="Board actions"');
     expect(toolbar).toContain('data-action-role="utility"');
     expect(toolbar).toContain('data-action-role="toggle"');
     expect(toolbar).toContain('data-action-role="primary"');
@@ -24,6 +31,7 @@ describe("puzzle UI sections", () => {
     const workspace = renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" });
 
     expect(workspace).toContain('aria-label="Logic grids"');
+    expect(workspace).toContain('class="legend legend--quiet"');
   });
 
   it("offers an action to mark a used clue as unused", () => {
