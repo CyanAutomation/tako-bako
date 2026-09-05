@@ -1198,6 +1198,7 @@ footer {
 /* Fixed board-action hierarchy: utility → toggle → primary. Reset uses utility too. */
 .board-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
   padding-left: 0.9rem;
@@ -1424,6 +1425,10 @@ footer {
   width: 100%;
   box-shadow: none;
 }
+.action-menu__danger {
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--line);
+}
 .celebration-backdrop {
   z-index: 30;
 }
@@ -1605,6 +1610,16 @@ footer {
   }
   .header-actions .action-menu summary {
     font-size: 0.72rem;
+  }
+  .workspace-bar {
+    flex-wrap: wrap;
+  }
+  .board-actions {
+    width: 100%;
+    padding-top: 0.7rem;
+    padding-left: 0;
+    border-top: 2px solid color-mix(in srgb, var(--line) 58%, transparent);
+    border-left: 0;
   }
 }
 

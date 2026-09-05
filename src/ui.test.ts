@@ -18,14 +18,14 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"');
   });
 
-  it("provides standard controls for both compact mobile and wider layouts", () => {
+  it("uses tabs on wider layouts and one labelled selector on compact layouts", () => {
     const markup = renderTabs(tabs, "weight");
 
     expect(markup).toContain('class="grid-picker"');
     expect(markup).toContain('class="grid-navigation"');
     expect(markup).toContain('class="grid-tabs"');
-    expect(markup).toContain('id="previous-grid"');
-    expect(markup).toContain('id="next-grid"');
+    expect(markup).not.toContain('id="previous-grid"');
+    expect(markup).not.toContain('id="next-grid"');
     expect(markup).not.toContain(" hidden");
   });
 
@@ -52,16 +52,17 @@ describe("shared UI primitives", () => {
     expect(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" })).toBeUndefined();
   });
 
-  it("uses a shared button primitive for regular and custom SVG icon actions", () => {
+  it("uses a shared button primitive that keeps icon-action labels visible by default", () => {
     expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
     const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
-    expect(iconButton).toContain('class="button button--icon button--secondary"');
+    expect(iconButton).toContain('class="button button--with-icon button--secondary"');
     expect(iconButton).toContain('<svg');
+    expect(iconButton).toContain('<span>Undo</span>');
     expect(iconButton).toContain('aria-hidden="true"');
     expect(iconButton).not.toContain("↶");
-    const labelledIconButton = renderButton({ id: "assist", label: "Auto-eliminate: on", icon: "sparkle", iconPlacement: "start", pressed: true });
+    const labelledIconButton = renderButton({ id: "assist", label: "Smart marking: on", icon: "sparkle", pressed: true });
     expect(labelledIconButton).toContain('class="button button--with-icon button--secondary"');
-    expect(labelledIconButton).toContain('<span>Auto-eliminate: on</span>');
+    expect(labelledIconButton).toContain('<span>Smart marking: on</span>');
   });
 
   it("renders each Puzzle Challenge level through one stateful card primitive", () => {
@@ -72,6 +73,14 @@ describe("shared UI primitives", () => {
     expect(markup).toContain('aria-label="Beginner Level 2, locked"');
     expect(markup).toContain('disabled');
     expect(markup).toContain('>Locked</span>');
+  });
+
+  it("makes the current Puzzle Challenge level informational rather than restartable", () => {
+    const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "current" });
+
+    expect(markup).toContain('aria-label="Beginner Level 2, current"');
+    expect(markup).toContain("disabled");
+    expect(markup).toContain(">Current</span>");
   });
 
   it("renders typed state and data attributes without a raw attribute string", () => {
