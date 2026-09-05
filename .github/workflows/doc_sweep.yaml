@@ -1,0 +1,58 @@
+name: Kaseki documentation sweep
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaseki-docs-sweep
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check Kaseki availability
+        run: curl --fail --silent --show-error --max-time 20 https://kaseki-tunnel.scheimann.xyz/ready
+
+      - name: Submit documentation sweep
+        id: submit
+        env:
+          KASEKI_API_TOKEN: ${{ secrets.KASEKI_API_TOKEN }}
+        run: |
+          response="$(
+            curl --fail-with-body --silent --show-error \
+              --request POST https://kaseki-tunnel.scheimann.xyz/api/runs \
+              --header "Authorization: Bearer $KASEKI_API_TOKEN" \
+              --header "Content-Type: application/json" \
+              --data @- <<JSON
+          {
+            "repoUrl": "https://github.com/CyanAutomation/tako-bako",
+            "ref": "main",
+            "taskMode": "patch",
+            "publishMode": "$PUBLISH_MODE",
+            "timeoutSeconds": 10800,
+            "changedFilesAllowlist": [
+              "README.md",
+              "docs/**",
+              "**/*.md"
+            ],
+            "validationCommands": ["npm run check"],
+            "goalCheck": {
+              "enabled": true,
+              "maxRetries": 1
+            },
+            "taskPrompt": "The overnight docs sweep. Review the codebase in full and make sure all user-facing and developer documentation reflects the current implementation. Update documentation where it has drifted. Keep changes documentation-only: do not change application or test code. Run the configured validation command. Open a reviewable pull request when documentation changes are needed; do not open an empty PR when documentation already matches the implementation. Completion condition: documentation matches the current implementation."
+          }
+          JSON
+          )"
+          echo "$response" | jq .
+          echo "run_id=$(echo "$response" | jq -r '.id')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish run link
+        run: |
+          echo "Submitted Kaseki run: \`${{ steps.submit.outputs.run_id }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Monitor it at: https://kaseki-tunnel.scheimann.xyz/ui" >> "$GITHUB_STEP_SUMMARY"
