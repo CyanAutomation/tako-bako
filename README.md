@@ -24,10 +24,9 @@ Prerequisites: Node.js 20.19+ or 22.12+ (matching Vite's supported runtime).
 
 Tako Bako presents logic grid puzzles with several categories of clues. For example, "The cat owner lives next door to the fish keeper" or "The Swiss plays tennis." Players deduce correct assignments using these tools:
 
-1. **Mark** -- Left-click a cell to place your current guess about what belongs there (e.g., a person assigned to a house number).
-2. **Eliminate** -- Right-click a cell to mark it as impossible, narrowing down options without committing to an answer.
-3. **Check** -- Once satisfied with your grid, submit it to Yokaiba for verification against the official solution.
-4. **Share** -- Export your puzzle link, encoding the seed and selected scenario so others can replay or compare.
+1. **Mark / Eliminate** -- Click a cell to cycle through states: empty, yes (a ✓), then no (an ×). Place a guess or rule one out with the same action, without committing to an answer.
+2. **Check** -- Once satisfied with your grid, submit it to Yokaiba for verification against the official solution.
+3. **Share** -- Export your puzzle link, encoding the seed and selected scenario so others can replay or compare.
 
 Three scenarios are available: Tournament Order (a compact 4x4 warm-up), Open Division (a broader 5x5 challenge), and Championship Circuit (an expert 5x5 puzzle with three grids).
 
