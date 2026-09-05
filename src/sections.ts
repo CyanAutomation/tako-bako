@@ -22,10 +22,10 @@ export function renderPuzzleHeader({ title, difficulty, message }: { title: stri
 }
 
 export function renderBoardToolbar({ matches, total, undoDisabled, checkDisabled, assist }: { matches: number; total: number; undoDisabled: boolean; checkDisabled: boolean; assist: boolean }): string {
-  const checkHint = checkDisabled ? "Find one match in every row and column, then check your solution." : "You’re ready to check your solution.";
-  const assistLabel = `Auto elimination: ${assist ? "on" : "off"}`;
+  const checkHint = checkDisabled ? "Find one match in each row and column. Then check your deduction." : "Your deduction is ready to check.";
+  const assistLabel = `Smart marking: ${assist ? "on" : "off"}`;
   // Fixed board-action hierarchy: reversible utilities → optional toggles → the primary solve action.
-  const actions = `${renderButton({ id: "undo", label: "Undo last mark", icon: "undo", disabled: undoDisabled, data: { actionRole: "utility" } })}${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist, data: { actionRole: "toggle" } })}${renderButton({ id: "check-solution", label: "Check solution", icon: "check", variant: "primary", disabled: checkDisabled, data: { actionRole: "primary" } })}`;
+  const actions = `${renderButton({ id: "undo", label: "Undo", ariaLabel: "Undo last mark", icon: "undo", disabled: undoDisabled, data: { actionRole: "utility" } })}${renderButton({ id: "assist-toggle", label: assistLabel, icon: "sparkle", variant: "assist", pressed: assist, data: { actionRole: "toggle" } })}${renderButton({ id: "check-solution", label: "Check deduction", ariaLabel: "Check solution", icon: "check", variant: "primary", disabled: checkDisabled, data: { actionRole: "primary" } })}`;
   const progress = total === 0 ? 0 : Math.round((matches / total) * 100);
   return `<div class="workspace-bar"><div class="readiness-meter" aria-label="${matches} of ${total} matches found"><div class="readiness-meter__copy"><p class="progress">${matches} of ${total} matches found</p><p class="check-hint">${checkHint}</p></div><span class="readiness-meter__bar" aria-hidden="true"><span style="width:${progress}%"></span></span></div>${renderControlGroup("Board actions", actions, "board-actions")}</div>`;
 }
