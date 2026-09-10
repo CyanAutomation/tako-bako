@@ -10,6 +10,7 @@ import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
+import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
 import { gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
 import mascotUrl from "./brand/tako-bako-mascot-512.png";
@@ -68,12 +69,16 @@ function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replac
   void fetchPuzzle(seed, urlMode);
 }
 
-function openSharedPuzzle(seed: string): void {
+function openSharedPuzzle(input: SharedPuzzleInput): void {
   challengeOptionsOpen = false;
   playMode = "shared";
-  templateId = templateFromUrl();
-  difficultyLevel = difficultyFromUrl();
-  void fetchPuzzle(seed, "push");
+  const course = input.tier && input.level ? courseFor(input.tier, input.level) : undefined;
+  if (course) ({ templateId, difficultyLevel } = puzzleParametersForCourse(course));
+  else {
+    templateId = scenarioIdFromUrl(input.templateId ?? null) ?? DEFAULT_SCENARIO_ID;
+    difficultyLevel = input.difficultyLevel;
+  }
+  void fetchPuzzle(input.seed, "push");
 }
 
 function seedFromUrl(): string | undefined {
@@ -249,7 +254,7 @@ async function checkAnswer(): Promise<void> {
   if (!puzzle) return;
   const answer = answerFromBoard(board, puzzle.spec);
   if (!answer) {
-    message = "Find one ✓ in each row and column before checking your deduction.";
+    message = "Choose one ✓ in each row and column before checking your solution.";
     render();
     return;
   }
@@ -259,7 +264,7 @@ async function checkAnswer(): Promise<void> {
     return;
   }
   loading = true;
-  message = "Tako is checking your deductions…";
+  message = "Tako is checking your solution…";
   render();
   try {
     const result = await fetch("/api/puzzle", {
@@ -275,12 +280,12 @@ async function checkAnswer(): Promise<void> {
         progress = completeCourse(progress, activeCourse.id);
         saveProgress(localStorage, progress);
         const next = nextCourse(activeCourse);
-        message = next ? `Perfect deduction — ${activeCourse.label} complete. ${next.label} is now unlocked!` : "Perfect deduction — you have completed every Puzzle Challenge level!";
-      } else message = "Perfect deduction — this shared puzzle is solved! Start Puzzle Challenge to advance your course.";
+        message = next ? `Beautifully solved — ${activeCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
+      } else message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
       pendingCelebration = true;
     } else message = "Not quite yet. Your notes are saved, so keep refining the grid.";
   } catch {
-    message = "The dojo could not check this answer. Your board is still saved.";
+    message = "Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.";
   } finally {
     loading = false;
     render();
@@ -349,7 +354,7 @@ function renderCelebrationModal(): string {
 
 function renderProgressManagement(): string {
   const completed = progress.completed.length;
-  return `<section class="progress-management" aria-label="Puzzle Challenge progress"><div><p class="eyebrow">Your progress</p><strong>${completed} of 12 levels complete</strong><p>Reset your Puzzle Challenge without erasing saved boards.</p></div>${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</section>`;
+  return `<section class="progress-management" aria-label="Puzzle Challenge progress"><div><p class="eyebrow">Your progress</p><strong>${completed} of 12 levels complete</strong><p>Your saved boards stay separate from your Puzzle Challenge progress.</p></div>${renderDisclosure({ className: "progress-settings", summary: "Progress settings", content: renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" }) })}</section>`;
 }
 
 function renderChallengeOptions(): string {
@@ -360,9 +365,9 @@ function renderChallengeOptions(): string {
 
 function renderSharedPuzzleModal(): string {
   if (!sharedPuzzleOpen) return "";
-  const content = `<label class="seed-entry">Puzzle code <input id="landing-seed-input" maxlength="128" pattern="[a-zA-Z0-9-]+" autocomplete="off"></label>`;
+  const content = `<label class="seed-entry">Shared puzzle link or code <input id="landing-seed-input" placeholder="Paste a link or code" autocomplete="off"></label>`;
   const actions = `${renderButton({ id: "close-shared-puzzle", label: "Cancel" })}${renderButton({ id: "open-landing-seed", label: "Open puzzle", variant: "primary" })}`;
-  return `<div class="modal-backdrop">${renderDialog({ id: "shared-puzzle", eyebrow: "Shared puzzle", title: "Open a shared puzzle", description: "Paste the puzzle code from a friend’s link to pick up their exact challenge.", content, actions })}</div>`;
+  return `<div class="modal-backdrop">${renderDialog({ id: "shared-puzzle", eyebrow: "Shared puzzle", title: "Open a shared puzzle", description: "Paste a friend’s link or puzzle code to pick up the exact puzzle.", content, actions })}</div>`;
 }
 
 function renderPuzzle(current: Puzzle): string {
@@ -573,13 +578,13 @@ root.addEventListener("click", event => {
     return;
   }
   if (button.id === "open-landing-seed") {
-    const seed = root.querySelector<HTMLInputElement>("#landing-seed-input")?.value.trim() ?? "";
-    if (!/^[a-zA-Z0-9-]{1,128}$/.test(seed)) {
-      message = "Use 1–128 letters, numbers, or hyphens for a challenge seed.";
+    const input = parseSharedPuzzleInput(root.querySelector<HTMLInputElement>("#landing-seed-input")?.value ?? "");
+    if (!input) {
+      message = "Paste a shared puzzle link or a code using 1–128 letters, numbers, or hyphens.";
       render();
     } else {
       sharedPuzzleOpen = false;
-      openSharedPuzzle(seed);
+      openSharedPuzzle(input);
     }
   }
   if (button.dataset.course) {
