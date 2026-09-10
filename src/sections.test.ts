@@ -14,7 +14,8 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
-    expect(toolbar).toContain('Find one match in each row and column. Then check your deduction.');
+    expect(toolbar).toContain('Choose one match in each row and column, then check your solution.');
+    expect(toolbar).toContain('>Check my solution</span>');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
     expect(toolbar).toContain('aria-label="Smart marking: on"');
@@ -45,7 +46,7 @@ describe("puzzle UI sections", () => {
     const markup = renderCluePanel({ clues, activeCategory: { id: "club", label: "Club", values: ["Lions", "Wolves"] }, cluesOpen: true, usedClueIds: new Set(["two"]), clueFilter: "remaining" });
 
     expect(markup).toContain('data-clue-filter="remaining"');
-    expect(markup).toContain('>Unmarked</button>');
+    expect(markup).toContain('>To review</button>');
     expect(markup).toContain('Mark clue 1 as used');
     expect(markup).not.toContain('Mark clue 2 as unused');
     expect(markup).toContain('class="clue-item clue-item--related"');
