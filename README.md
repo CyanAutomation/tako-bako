@@ -20,6 +20,12 @@ Prerequisites: Node.js 20.19+ or 22.12+ (matching Vite's supported runtime).
 
 3. Open the app: navigate to `http://localhost:5173` in your browser.
 
+4. Run tests:
+
+   ```sh
+   npm run test
+   ```
+
 ## How to Play
 
 Tako Bako presents logic grid puzzles with several categories of clues. For example, "The cat owner lives next door to the fish keeper" or "The Swiss plays tennis." Players deduce correct assignments using these tools:
