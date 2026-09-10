@@ -422,7 +422,6 @@ main:not(.landing-state) {
   font-size: 0.76rem;
   font-weight: 700;
 }
-.workspace-actions,
 .history-controls {
   display: flex;
   align-items: center;
@@ -913,9 +912,6 @@ footer {
   .progress {
     max-width: 7rem;
     line-height: 1.25;
-  }
-  .workspace-actions {
-    gap: 0.25rem;
   }
   .history-controls {
     padding: 0.1rem;
@@ -1655,8 +1651,45 @@ footer {
   font-size: 0.68rem;
   line-height: 1.4;
 }
-.progress-management .button {
+.progress-management > .button {
   flex: 0 0 auto;
+}
+.progress-settings {
+  position: relative;
+  flex: 0 0 auto;
+}
+.progress-settings summary {
+  min-height: 2.45rem;
+  padding: 0.55rem 0.8rem;
+  color: var(--ink);
+  list-style: none;
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--control-radius);
+  box-shadow: var(--control-shadow);
+  font-weight: 700;
+}
+.progress-settings summary::-webkit-details-marker {
+  display: none;
+}
+.progress-settings summary::after {
+  margin-left: 0.45rem;
+  content: "⌄";
+}
+.progress-settings[open] summary::after {
+  content: "⌃";
+}
+.progress-settings > div {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  display: grid;
+  min-width: max-content;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  background: var(--surface);
+  border: var(--border);
+  box-shadow: var(--card-shadow);
 }
 .course-state {
   display: block;
@@ -1691,20 +1724,13 @@ footer {
     flex-direction: column;
   }
   .workspace-bar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
   }
   .readiness-meter {
-    min-width: 0;
-  }
-  .workspace-actions {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: 1fr;
-    justify-content: stretch;
-  }
-  .workspace-actions > #check-solution {
     width: 100%;
+    min-width: 0;
   }
   .board-state-controls {
     justify-content: flex-start;
@@ -1716,7 +1742,16 @@ footer {
     max-width: none;
   }
   .board-actions {
-    padding-left: 0.65rem;
+    display: grid;
+    width: 100%;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0.7rem 0 0;
+    border-top: 2px solid color-mix(in srgb, var(--line) 58%, transparent);
+    border-left: 0;
+  }
+  .board-actions [data-action-role="primary"] {
+    grid-column: 1 / -1;
+    width: 100%;
   }
   .grid-card h3 {
     padding: 0.7rem 0.75rem;
