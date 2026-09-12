@@ -8,31 +8,34 @@ export interface Course {
   tier: Tier;
   level: 1 | 2 | 3 | 4;
   label: string;
-  templateId: "tournament-order-v1" | "open-division-v2" | "championship-circuit-v2";
+  templateId: "tournament-order-v2" | "open-division-v2" | "championship-bridge-v1" | "championship-circuit-v2";
   difficultyLevel: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   description: string;
 }
 
-const tierDetails: Record<Tier, Pick<Course, "templateId" | "description">> = {
-  beginner: { templateId: "tournament-order-v1", description: "A compact 4×4 introduction to logic-grid deduction." },
-  intermediate: { templateId: "open-division-v2", description: "A broader 5×5 challenge with more possibilities to track." },
-  advanced: { templateId: "championship-circuit-v2", description: "A dense 5×5 challenge across three working grids." },
-};
-
 const levels = [1, 2, 3, 4] as const;
-const yokaibaLevels: Record<Tier, readonly Course["difficultyLevel"][]> = {
-  beginner: [1, 2, 3, 4],
-  intermediate: [5, 6, 7, 8],
-  advanced: [9, 10, 11, 12],
+const tierDetails: Record<Tier, readonly Pick<Course, "templateId" | "difficultyLevel" | "description">[]> = {
+  beginner: levels.map(difficultyLevel => ({ templateId: "tournament-order-v2", difficultyLevel, description: "A compact 4×4 introduction with no-guess beginner puzzles." })),
+  intermediate: [
+    { templateId: "open-division-v2", difficultyLevel: 5, description: "A broader 5×5 challenge with more possibilities to track." },
+    { templateId: "open-division-v2", difficultyLevel: 6, description: "A broader 5×5 challenge with more possibilities to track." },
+    { templateId: "open-division-v2", difficultyLevel: 7, description: "A broader 5×5 challenge with more possibilities to track." },
+    { templateId: "championship-bridge-v1", difficultyLevel: 8, description: "A five-row bridge into the expert three-grid board." },
+  ],
+  advanced: [
+    { templateId: "championship-bridge-v1", difficultyLevel: 9, description: "Complete the bridge before the Championship Circuit." },
+    { templateId: "championship-circuit-v2", difficultyLevel: 10, description: "A dense 5×5 challenge across three working grids." },
+    { templateId: "championship-circuit-v2", difficultyLevel: 11, description: "A dense 5×5 challenge across three working grids." },
+    { templateId: "championship-circuit-v2", difficultyLevel: 12, description: "A dense 5×5 challenge across three working grids." },
+  ],
 };
 
-export const courses: readonly Course[] = TIERS.flatMap(tier => levels.map(level => ({
+export const courses: readonly Course[] = TIERS.flatMap(tier => levels.map((level, index) => ({
   id: `${tier}-${level}` as CourseId,
   tier,
   level,
   label: `${tier[0]!.toUpperCase()}${tier.slice(1)} Level ${level}`,
-  difficultyLevel: yokaibaLevels[tier][level - 1]!,
-  ...tierDetails[tier],
+  ...tierDetails[tier][index]!,
 })));
 
 export function courseFor(tier: string | undefined, level: number | undefined): Course | undefined {

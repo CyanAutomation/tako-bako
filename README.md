@@ -40,13 +40,13 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 5. **Share** -- Copy the current page URL to the clipboard. The link encodes the seed, template, and difficulty so others can open the same puzzle.
 
-Three scenarios are available: Tournament Order (a compact 4×4 warm-up), Open Division (a broader 5×5 challenge), and Championship Circuit (an expert 5×5 puzzle with three grids). The active grid tab switches between them when a puzzle has multiple grids.
+Four current scenarios are available: Tournament Order v2 (a compact no-guess 4×4 warm-up), Open Division (a broader 5×5 challenge), Championship Bridge (a five-row transition into the expert board), and Championship Circuit (an expert 5×5 puzzle with three grids). Tournament Order v1 remains available for existing shared links.
 
 You can filter clues as All, Unmarked, or Used, and mark individual clues as used or unused to track your reasoning.
 
 ### Puzzle Challenge
 
-Tako Bako includes a guided progression called Puzzle Challenge. The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses levels 1-4, Intermediate 5-8, and Advanced 9-12. Complete each level sequentially to unlock the next. Your daily puzzle locks to your current level and advances automatically upon a correct deduction. You can also play shared puzzles from links, replay the current tier, or start the daily puzzle fresh. Reset your Challenge progress at any time without affecting saved boards or shared puzzle links.
+Tako Bako includes a guided progression called Puzzle Challenge. The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses Tournament Order v2 levels 1-4; Intermediate uses Open Division 5-7 then Championship Bridge 8; Advanced uses Championship Bridge 9 then Championship Circuit 10-12. Complete each level sequentially to unlock the next. A Hint button starts with a clue, then offers an elimination or one revealed placement as progress increases. Your daily puzzle locks to your current level and advances automatically upon a correct deduction. You can also play shared puzzles from links, replay the current tier, or start the daily puzzle fresh. Reset your Challenge progress at any time without affecting saved boards or shared puzzle links.
 
 ## Development
 
@@ -65,7 +65,7 @@ Vite proxies `/api/puzzle` requests to Yokaiba during development, routing queri
 
 ## Deployment
 
-`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. Shared-origin API functions live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification. The API forwards requests to Yokaiba at `https://yokaiba.scheimann.workers.dev`, applying caching headers (`s-maxage=300, stale-while-revalidate=3600`) and translating upstream error codes. Browser-side CORS configuration is not required because the API layer shares the same origin. Import the repository into Vercel with Git integration: pushes to `main` deploy production; pull requests deploy previews.
+`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. Shared-origin API functions live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` and `/api/events` proxy bounded assistance and anonymous calibration outcomes. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
 
 The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options headers for all non-asset routes. Static assets receive immutable caching for one year.
 
@@ -75,7 +75,7 @@ The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer
 
 Tako Bako forwards completed boards to Yokaiba via the `/api/puzzle` endpoint. Before deploying this feature, configure the same `PUZZLE_TOKEN_SECRET` on the Yokaiba Worker (using `wrangler secret put PUZZLE_TOKEN_SECRET`) and redeploy it. The token is issued with each generated puzzle and is never exposed as a solution; without the secret, the player keeps working normally but solution checking is unavailable.
 
-The API caches puzzle responses at the edge with `s-maxage=300` and `stale-while-revalidate=3600`. Upstream rate-limit headers are forwarded to the client. Yokaiba timeouts produce a 504 with a user-friendly message. When a seed cannot produce the requested difficulty, Yokaiba returns HTTP 422 with `difficulty_unavailable` and optionally `availableDifficultyLevels`; the API surfaces both on the client.
+The API caches puzzle responses at the edge with `s-maxage=300` and `stale-while-revalidate=3600`. Upstream rate-limit headers are forwarded to the client. Yokaiba timeouts produce a 504 with a user-friendly message. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events never include a player identifier, seed, or answer cells.
 
 ## Project Structure
 
@@ -96,6 +96,8 @@ src/       Application source
   brand/          Brand assets (PNG sprites)
 api/         Vercel API functions
   puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
+  hint.ts     POST /hint assistance proxy
+  events.ts   POST /events anonymous calibration proxy
   health.ts   GET /healthz readiness check
 index.html      App entry HTML
 vite.config.ts  Dev proxy: /api/puzzle → /v1/puzzles/generate

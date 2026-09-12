@@ -4,8 +4,10 @@ import { scenarioIdFromUrl, scenarios } from "./scenarios";
 describe("public puzzle scenarios", () => {
   it("uses the template identifiers served by the current Yokaiba catalog", () => {
     expect(scenarios.map(scenario => scenario.id)).toEqual([
+      "tournament-order-v2",
       "tournament-order-v1",
       "open-division-v2",
+      "championship-bridge-v1",
       "championship-circuit-v2",
     ]);
   });
