@@ -46,6 +46,8 @@ let clueFilter: ClueFilter = "all";
 let activeCellKey: string | undefined;
 let challengeOptionsOpen = false;
 let sharedPuzzleOpen = false;
+let puzzleStartedAt = 0;
+let hintsUsed = 0;
 
 const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
@@ -59,6 +61,11 @@ class DifficultyUnavailableError extends Error {
       ? `This seed cannot produce the selected difficulty. It can make Level${availableLevels.length === 1 ? "" : "s"} ${availableLevels.join(", ")}. Try another puzzle.`
       : "This seed cannot produce the selected difficulty. Try another puzzle.");
   }
+}
+
+function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
+  if (!puzzle) return;
+  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed }) }).catch(() => undefined);
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -129,6 +136,7 @@ function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none"): void {
 let currentFetchId = 0;
 
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
+  if (puzzle) recordOutcome("puzzle_abandoned");
   loading = true;
   difficultyUnavailable = false;
   message = "Tako is setting the puzzle tiles…";
@@ -168,6 +176,9 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     }
     if (fetchId !== currentFetchId) return;
     puzzle = data;
+    puzzleStartedAt = Date.now();
+    hintsUsed = 0;
+    recordOutcome("puzzle_started");
     board = loadBoard(puzzle.id);
     undoStack = [];
     activeGridId = data.spec.categories.find(category => category.id !== data.spec.baseCategory)?.id;
@@ -276,6 +287,7 @@ async function checkAnswer(): Promise<void> {
     const response: unknown = await result.json();
     if (!response || typeof response !== "object" || typeof (response as { correct?: unknown }).correct !== "boolean") throw new Error("Invalid verification response");
     if ((response as { correct: boolean }).correct) {
+      recordOutcome("puzzle_completed");
       if (shouldAdvanceProgress(playMode)) {
         progress = completeCourse(progress, activeCourse.id);
         saveProgress(localStorage, progress);
@@ -283,13 +295,39 @@ async function checkAnswer(): Promise<void> {
         message = next ? `Beautifully solved — ${activeCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
       } else message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
       pendingCelebration = true;
-    } else message = "Not quite yet. Your notes are saved, so keep refining the grid.";
+    } else { recordOutcome("mistake"); message = "Not quite yet. Your notes are saved, so keep refining the grid."; }
   } catch {
     message = "Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.";
   } finally {
     loading = false;
     render();
   }
+}
+
+async function requestHint(): Promise<void> {
+  if (!puzzle?.puzzleToken) return;
+  const progress = boardSolveProgress(board, puzzle.spec);
+  const kind = progress.matches === 0 ? "clue" : progress.matches < Math.ceil(progress.total / 2) ? "elimination" : "placement";
+  loading = true;
+  message = "Tako is finding the next helpful nudge…";
+  render();
+  try {
+    const result = await fetch("/api/hint", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ puzzleToken: puzzle.puzzleToken, kind }) });
+    const hint: unknown = await result.json();
+    if (!result.ok || !hint || typeof hint !== "object") throw new Error("Hint unavailable");
+    const value = hint as { kind?: unknown; clue?: { id?: unknown; text?: unknown }; placement?: { subject?: unknown; category?: unknown; value?: unknown } };
+    if (value.kind === "placement" && value.placement && typeof value.placement.subject === "string" && typeof value.placement.category === "string" && typeof value.placement.value === "string") {
+      board = { ...board, [squareKey(value.placement.category, value.placement.subject, value.placement.value)]: "yes" };
+      saveBoard(puzzle.id, board);
+      message = `Hint: ${value.placement.subject} matches ${value.placement.value}.`;
+    } else if (value.clue && typeof value.clue.text === "string") {
+      if (typeof value.clue.id === "string") { usedClueIds = new Set(usedClueIds).add(value.clue.id); saveUsedClues(puzzle.id, usedClueIds); }
+      message = `Hint: ${value.clue.text}`;
+    } else throw new Error("Invalid hint");
+    hintsUsed += 1;
+    recordOutcome("hint_used");
+  } catch { message = "Tako can’t offer a hint just now. Please try again in a moment."; }
+  finally { loading = false; render(); }
 }
 
 async function sharePuzzle(): Promise<void> {
@@ -381,7 +419,7 @@ function renderPuzzle(current: Puzzle): string {
   const progress = boardSolveProgress(board, current.spec);
   const title = playMode === "challenge" ? activeCourse.label : current.spec.title;
   const courseLabel = playMode === "challenge" ? `${activeCourse.tier[0]!.toUpperCase()}${activeCourse.tier.slice(1)} · Level ${activeCourse.level}` : `Shared · Level ${current.difficulty.level}`;
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
+  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
 }
 
 function renderLandingAction(): string {
@@ -469,6 +507,7 @@ root.addEventListener("click", event => {
   }
   if (button.id === "daily-puzzle") startCourse(activeCourse, dailySeed());
   if (button.id === "check-solution") void checkAnswer();
+  if (button.id === "hint") void requestHint();
   if (button.id === "undo") restoreBoard();
   if (button.id === "cancel-grid-reset") {
     dismissResetDialog();
