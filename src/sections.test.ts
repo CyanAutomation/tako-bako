@@ -10,7 +10,7 @@ describe("puzzle UI sections", () => {
   });
 
   it("labels the board actions and exposes their interaction roles", () => {
-    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, assist: true });
+    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, hintDisabled: false, assist: true });
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
@@ -18,6 +18,7 @@ describe("puzzle UI sections", () => {
     expect(toolbar).toContain('>Check my solution</span>');
     expect(toolbar).not.toContain('id="redo"');
     expect(toolbar).toContain('id="assist-toggle"');
+    expect(toolbar).toContain('id="hint"');
     expect(toolbar).toContain('aria-label="Smart marking: on"');
     expect(toolbar).toContain('class="board-actions"');
     expect(toolbar).toContain('aria-label="Board actions"');
@@ -65,7 +66,7 @@ describe("puzzle UI sections", () => {
     expect(markup).toContain('Complete');
     expect(markup).toContain('class="info-disclosure"');
     expect(markup).toContain('More information about Beginner');
-    expect(markup).toContain('A compact 4×4 introduction to logic-grid deduction.');
+    expect(markup).toContain('A compact 4×4 introduction with no-guess beginner puzzles.');
     expect(markup).toMatch(/course--current[\s\S]*disabled/);
   });
 

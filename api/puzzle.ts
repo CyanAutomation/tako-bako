@@ -188,7 +188,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
   try {
     const parameters = new URLSearchParams({ templateId, seed });
-    if (difficultyLevel) parameters.set("difficultyLevel", difficultyLevel);
+    if (difficultyLevel) {
+      parameters.set("difficultyLevel", difficultyLevel);
+      parameters.set("allowSeedFallback", "true");
+    }
     const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);
     forwardEtag(upstream, response);

@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 import { courseFor, courseProgressLabel, courses, firstAvailableCourse, nextCourse, puzzleParametersForCourse } from "./curriculum";
 
 describe("Puzzle Challenge curriculum", () => {
-  it("maps the three four-level course tiers across Yokaiba's 1–12 scale", () => {
+  it("uses the bridge at the two structural transitions while retaining all 12 levels", () => {
     expect(courses.filter(course => course.tier === "beginner").map(course => course.difficultyLevel)).toEqual([1, 2, 3, 4]);
-    expect(courses.filter(course => course.tier === "intermediate").map(course => course.difficultyLevel)).toEqual([5, 6, 7, 8]);
-    expect(courses.filter(course => course.tier === "advanced").map(course => course.difficultyLevel)).toEqual([9, 10, 11, 12]);
+    expect(courses.filter(course => course.tier === "intermediate").map(course => [course.templateId, course.difficultyLevel])).toEqual([["open-division-v2", 5], ["open-division-v2", 6], ["open-division-v2", 7], ["championship-bridge-v1", 8]]);
+    expect(courses.filter(course => course.tier === "advanced").map(course => [course.templateId, course.difficultyLevel])).toEqual([["championship-bridge-v1", 9], ["championship-circuit-v2", 10], ["championship-circuit-v2", 11], ["championship-circuit-v2", 12]]);
   });
 
   it("maps each player-facing tier and level to the calibrated Yokaiba template", () => {
-    expect(courseFor("beginner", 1)).toMatchObject({ label: "Beginner Level 1", templateId: "tournament-order-v1", difficultyLevel: 1 });
+    expect(courseFor("beginner", 1)).toMatchObject({ label: "Beginner Level 1", templateId: "tournament-order-v2", difficultyLevel: 1 });
     expect(courseFor("intermediate", 3)).toMatchObject({ label: "Intermediate Level 3", templateId: "open-division-v2", difficultyLevel: 7 });
     expect(courseFor("advanced", 4)).toMatchObject({ label: "Advanced Level 4", templateId: "championship-circuit-v2", difficultyLevel: 12 });
   });
@@ -25,7 +25,7 @@ describe("Puzzle Challenge curriculum", () => {
   });
 
   it("keeps generator parameters behind the player-facing curriculum", () => {
-    expect(puzzleParametersForCourse(courseFor("intermediate", 2)!)).toEqual({ templateId: "open-division-v2", difficultyLevel: 6 });
+    expect(puzzleParametersForCourse(courseFor("intermediate", 4)!)).toEqual({ templateId: "championship-bridge-v1", difficultyLevel: 8 });
   });
 
   it("summarises current-tier progress for the compact header status", () => {
