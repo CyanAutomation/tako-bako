@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
+import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleResponseToCache, savePuzzleToCache, type PuzzleCacheRequest } from "./puzzle-cache";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();
@@ -47,5 +47,37 @@ describe("puzzle session cache", () => {
 
     expect(loadPuzzleFromCache(storage, "shared-seed", 5, 10_001, "tournament-order-v1")).toEqual({ id: "tournament" });
     expect(loadPuzzleFromCache(storage, "shared-seed", 5, 10_001, "championship-circuit-v1")).toEqual({ id: "championship" });
+  });
+
+  it("does not let an older overlapping response use a newer request's cache key", async () => {
+    const storage = new MemoryStorage();
+    let currentFetchId = 0;
+    const deferred = <T>() => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>(done => { resolve = done; });
+      return { promise, resolve };
+    };
+    const olderResponse = deferred<{ id: string }>();
+    const newerResponse = deferred<{ id: string }>();
+
+    const load = async (request: PuzzleCacheRequest, response: Promise<{ id: string }>) => {
+      const fetchId = ++currentFetchId;
+      const data = await response;
+      savePuzzleResponseToCache(storage, request, data, fetchId === currentFetchId, 10_000);
+    };
+    const olderRequest = { seed: "shared", templateId: "tournament-order-v1", difficultyLevel: 2 } as const;
+    const newerRequest = { seed: "shared", templateId: "championship-circuit-v1", difficultyLevel: 7 } as const;
+    const olderLoad = load(olderRequest, olderResponse.promise);
+    const newerLoad = load(newerRequest, newerResponse.promise);
+
+    newerResponse.resolve({ id: "newer-puzzle" });
+    await newerLoad;
+    olderResponse.resolve({ id: "older-puzzle" });
+    await olderLoad;
+
+    expect(loadPuzzleFromCache(storage, newerRequest.seed, newerRequest.difficultyLevel, 10_001, newerRequest.templateId)).toEqual({ id: "newer-puzzle" });
+    expect(loadPuzzleFromCache(storage, olderRequest.seed, olderRequest.difficultyLevel, 10_001, olderRequest.templateId)).toBeUndefined();
+    expect(storage.getItem(puzzleCacheKey(newerRequest.seed, newerRequest.difficultyLevel, newerRequest.templateId))).not.toContain("older-puzzle");
+    expect(storage.getItem(puzzleCacheKey(olderRequest.seed, olderRequest.difficultyLevel, olderRequest.templateId))).toBeNull();
   });
 });

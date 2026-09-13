@@ -5,7 +5,7 @@ import "@fontsource/ibm-plex-mono/latin-700.css";
 import "@fontsource/roboto-slab/latin-600.css";
 import "@fontsource/roboto-slab/latin-700.css";
 import { answerFromBoard, boardSolveProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
-import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache";
+import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleResponseToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
@@ -114,48 +114,58 @@ function courseFromUrl(): Course | undefined {
   return courseFor(parameters.get("tier") ?? undefined, Number(parameters.get("level")) || undefined);
 }
 
-function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none"): void {
+function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course): void {
   if (mode === "none") return;
   const url = new URL(window.location.href);
   url.searchParams.set("seed", seed);
-  url.searchParams.set("mode", playMode);
-  if (playMode === "challenge") {
-    url.searchParams.set("tier", activeCourse.tier);
-    url.searchParams.set("level", String(activeCourse.level));
+  url.searchParams.set("mode", requestedPlayMode);
+  if (requestedPlayMode === "challenge") {
+    url.searchParams.set("tier", requestedCourse.tier);
+    url.searchParams.set("level", String(requestedCourse.level));
     url.searchParams.delete("template");
     url.searchParams.delete("difficulty");
   } else {
     url.searchParams.delete("tier");
     url.searchParams.delete("level");
-    if (templateId === DEFAULT_SCENARIO_ID) url.searchParams.delete("template"); else url.searchParams.set("template", templateId);
-    if (difficultyLevel) url.searchParams.set("difficulty", String(difficultyLevel)); else url.searchParams.delete("difficulty");
+    if (requestedTemplateId === DEFAULT_SCENARIO_ID) url.searchParams.delete("template"); else url.searchParams.set("template", requestedTemplateId);
+    if (requestedDifficultyLevel) url.searchParams.set("difficulty", String(requestedDifficultyLevel)); else url.searchParams.delete("difficulty");
   }
   window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
 
 let currentFetchId = 0;
+let activePuzzleRequest: AbortController | undefined;
 
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
+  const requestedSeed = seed;
+  const requestedTemplateId = templateId;
+  const requestedDifficultyLevel = difficultyLevel;
+  const cacheRequest = { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel } as const;
+  const requestedPlayMode = playMode;
+  const requestedCourse = activeCourse;
   if (puzzle) recordOutcome("puzzle_abandoned");
   loading = true;
   difficultyUnavailable = false;
   message = "Tako is setting the puzzle tiles…";
   const fetchId = ++currentFetchId;
+  activePuzzleRequest?.abort();
+  const requestController = new AbortController();
+  activePuzzleRequest = requestController;
   render();
   try {
-    const parameters = new URLSearchParams({ seed, templateId, ...(difficultyLevel ? { difficultyLevel: String(difficultyLevel) } : {}) });
+    const parameters = new URLSearchParams({ seed: requestedSeed, templateId: requestedTemplateId, ...(requestedDifficultyLevel ? { difficultyLevel: String(requestedDifficultyLevel) } : {}) });
     const endpoint = `/api/puzzle?${parameters}`;
     let data: Puzzle | undefined;
-    const cached = loadPuzzleFromCache<unknown>(sessionStorage, seed, difficultyLevel, Date.now(), templateId);
+    const cached = loadPuzzleFromCache<unknown>(sessionStorage, requestedSeed, requestedDifficultyLevel, Date.now(), requestedTemplateId);
     if (cached) {
       try {
         data = parsePuzzle(cached);
       } catch {
-        sessionStorage.removeItem(puzzleCacheKey(seed, difficultyLevel, templateId));
+        sessionStorage.removeItem(puzzleCacheKey(requestedSeed, requestedDifficultyLevel, requestedTemplateId));
       }
     }
     if (!data) {
-      const result = await fetch(endpoint);
+      const result = await fetch(endpoint, { signal: requestController.signal });
       if (!result.ok) {
         if (result.status === 422) {
           const error = await result.json().catch(() => undefined) as { availableDifficultyLevels?: unknown } | undefined;
@@ -168,7 +178,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
       }
       try {
         data = parsePuzzle(await result.json());
-        savePuzzleToCache(sessionStorage, seed, difficultyLevel, data, Date.now(), templateId);
+        savePuzzleResponseToCache(sessionStorage, cacheRequest, data, fetchId === currentFetchId, Date.now());
       } catch (error) {
         console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
         throw error;
@@ -188,7 +198,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
     // Keep the requested seed in the URL: Yokaiba may derive a different
     // internal seed while searching for the chosen difficulty level.
-    setPuzzleUrl(seed, urlMode);
+    setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
     message = "Mark each square: leave it blank, confirm a match ✓, or rule it out ×.";
   } catch (error) {
     if (fetchId !== currentFetchId) return;
@@ -197,6 +207,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     message = error instanceof Error ? error.message : "The puzzle could not be collected. Please try again.";
   } finally {
     if (fetchId === currentFetchId) {
+      activePuzzleRequest = undefined;
       loading = false;
       render();
     }
