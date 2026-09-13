@@ -7,6 +7,12 @@ export interface SessionStorageLike {
   removeItem(key: string): void;
 }
 
+export interface PuzzleCacheRequest {
+  readonly seed: string;
+  readonly difficultyLevel: number | undefined;
+  readonly templateId: string;
+}
+
 interface CachedPuzzle<T> {
   expiresAt: number;
   value: T;
@@ -39,4 +45,10 @@ export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, 
   } catch {
     // Private browsing or quota failures should never block play.
   }
+}
+
+/** Stores a response only while its request is current, using that request's immutable identity. */
+export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, isCurrent: boolean, now = Date.now()): void {
+  if (!isCurrent) return;
+  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, now, request.templateId);
 }
