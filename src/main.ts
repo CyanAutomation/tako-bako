@@ -137,6 +137,8 @@ let currentFetchId = 0;
 let activePuzzleRequest: AbortController | undefined;
 let verificationGeneration = 0;
 let activeVerificationRequest: AbortController | undefined;
+let hintGeneration = 0;
+let activeHintRequest: AbortController | undefined;
 
 function invalidateVerification(): void {
   verificationGeneration += 1;
@@ -144,8 +146,15 @@ function invalidateVerification(): void {
   activeVerificationRequest = undefined;
 }
 
+function invalidateHint(): void {
+  hintGeneration += 1;
+  activeHintRequest?.abort();
+  activeHintRequest = undefined;
+}
+
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
   invalidateVerification();
+  invalidateHint();
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
@@ -345,28 +354,53 @@ async function checkAnswer(): Promise<void> {
 
 async function requestHint(): Promise<void> {
   if (!puzzle?.puzzleToken) return;
-  const progress = boardSolveProgress(board, puzzle.spec);
+  const requestedPuzzle = puzzle;
+  const requestedPuzzleId = requestedPuzzle.id;
+  const requestedPuzzleToken = requestedPuzzle.puzzleToken;
+  const requestedBoard = { ...board };
+  const requestedUsedClueIds = new Set(usedClueIds);
+  const requestedDifficultyLevel = difficultyLevel;
+  const requestedPuzzleStartedAt = puzzleStartedAt;
+  const requestedHintsUsed = hintsUsed;
+  const requestGeneration = ++hintGeneration;
+  activeHintRequest?.abort();
+  const requestController = new AbortController();
+  activeHintRequest = requestController;
+  const isActiveRequest = () => requestGeneration === hintGeneration
+    && puzzle?.id === requestedPuzzleId
+    && puzzle.puzzleToken === requestedPuzzleToken;
+  const progress = boardSolveProgress(requestedBoard, requestedPuzzle.spec);
   const kind = progress.matches === 0 ? "clue" : progress.matches < Math.ceil(progress.total / 2) ? "elimination" : "placement";
   loading = true;
   message = "Tako is finding the next helpful nudge…";
   render();
   try {
-    const result = await fetch("/api/hint", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ puzzleToken: puzzle.puzzleToken, kind }) });
+    const result = await fetch("/api/hint", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ puzzleToken: requestedPuzzleToken, kind }), signal: requestController.signal });
+    if (!isActiveRequest()) return;
     const hint: unknown = await result.json();
+    if (!isActiveRequest()) return;
     if (!result.ok || !hint || typeof hint !== "object") throw new Error("Hint unavailable");
     const value = hint as { kind?: unknown; clue?: { id?: unknown; text?: unknown }; placement?: { subject?: unknown; category?: unknown; value?: unknown } };
     if (value.kind === "placement" && value.placement && typeof value.placement.subject === "string" && typeof value.placement.category === "string" && typeof value.placement.value === "string") {
-      board = { ...board, [squareKey(value.placement.category, value.placement.subject, value.placement.value)]: "yes" };
-      saveBoard(puzzle.id, board);
+      board = { ...requestedBoard, [squareKey(value.placement.category, value.placement.subject, value.placement.value)]: "yes" };
+      saveBoard(requestedPuzzleId, board);
       message = `Hint: ${value.placement.subject} matches ${value.placement.value}.`;
     } else if (value.clue && typeof value.clue.text === "string") {
-      if (typeof value.clue.id === "string") { usedClueIds = new Set(usedClueIds).add(value.clue.id); saveUsedClues(puzzle.id, usedClueIds); }
+      if (typeof value.clue.id === "string") { usedClueIds = new Set(requestedUsedClueIds).add(value.clue.id); saveUsedClues(requestedPuzzleId, usedClueIds); }
       message = `Hint: ${value.clue.text}`;
     } else throw new Error("Invalid hint");
-    hintsUsed += 1;
-    recordOutcome("hint_used");
-  } catch { message = "Tako can’t offer a hint just now. Please try again in a moment."; }
-  finally { loading = false; render(); }
+    hintsUsed = requestedHintsUsed + 1;
+    void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "hint_used", templateId: requestedPuzzle.templateId, requestedDifficultyLevel, assessedDifficultyLevel: requestedPuzzle.difficulty.level, clueCount: requestedPuzzle.clues.length, elapsedMs: requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : undefined, hintsUsed }) }).catch(() => undefined);
+  } catch {
+    if (!isActiveRequest()) return;
+    message = "Tako can’t offer a hint just now. Please try again in a moment.";
+  } finally {
+    if (isActiveRequest()) {
+      activeHintRequest = undefined;
+      loading = false;
+      render();
+    }
+  }
 }
 
 async function sharePuzzle(): Promise<void> {
@@ -583,6 +617,7 @@ root.addEventListener("click", event => {
   }
   if (button.id === "confirm-progress-reset") {
     invalidateVerification();
+    invalidateHint();
     currentFetchId += 1;
     loading = false;
     difficultyUnavailable = false;
