@@ -135,8 +135,17 @@ function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requested
 
 let currentFetchId = 0;
 let activePuzzleRequest: AbortController | undefined;
+let verificationGeneration = 0;
+let activeVerificationRequest: AbortController | undefined;
+
+function invalidateVerification(): void {
+  verificationGeneration += 1;
+  activeVerificationRequest?.abort();
+  activeVerificationRequest = undefined;
+}
 
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
+  invalidateVerification();
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
@@ -274,13 +283,25 @@ function dismissResetDialog(): void {
 
 async function checkAnswer(): Promise<void> {
   if (!puzzle) return;
-  const answer = answerFromBoard(board, puzzle.spec);
+  const requestedPuzzle = puzzle;
+  const requestedPuzzleId = requestedPuzzle.id;
+  const requestedPuzzleToken = requestedPuzzle.puzzleToken;
+  const requestedPlayMode = playMode;
+  const requestedCourse = activeCourse;
+  const requestGeneration = ++verificationGeneration;
+  activeVerificationRequest?.abort();
+  const requestController = new AbortController();
+  activeVerificationRequest = requestController;
+  const isActiveRequest = () => requestGeneration === verificationGeneration
+    && puzzle?.id === requestedPuzzleId
+    && puzzle.puzzleToken === requestedPuzzleToken;
+  const answer = answerFromBoard(board, requestedPuzzle.spec);
   if (!answer) {
     message = "Choose one ✓ in each row and column before checking your solution.";
     render();
     return;
   }
-  if (!puzzle.puzzleToken) {
+  if (!requestedPuzzleToken) {
     message = "Solution checking is temporarily unavailable for this dojo puzzle.";
     render();
     return;
@@ -292,26 +313,33 @@ async function checkAnswer(): Promise<void> {
     const result = await fetch("/api/puzzle", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ puzzleToken: puzzle.puzzleToken, answer }),
+      body: JSON.stringify({ puzzleToken: requestedPuzzleToken, answer }),
+      signal: requestController.signal,
     });
+    if (!isActiveRequest()) return;
     if (!result.ok) throw new Error("Verification is unavailable");
     const response: unknown = await result.json();
+    if (!isActiveRequest()) return;
     if (!response || typeof response !== "object" || typeof (response as { correct?: unknown }).correct !== "boolean") throw new Error("Invalid verification response");
     if ((response as { correct: boolean }).correct) {
       recordOutcome("puzzle_completed");
-      if (shouldAdvanceProgress(playMode)) {
-        progress = completeCourse(progress, activeCourse.id);
+      if (shouldAdvanceProgress(requestedPlayMode)) {
+        progress = completeCourse(progress, requestedCourse.id);
         saveProgress(localStorage, progress);
-        const next = nextCourse(activeCourse);
-        message = next ? `Beautifully solved — ${activeCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
+        const next = nextCourse(requestedCourse);
+        message = next ? `Beautifully solved — ${requestedCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
       } else message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
       pendingCelebration = true;
     } else { recordOutcome("mistake"); message = "Not quite yet. Your notes are saved, so keep refining the grid."; }
   } catch {
+    if (!isActiveRequest()) return;
     message = "Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.";
   } finally {
-    loading = false;
-    render();
+    if (isActiveRequest()) {
+      activeVerificationRequest = undefined;
+      loading = false;
+      render();
+    }
   }
 }
 
@@ -554,6 +582,7 @@ root.addEventListener("click", event => {
     return;
   }
   if (button.id === "confirm-progress-reset") {
+    invalidateVerification();
     currentFetchId += 1;
     loading = false;
     difficultyUnavailable = false;
@@ -745,6 +774,7 @@ root.addEventListener("change", event => {
 });
 
 window.addEventListener("popstate", () => {
+  invalidateVerification();
   playMode = modeFromUrl();
   activeCourse = courseFromUrl() ?? firstAvailableCourse(progress.completed);
   difficultyLevel = playMode === "challenge" ? activeCourse.difficultyLevel : difficultyFromUrl();
