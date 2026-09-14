@@ -1,0 +1,102 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PROGRESS_STORAGE_KEY } from "./progress";
+
+interface FakeButton {
+  id: string;
+  disabled: boolean;
+  dataset: Record<string, string>;
+}
+
+const puzzleResponse = (id: string, token: string) => ({
+  id,
+  seed: id,
+  puzzleToken: token,
+  clues: [],
+  difficulty: { level: 1, label: "Very easy", modelVersion: "test" },
+  spec: {
+    id: "tournament-order-v2",
+    title: "Tournament Order",
+    baseCategory: "judoka",
+    categories: [
+      { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+      { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+    ],
+  },
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+describe("answer verification navigation", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+  });
+
+  it("does not let a response from the previous course complete or alter the new course UI", async () => {
+    const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
+    const windowListeners = new Map<string, () => void>();
+    const root = {
+      innerHTML: "",
+      addEventListener: (name: string, listener: (event: { target: { closest: () => FakeButton | null } }) => void) => listeners.set(name, listener),
+      querySelector: () => null,
+    };
+    let href = "https://example.test/?seed=course-one&mode=challenge&tier=beginner&level=1";
+    const storage = new Map<string, string>();
+    const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+    vi.stubGlobal("document", { querySelector: () => root, activeElement: null });
+    vi.stubGlobal("window", {
+      get location() { return new URL(href); },
+      matchMedia: () => ({ matches: false }),
+      addEventListener: (name: string, listener: () => void) => windowListeners.set(name, listener),
+      history: {
+        pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+        replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+      },
+    });
+    vi.stubGlobal("localStorage", storageApi);
+    vi.stubGlobal("sessionStorage", storageApi);
+    vi.stubGlobal("CSS", { escape: (value: string) => value });
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+
+    const verification = deferred<{ ok: boolean; json: () => Promise<{ correct: boolean }> }>();
+    const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/events") return { ok: true, json: async () => ({}) };
+      if (url === "/api/puzzle" && init?.method === "POST") return verification.promise;
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      return { ok: true, status: 200, json: async () => puzzleResponse(seed, `${seed}-token`) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await import("./main");
+    await flush();
+
+    const click = (button: Partial<FakeButton>) => listeners.get("click")!({
+      target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
+    });
+    click({ dataset: { square: "club|Aki|Lions" } });
+    click({ dataset: { square: "club|Ben|Wolves" } });
+    click({ id: "check-solution" });
+    await flush();
+    expect(root.innerHTML).toContain("Tako is checking your solution");
+
+    click({ dataset: { course: "beginner-2" } });
+    await flush();
+    expect(root.innerHTML).toContain("Beginner Level 2");
+    const newCourseUi = root.innerHTML;
+
+    verification.resolve({ ok: true, json: async () => ({ correct: true }) });
+    await flush();
+    await flush();
+
+    expect(storage.get(PROGRESS_STORAGE_KEY)).toBeUndefined();
+    expect(root.innerHTML).toBe(newCourseUi);
+    expect(root.innerHTML).not.toContain("Level complete!");
+  });
+});
