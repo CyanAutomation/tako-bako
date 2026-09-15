@@ -2,33 +2,11 @@ name: Kaseki Docs Sweep
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to inspect
-        required: true
-        default: main
-        type: string
-      task_description:
-        description: What Kaseki should do
-        required: true
-        default: Keep README.md and docs/ accurate against the current implementation.
-        type: string
-      allowlist:
-        description: Permitted changed-file patterns, comma-separated
-        required: true
-        default: README.md,docs/**/*.md
-        type: string
-      validation_command:
-        description: Validation command to run (leave blank for none)
-        required: false
-        default: npm run check
-        type: string
 
 run-name: >-
-  Docs sweep · ${{ github.repository }}@${{ inputs.ref }}
+  Docs sweep · ${{ github.repository }}@main
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: kaseki-docs-sweep-${{ github.repository }}
@@ -39,20 +17,29 @@ jobs:
     name: Submit Kaseki documentation sweep
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Configure this environment with required reviewers, a main-only branch rule,
+    # KASEKI_API_TOKEN as an environment secret, and KASEKI_BASE_URL as a variable.
+    environment: kaseki-docs
     env:
-      # Create this as a repository or organization Actions variable.
-      KASEKI_BASE_URL: ${{ vars.KASEKI_BASE_URL || 'https://kaseki-tunnel.scheimann.xyz' }}
-
-      # Automatically targets the repository containing this workflow.
+      KASEKI_BASE_URL: ${{ vars.KASEKI_BASE_URL }}
       REPO_URL: ${{ github.server_url }}/${{ github.repository }}
-      REF: ${{ inputs.ref }}
-      TASK_DESCRIPTION: ${{ inputs.task_description }}
-      ALLOWLIST: ${{ inputs.allowlist }}
-      VALIDATION_COMMAND: ${{ inputs.validation_command }}
+      REF: main
+      ALLOWLIST: README.md,docs/**/*.md
+      VALIDATION_COMMAND: npm run check
 
     steps:
       - name: Check Kaseki availability
         run: |
+          set -euo pipefail
+          if [[ -z "${KASEKI_BASE_URL:-}" ]]; then
+            echo "::error title=Missing Kaseki URL::KASEKI_BASE_URL is not configured for the kaseki-docs environment"
+            exit 1
+          fi
+          if [[ ! "$KASEKI_BASE_URL" =~ ^https://[^/]+(/.*)?$ ]]; then
+            echo "::error title=Invalid Kaseki URL::KASEKI_BASE_URL must be an HTTPS URL"
+            exit 1
+          fi
+          KASEKI_BASE_URL="${KASEKI_BASE_URL%/}"
           curl --fail --silent --show-error --max-time 20 \
             "$KASEKI_BASE_URL/ready"
 
@@ -68,7 +55,6 @@ jobs:
             jq -n \
               --arg repoUrl "$REPO_URL" \
               --arg ref "$REF" \
-              --arg taskDescription "$TASK_DESCRIPTION" \
               --arg validationCommand "$VALIDATION_COMMAND" \
               --arg allowlist "$ALLOWLIST" \
               '{
@@ -92,8 +78,7 @@ jobs:
                   maxRetries: 1
                 },
                 taskPrompt: (
-                  $taskDescription
-                  + "\n\nPerform the documentation sweep for this repository. "
+                  "Perform the documentation sweep for this repository. "
                   + "First read repository instructions, then inspect the current "
                   + "implementation and compare it against README.md and documentation "
                   + "under docs/. Update documentation only where inaccurate, incomplete, "
@@ -161,9 +146,6 @@ jobs:
             echo '```text'
             echo "$ALLOWLIST" | tr ',' '\n'
             echo '```'
-            echo
-            echo "### Task description"
-            echo "$TASK_DESCRIPTION"
             echo
             echo "### Validation"
             echo '```text'
