@@ -140,6 +140,34 @@ let activeVerificationRequest: AbortController | undefined;
 let hintGeneration = 0;
 let activeHintRequest: AbortController | undefined;
 
+function showLandingPage(): void {
+  invalidateVerification();
+  invalidateHint();
+  currentFetchId += 1;
+  activePuzzleRequest?.abort();
+  activePuzzleRequest = undefined;
+  puzzle = null;
+  board = {};
+  loading = false;
+  difficultyUnavailable = false;
+  undoStack = [];
+  activeGridId = undefined;
+  usedClueIds = new Set();
+  pendingResetGridId = undefined;
+  pendingNewChallenge = false;
+  pendingProgressReset = false;
+  pendingCelebration = false;
+  resetReturnFocusSelector = undefined;
+  activeCellKey = undefined;
+  clueFilter = "all";
+  challengeOptionsOpen = false;
+  sharedPuzzleOpen = false;
+  puzzleStartedAt = 0;
+  hintsUsed = 0;
+  message = "Choose your next puzzle when you are ready.";
+  render();
+}
+
 function invalidateVerification(): void {
   verificationGeneration += 1;
   activeVerificationRequest?.abort();
@@ -809,12 +837,13 @@ root.addEventListener("change", event => {
 });
 
 window.addEventListener("popstate", () => {
-  invalidateVerification();
   playMode = modeFromUrl();
   activeCourse = courseFromUrl() ?? firstAvailableCourse(progress.completed);
   difficultyLevel = playMode === "challenge" ? activeCourse.difficultyLevel : difficultyFromUrl();
   templateId = playMode === "challenge" ? activeCourse.templateId : templateFromUrl();
-  void fetchPuzzle(seedFromUrl() ?? newSeed(), "none");
+  const seed = seedFromUrl();
+  if (seed) void fetchPuzzle(seed, "none");
+  else showLandingPage();
 });
 
 render();
