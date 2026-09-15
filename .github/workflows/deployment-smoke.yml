@@ -1,0 +1,43 @@
+name: Deployment smoke test
+
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deployment-smoke-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Check production health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      HEALTH_URL: https://tako-bako.vercel.app/api/health
+    steps:
+      - name: Verify the deployed API and its required dependency
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          http_status="$(
+            curl --silent --show-error --max-time 20 \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              "$HEALTH_URL"
+          )"
+
+          if [[ "$http_status" != "200" ]] || ! jq -e '.status == "ok" and .dependencies.yokaiba == "ok"' "$response_file" >/dev/null; then
+            echo "::error title=Production health check failed::GET $HEALTH_URL returned HTTP $http_status"
+            cat "$response_file"
+            exit 1
+          fi
+
+          {
+            echo "## Production health check"
+            echo
+            echo "GET \`$HEALTH_URL\` returned HTTP \`$http_status\`."
+          } >> "$GITHUB_STEP_SUMMARY"
