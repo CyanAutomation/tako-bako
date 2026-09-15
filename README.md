@@ -102,7 +102,7 @@ api/         Vercel API functions
   puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
   hint.ts     POST /hint assistance proxy
   events.ts   POST /events anonymous calibration proxy
-  health.ts   GET /healthz readiness check
+  health.ts   GET /health readiness check
 index.html      App entry HTML
 vite.config.ts  Dev proxy: /api/puzzle → /v1/puzzles/generate
 vercel.json     Vercel deployment config, security headers, output dir
