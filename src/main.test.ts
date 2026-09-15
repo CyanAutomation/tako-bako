@@ -160,4 +160,59 @@ describe("answer verification navigation", () => {
     expect(storage.get("tako-bako.clues.puzzle-b")).toBeUndefined();
     expect(root.innerHTML).not.toContain("An old hint");
   });
+
+  it("returns to the seedless landing page when navigating Back from a started puzzle", async () => {
+    const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
+    const windowListeners = new Map<string, () => void>();
+    const root = {
+      innerHTML: "",
+      addEventListener: (name: string, listener: (event: { target: { closest: () => FakeButton | null } }) => void) => listeners.set(name, listener),
+      querySelector: () => null,
+    };
+    let href = "https://example.test/";
+    const storage = new Map<string, string>();
+    const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+    vi.stubGlobal("document", { querySelector: () => root, activeElement: null });
+    vi.stubGlobal("window", {
+      get location() { return new URL(href); },
+      matchMedia: () => ({ matches: false }),
+      addEventListener: (name: string, listener: () => void) => windowListeners.set(name, listener),
+      history: {
+        pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+        replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+      },
+    });
+    vi.stubGlobal("localStorage", storageApi);
+    vi.stubGlobal("sessionStorage", storageApi);
+    vi.stubGlobal("CSS", { escape: (value: string) => value });
+    vi.stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+    vi.stubGlobal("crypto", { randomUUID: () => "reproducible-seed" });
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url === "/api/events") return { ok: true, json: async () => ({}) };
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      return { ok: true, status: 200, json: async () => puzzleResponse(seed, `${seed}-token`) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await import("./main");
+    const click = (button: Partial<FakeButton>) => listeners.get("click")!({
+      target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
+    });
+    click({ id: "start-puzzle" });
+    await flush();
+
+    expect(href).toContain("seed=reproducible-seed");
+    expect(root.innerHTML).toContain('id="share-puzzle"');
+
+    href = "https://example.test/";
+    windowListeners.get("popstate")!();
+    await flush();
+
+    expect(href).toBe("https://example.test/");
+    expect(root.innerHTML).toContain('class="landing-state"');
+    expect(root.innerHTML).toContain('id="start-puzzle"');
+    expect(root.innerHTML).not.toContain('id="share-puzzle"');
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).startsWith("/api/puzzle?")).length).toBe(1);
+  });
 });
