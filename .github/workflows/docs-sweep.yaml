@@ -31,7 +31,10 @@ jobs:
       - name: Check Kaseki availability
         run: |
           set -euo pipefail
-          : "${KASEKI_BASE_URL:?KASEKI_BASE_URL is not configured for the kaseki-docs environment}"
+          if [[ -z "${KASEKI_BASE_URL:-}" ]]; then
+            echo "::error title=Missing Kaseki URL::KASEKI_BASE_URL is not configured for the kaseki-docs environment"
+            exit 1
+          fi
           if [[ ! "$KASEKI_BASE_URL" =~ ^https://[^/]+(/.*)?$ ]]; then
             echo "::error title=Invalid Kaseki URL::KASEKI_BASE_URL must be an HTTPS URL"
             exit 1
