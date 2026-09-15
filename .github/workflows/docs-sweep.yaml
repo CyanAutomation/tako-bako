@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${KASEKI_BASE_URL:-}" ]]; then
-            echo "::error title=Missing Kaseki URL::KASEKI_BASE_URL is not configured for the kaseki-docs environment"
+            echo "::error title=Missing Kaseki URL::KASEKI_BASE_URL is empty or not configured for the kaseki-docs environment"
             exit 1
           fi
           if [[ ! "$KASEKI_BASE_URL" =~ ^https://[^/]+(/.*)?$ ]]; then
