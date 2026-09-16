@@ -26,7 +26,9 @@ let loading = false;
 let message = "Choose your next puzzle when you are ready.";
 let difficultyUnavailable = false;
 let undoStack: Board[] = [];
-let assist = localStorage.getItem("tako-bako.assist") === "on";
+const SMART_MARKING_STORAGE_KEY = "tako-bako.smart-marking";
+// Preserve the previous preference during this terminology migration.
+let smartMarking = (localStorage.getItem(SMART_MARKING_STORAGE_KEY) ?? localStorage.getItem("tako-bako.assist")) === "on";
 type PlayMode = "challenge" | "shared";
 
 let progress = loadProgress(localStorage);
@@ -65,7 +67,7 @@ class DifficultyUnavailableError extends Error {
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
   if (!puzzle) return;
-  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed }) }).catch(() => undefined);
+  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed, smartMarkingEnabled: smartMarking }) }).catch(() => undefined);
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -525,7 +527,7 @@ function renderPuzzle(current: Puzzle): string {
   const progress = boardSolveProgress(board, current.spec);
   const title = playMode === "challenge" ? activeCourse.label : current.spec.title;
   const courseLabel = playMode === "challenge" ? `${activeCourse.tier[0]!.toUpperCase()}${activeCourse.tier.slice(1)} · Level ${activeCourse.level}` : `Shared · Level ${current.difficulty.level}`;
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, assist }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
+  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, smartMarking }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
 }
 
 function renderLandingAction(): string {
@@ -698,12 +700,12 @@ root.addEventListener("click", event => {
     root.querySelector<HTMLButtonElement>("#challenge-menu")?.focus();
     return;
   }
-  if (button.id === "assist-toggle") {
-    assist = !assist;
-    localStorage.setItem("tako-bako.assist", assist ? "on" : "off");
-    message = assist ? "Smart marking is on. New ✓ marks will rule out the other squares in their row and column." : "Smart marking is off. You are in full control of every mark.";
+  if (button.id === "smart-marking-toggle") {
+    smartMarking = !smartMarking;
+    localStorage.setItem(SMART_MARKING_STORAGE_KEY, smartMarking ? "on" : "off");
+    message = smartMarking ? "Smart marking is on. New ✓ marks will rule out the other squares in their row and column." : "Smart marking is off. You are in full control of every mark.";
     render();
-    root.querySelector<HTMLButtonElement>("#assist-toggle")?.focus();
+    root.querySelector<HTMLButtonElement>("#smart-marking-toggle")?.focus();
     return;
   }
   if (button.dataset.gridTab) {
@@ -747,7 +749,7 @@ root.addEventListener("click", event => {
     if (!category || !base) return;
     const key = button.dataset.square;
     const previous = board;
-    saveCurrentBoard(markBoard(board, key, category, base, assist));
+    saveCurrentBoard(markBoard(board, key, category, base, smartMarking));
     updateBoardView(previous, current);
     focusGridCell(key);
   }

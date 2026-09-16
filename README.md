@@ -36,7 +36,7 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 2. **Undo** -- Revert the last mark. All previous marks remain available on the undo stack until the page reloads.
 
-3. **Smart marking (Assist)** -- Toggle smart marking on from the board toolbar. When enabled, placing a ✓ automatically rules out the other squares in the same row and column. Turn it off when you want full control of every mark.
+3. **Smart marking (Efficiency)** -- Toggle smart marking on from the board toolbar. It is an advanced-player speed tool: placing a ✓ automatically rules out the other squares in the same row and column. Turn it off when you want full control of every mark.
 
 4. **Check** -- Once your board meets the readiness requirement, submit it via the Check button. Tako Bako sends a puzzle token and your completed board to the API layer, which verifies the answer against Yokaiba. Correct deductions advance your Puzzle Challenge course.
 

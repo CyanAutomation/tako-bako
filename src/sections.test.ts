@@ -10,20 +10,20 @@ describe("puzzle UI sections", () => {
   });
 
   it("labels the board actions and exposes their interaction roles", () => {
-    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, hintDisabled: false, assist: true });
+    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
     expect(toolbar).toContain('2 of 4 matches found');
     expect(toolbar).toContain('id="undo"');
     expect(toolbar).toContain('id="check-solution"');
     expect(toolbar).toContain('Choose one match in each row and column, then check your solution.');
     expect(toolbar).toContain('>Check my solution</span>');
     expect(toolbar).not.toContain('id="redo"');
-    expect(toolbar).toContain('id="assist-toggle"');
+    expect(toolbar).toContain('id="smart-marking-toggle"');
     expect(toolbar).toContain('id="hint"');
-    expect(toolbar).toContain('aria-label="Smart marking: on"');
+    expect(toolbar).toContain('aria-label="Smart marking: on. An efficiency tool');
     expect(toolbar).toContain('class="board-actions"');
     expect(toolbar).toContain('aria-label="Board actions"');
     expect(toolbar).toContain('data-action-role="utility"');
-    expect(toolbar).toContain('data-action-role="toggle"');
+    expect(toolbar).toContain('data-action-role="efficiency"');
     expect(toolbar).toContain('data-action-role="primary"');
     expect(toolbar).toContain('class="readiness-meter"');
     expect(toolbar).toContain('aria-label="2 of 4 matches found"');
