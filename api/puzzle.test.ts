@@ -103,6 +103,21 @@ describe("puzzle proxy", () => {
     expect(result.headers.get("etag")).toBe('"yokaiba-v1-cached"');
   });
 
+  it("retries one transient upstream generation failure before surfacing an error", async () => {
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "recovered" }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", upstream);
+    const metric = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "recovery-day" } } as never, response as never);
+
+    expect(result).toMatchObject({ statusCode: 200, body: { id: "recovered" } });
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(metric).toHaveBeenCalledWith("tako_bako_api_metric", expect.objectContaining({ operation: "generate", outcome: "success", retryCount: 1 }));
+  });
+
   it("forwards an allowlisted expanded template to Yokaiba", async () => {
     const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "champion" }), {
       status: 200, headers: { "content-type": "application/json" },
