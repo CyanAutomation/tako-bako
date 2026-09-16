@@ -188,6 +188,15 @@ select,
   color: var(--paper);
   background: var(--jade);
 }
+.button--efficiency[aria-pressed="false"] {
+  color: var(--navy);
+  background: var(--gold);
+  border-color: var(--navy);
+}
+.button--efficiency[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--navy);
+}
 .button--icon {
   display: inline-grid;
   width: 2.45rem;
@@ -1212,8 +1221,8 @@ footer {
   color: var(--navy);
   background: var(--paper);
 }
-.board-actions [data-action-role="toggle"] {
-  border-color: var(--jade);
+.board-actions [data-action-role="efficiency"] {
+  border-color: var(--navy);
 }
 .board-actions [data-action-role="primary"] {
   box-shadow: 3px 3px 0 var(--rust);
@@ -1252,12 +1261,6 @@ footer {
 }
 
 /* Cosy design-system refinements: the logic board stays precise while the surrounding dojo gains softer, collectible details. */
-.button--assist[aria-pressed="false"] {
-  background: #f7c777;
-}
-.button--assist[aria-pressed="true"] {
-  background: #be6661;
-}
 .page-shell {
   box-shadow:
     0 0 0 5px var(--ink),
@@ -1577,10 +1580,6 @@ footer {
   border-style: solid;
   box-shadow: none;
   opacity: 0.72;
-}
-.button--assist[aria-pressed="true"] {
-  color: var(--paper);
-  background: var(--jade);
 }
 .board-state-controls {
   border-radius: var(--control-radius);
