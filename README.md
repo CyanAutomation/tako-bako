@@ -34,13 +34,13 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 1. **Mark / Eliminate** -- Click a cell to cycle through states: empty, yes (a ✓), then no (an ×). Place a guess or rule one out with the same action, without committing to an answer. A readiness meter shows how many matches you have found versus total required. You must have at least one ✓ in each row and column before checking your deduction.
 
-2. **Undo** -- Revert the last mark. All previous marks remain available on the undo stack until the page reloads.
+2. **Undo** -- Revert the last mark. The undo stack is cleared whenever a new puzzle is fetched or you return to the landing page, so marks never carry over between puzzles.
 
 3. **Smart marking (Efficiency)** -- Toggle smart marking on from the board toolbar. It is an advanced-player speed tool: placing a ✓ automatically rules out the other squares in the same row and column. Turn it off when you want full control of every mark.
 
 4. **Check** -- Once your board meets the readiness requirement, submit it via the Check button. Tako Bako sends a puzzle token and your completed board to the API layer, which verifies the answer against Yokaiba. Correct deductions advance your Puzzle Challenge course.
 
-5. **Share** -- Copy the current page URL to the clipboard. The link encodes the seed, template, difficulty, and optional tier/level parameters so others can open the same puzzle or jump directly into a Puzzle Challenge course.
+5. **Share** -- Copy the current page URL to the clipboard. The link always encodes the seed and mode: challenge links add tier and level, while shared links add template and difficulty (mutually exclusive), so others can open the same puzzle or jump directly into a Puzzle Challenge course.
 
 Four current scenarios are available: Tournament Order (a compact 4×4 warm-up designed for step-by-step deduction), Open Division (a broader 5×5 challenge), Championship Bridge (a five-row bridge into the expert three-grid board), and Championship Circuit (an expert 5×5 puzzle with three grids). Tournament Order v1 remains available for legacy shared links.
 
@@ -67,7 +67,7 @@ Vite proxies `/api/puzzle` requests to Yokaiba during development, routing queri
 
 ## Deployment
 
-`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. Vercel serverless functions live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` and `/api/events` proxy bounded assistance and anonymous calibration outcomes. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
+`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. Vercel serverless functions live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` and `/api/events` proxy bounded assistance and anonymous calibration outcomes; `/api/health` reports app and upstream puzzle-service readiness. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
 
 The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options headers for all non-asset routes (`/(.*)`). Static assets at `/assets/(.*)` receive immutable caching for one year with `Cache-Control: public, max-age=31536000, immutable`.
 
