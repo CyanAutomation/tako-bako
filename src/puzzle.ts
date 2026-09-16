@@ -65,12 +65,12 @@ export function squareKey(categoryId: string, row: string, column: string): stri
   return [categoryId, row, column].map(encodeURIComponent).join("|");
 }
 
-/** Applies a mark without mutating the saved board. Optional assist eliminates obvious peers. */
-export function markBoard(board: Board, key: string, category: Category, base: Category, assist: boolean): Board {
+/** Applies a mark without mutating the saved board. Smart marking eliminates obvious peers. */
+export function markBoard(board: Board, key: string, category: Category, base: Category, smartMarking: boolean): Board {
   const next = cycleMark(board[key] ?? "unknown");
   const updated: Board = { ...board };
   if (next === "unknown") delete updated[key]; else updated[key] = next;
-  if (next !== "yes" || !assist) return updated;
+  if (next !== "yes" || !smartMarking) return updated;
 
   const parts = key.split("|");
   if (parts.length !== 3) return updated;

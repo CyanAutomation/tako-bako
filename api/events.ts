@@ -4,6 +4,7 @@ const URL = "https://yokaiba.scheimann.workers.dev/v1/events";
 const EVENTS = new Set(["puzzle_started", "puzzle_completed", "hint_used", "mistake", "puzzle_abandoned"]);
 const TEMPLATE_IDS = new Set(["tournament-order-v1", "tournament-order-v2", "open-division-v2", "championship-bridge-v1", "championship-circuit-v2"]);
 const NUMBER_FIELDS = ["requestedDifficultyLevel", "assessedDifficultyLevel", "clueCount", "elapsedMs", "hintsUsed", "mistakes"] as const;
+const BOOLEAN_FIELDS = ["smartMarkingEnabled"] as const;
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "POST") { response.setHeader("allow", "POST"); response.status(405).json({ error: "Method not allowed" }); return; }
@@ -18,6 +19,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const difficulty = field === "requestedDifficultyLevel" || field === "assessedDifficultyLevel";
     const maximum = difficulty ? 12 : field === "elapsedMs" ? 86_400_000 : 100;
     if (typeof candidate !== "number" || !Number.isSafeInteger(candidate) || candidate < (difficulty ? 1 : 0) || candidate > maximum) { response.status(400).json({ error: "A valid anonymous puzzle outcome is required" }); return; }
+    event[field] = candidate;
+  }
+  for (const field of BOOLEAN_FIELDS) {
+    const candidate = value[field];
+    if (candidate === undefined) continue;
+    if (typeof candidate !== "boolean") { response.status(400).json({ error: "A valid anonymous puzzle outcome is required" }); return; }
     event[field] = candidate;
   }
   try {
