@@ -60,8 +60,8 @@ describe("shared UI primitives", () => {
     expect(iconButton).toContain('<span>Undo</span>');
     expect(iconButton).toContain('aria-hidden="true"');
     expect(iconButton).not.toContain("↶");
-    const labelledIconButton = renderButton({ id: "assist", label: "Smart marking: on", icon: "sparkle", pressed: true });
-    expect(labelledIconButton).toContain('class="button button--with-icon button--secondary"');
+    const labelledIconButton = renderButton({ id: "smart-marking", label: "Smart marking: on", icon: "fast-forward", variant: "efficiency", pressed: true });
+    expect(labelledIconButton).toContain('class="button button--with-icon button--efficiency"');
     expect(labelledIconButton).toContain('<span>Smart marking: on</span>');
   });
 

@@ -10,7 +10,7 @@ export interface ButtonOptions {
   icon?: IconName;
   /** Icon-only controls are reserved for compact, familiar navigation actions. */
   iconOnly?: boolean;
-  variant?: "primary" | "secondary" | "danger" | "toggle";
+  variant?: "primary" | "secondary" | "danger" | "toggle" | "efficiency";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
   pressed?: boolean;
@@ -21,7 +21,7 @@ export interface ButtonOptions {
 }
 
 /** Icons belong to one small rounded-stroke family so browser emoji never leak into the UI. */
-export type IconName = "share" | "undo" | "reset" | "lock" | "unlock" | "check" | "sparkle" | "arrow-left" | "arrow-right";
+export type IconName = "share" | "undo" | "reset" | "lock" | "unlock" | "check" | "sparkle" | "fast-forward" | "arrow-left" | "arrow-right";
 
 const iconPaths: Record<IconName, string> = {
   share: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
@@ -31,6 +31,7 @@ const iconPaths: Record<IconName, string> = {
   unlock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M16 10V7a4 4 0 0 0-7-2.7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   sparkle: '<path d="m12 3 .8 5.2L18 9l-5.2.8L12 15l-.8-5.2L6 9l5.2-.8L12 3Z"/><path d="m19 15 .4 2.6L22 18l-2.6.4L19 21l-.4-2.6L16 18l2.6-.4L19 15Z"/>',
+  "fast-forward": '<path d="m5 5 7 7-7 7V5Z"/><path d="m12 5 7 7-7 7V5Z"/>',
   "arrow-left": '<path d="m14 5-7 7 7 7"/><path d="M7 12h11"/>',
   "arrow-right": '<path d="m10 5 7 7-7 7"/><path d="M17 12H6"/>',
 };
