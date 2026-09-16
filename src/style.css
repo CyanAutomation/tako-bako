@@ -4,10 +4,10 @@
   --paper: #fff1ca;
   --surface: #f7e7bc;
   --canvas: #e6d4a4;
-  --gold: #f5cf75;
-  --jade: #1c716a;
+  --gold: #f5cf75; /* attention and focus */
+  --jade: #1c716a; /* success, selected state, primary action */
   --jade-light: #c8e0be;
-  --rust: #b74e45;
+  --rust: #b74e45; /* destructive actions and errors */
   --line: #756b54;
   --muted: #625a48;
   --border: 2px solid var(--ink);
@@ -176,14 +176,17 @@ select,
 .button--primary:hover:not(:disabled) {
   background: #145751;
 }
-.button--danger,
-.button--assist {
+.button--danger {
   color: var(--paper);
   background: var(--rust);
 }
-.button--assist[aria-pressed="false"] {
+.button--toggle[aria-pressed="false"] {
   color: var(--navy);
   background: var(--gold);
+}
+.button--toggle[aria-pressed="true"] {
+  color: var(--paper);
+  background: var(--jade);
 }
 .button--icon {
   display: inline-grid;
