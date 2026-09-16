@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSelect, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSegmentedControl, renderSelect, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -63,6 +63,16 @@ describe("shared UI primitives", () => {
     const labelledIconButton = renderButton({ id: "assist", label: "Smart marking: on", icon: "sparkle", pressed: true });
     expect(labelledIconButton).toContain('class="button button--with-icon button--secondary"');
     expect(labelledIconButton).toContain('<span>Smart marking: on</span>');
+  });
+
+  it("renders filter choices through one labelled segmented-control primitive", () => {
+    const markup = renderSegmentedControl({ label: "Filter clues", items: [
+      { id: "all", label: "All", selected: true, data: { clueFilter: "all" } },
+      { id: "used", label: "Used", selected: false, data: { clueFilter: "used" } },
+    ] });
+    expect(markup).toContain('class="segmented-control" role="group" aria-label="Filter clues"');
+    expect(markup).toContain('data-clue-filter="all"');
+    expect(markup).toContain('aria-pressed="true"');
   });
 
   it("renders each Puzzle Challenge level through one stateful card primitive", () => {

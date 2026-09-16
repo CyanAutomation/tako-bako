@@ -55,8 +55,19 @@ function isTimeoutError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "TimeoutError";
 }
 
-async function fetchYokaiba(url: string, init?: RequestInit): Promise<Response> {
-  return fetch(url, { ...init, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+async function fetchYokaiba(url: string, init?: RequestInit): Promise<{ response: Response; retryCount: number }> {
+  const request = () => fetch(url, { ...init, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+  let response = await request();
+  let retryCount = 0;
+  // A Cloudflare Worker can occasionally return a transient 5xx while an
+  // otherwise healthy deployment is generating a dense targeted puzzle.
+  // Retry once only; client-visible rate limits and deterministic 4xx errors
+  // must remain single-attempt responses.
+  if (response.status >= 500 && response.status <= 599) {
+    retryCount = 1;
+    response = await request();
+  }
+  return { response, retryCount };
 }
 
 function upstreamFailure(response: VercelResponse, operation: Operation, error: unknown, startedAt: number): void {
@@ -146,7 +157,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     try {
-      const upstream = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
+      const { response: upstream } = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(completion),
@@ -192,7 +203,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       parameters.set("difficultyLevel", difficultyLevel);
       parameters.set("allowSeedFallback", "true");
     }
-    const upstream = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
+    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
     forwardUpstreamRequestId(upstream, response);
     forwardEtag(upstream, response);
     forwardRateLimitHeaders(upstream, response);
@@ -216,7 +227,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     response.setHeader("server-timing", `yokaiba;dur=${Date.now() - startedAt}`);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
-    logMetric("generate", "success", 200, startedAt);
+    logMetric("generate", "success", 200, startedAt, { retryCount });
   } catch (error) {
     upstreamFailure(response, "generate", error, startedAt);
   }

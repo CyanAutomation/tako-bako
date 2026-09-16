@@ -134,6 +134,7 @@ function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requested
 }
 
 let currentFetchId = 0;
+let puzzleLoadFailed = false;
 let activePuzzleRequest: AbortController | undefined;
 let verificationGeneration = 0;
 let activeVerificationRequest: AbortController | undefined;
@@ -150,6 +151,7 @@ function showLandingPage(): void {
   board = {};
   loading = false;
   difficultyUnavailable = false;
+  puzzleLoadFailed = false;
   undoStack = [];
   activeGridId = undefined;
   usedClueIds = new Set();
@@ -192,6 +194,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   if (puzzle) recordOutcome("puzzle_abandoned");
   loading = true;
   difficultyUnavailable = false;
+  puzzleLoadFailed = false;
   message = "Tako is setting the puzzle tiles…";
   const fetchId = ++currentFetchId;
   activePuzzleRequest?.abort();
@@ -232,6 +235,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     }
     if (fetchId !== currentFetchId) return;
     puzzle = data;
+    puzzleLoadFailed = false;
     puzzleStartedAt = Date.now();
     hintsUsed = 0;
     recordOutcome("puzzle_started");
@@ -249,6 +253,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   } catch (error) {
     if (fetchId !== currentFetchId) return;
     puzzle = null;
+    puzzleLoadFailed = true;
     difficultyUnavailable = error instanceof DifficultyUnavailableError;
     message = error instanceof Error ? error.message : "The puzzle could not be collected. Please try again.";
   } finally {
@@ -525,7 +530,7 @@ function renderPuzzle(current: Puzzle): string {
 
 function renderLandingAction(): string {
   if (difficultyUnavailable) return renderButton({ id: "try-another-puzzle", label: "Try another puzzle", variant: "primary", disabled: loading });
-  return renderButton({ id: "start-puzzle", label: loading ? "Preparing challenge…" : `Start ${activeCourse.label}`, variant: "primary", disabled: loading });
+  return renderButton({ id: "start-puzzle", label: loading ? "Preparing challenge…" : puzzleLoadFailed ? `Retry ${activeCourse.label}` : `Start ${activeCourse.label}`, variant: "primary", disabled: loading });
 }
 
 function render(): void {

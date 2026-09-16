@@ -10,7 +10,7 @@ export interface ButtonOptions {
   icon?: IconName;
   /** Icon-only controls are reserved for compact, familiar navigation actions. */
   iconOnly?: boolean;
-  variant?: "primary" | "secondary" | "danger" | "assist";
+  variant?: "primary" | "secondary" | "danger" | "toggle";
   disabled?: boolean;
   /** State exposed by toggle-like controls. */
   pressed?: boolean;
@@ -109,6 +109,12 @@ export interface LevelCardOptions {
   state: "complete" | "current" | "available" | "locked";
 }
 
+export interface SegmentedControlOptions {
+  label: string;
+  items: readonly { id: string; label: string; selected: boolean; data: Record<string, string> }[];
+  className?: string;
+}
+
 export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 /** A consistent semantic button used by page, toolbar, and settings actions. */
@@ -178,6 +184,11 @@ export function renderLevelCard({ courseId, label, level, state }: LevelCardOpti
 /** Groups related controls under one accessible label. */
 export function renderControlGroup(label: string, controls: string, className = "control-group"): string {
   return `<div class="${escapeHtml(className)}" aria-label="${escapeHtml(label)}">${controls}</div>`;
+}
+
+/** A shared, mutually exclusive control for filters and compact mode choices. */
+export function renderSegmentedControl({ label, items, className = "segmented-control" }: SegmentedControlOptions): string {
+  return `<div class="${escapeHtml(className)}" role="group" aria-label="${escapeHtml(label)}">${items.map(item => renderButton({ label: item.label, pressed: item.selected, data: item.data })).join("")}</div>`;
 }
 
 /** A reusable, labelled native dialog. The caller owns its open state and actions. */

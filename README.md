@@ -77,7 +77,7 @@ The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer
 
 Tako Bako forwards completed boards to Yokaiba via the `/api/puzzle` endpoint. Before deploying this feature, configure the same `PUZZLE_TOKEN_SECRET` on the Yokaiba Worker (using `wrangler secret put PUZZLE_TOKEN_SECRET`) and redeploy it. The token is issued with each generated puzzle and is never exposed as a solution; without the secret, the player keeps working normally but solution checking is unavailable.
 
-The API caches puzzle responses at the edge with `s-maxage=300` and `stale-while-revalidate=3600`. Upstream rate-limit headers are forwarded to the client. Yokaiba timeouts produce a 504 with a user-friendly message. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events never include a player identifier, seed, or answer cells.
+The API caches puzzle responses at the edge with `s-maxage=300` and `stale-while-revalidate=3600`. Upstream rate-limit headers are forwarded to the client. A single transient upstream 5xx is retried before the API returns a user-friendly 502/504 failure, while rate-limit and validation responses are never retried. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events never include a player identifier, seed, or answer cells.
 
 ## Project Structure
 
