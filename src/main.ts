@@ -12,7 +12,7 @@ import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzl
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
+import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
 import mascotUrl from "./brand/tako-bako-mascot-512.png";
 import markUrl from "./brand/tako-bako-mark-512.png";
 
@@ -50,8 +50,6 @@ let challengeOptionsOpen = false;
 let sharedPuzzleOpen = false;
 let puzzleStartedAt = 0;
 let hintsUsed = 0;
-
-const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 function newSeed(): string {
   return crypto.randomUUID();
