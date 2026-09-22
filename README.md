@@ -6,7 +6,7 @@ A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy
 
 ## Getting Started
 
-Prerequisites: Node.js 20.19+ or 22.12+ (matching Vite's supported runtime).
+Prerequisites: Node.js ^20.19.0 || >=22.12.0 (matching Vite's supported runtime).
 
 1. Install dependencies:
 
@@ -32,7 +32,7 @@ Prerequisites: Node.js 20.19+ or 22.12+ (matching Vite's supported runtime).
 
 Tako Bako presents logic grid puzzles with several categories of clues. For example, "The cat owner lives next door to the fish keeper" or "The Swiss plays tennis." Players deduce correct assignments using these tools:
 
-1. **Mark / Eliminate** -- Click a cell to cycle through states: empty, yes (a ✓), then no (an ×). Place a guess or rule one out with the same action, without committing to an answer. A readiness meter shows how many matches you have found versus total required. You must have at least one ✓ in each row and column before checking your deduction.
+1. **Mark / Eliminate** -- Click a cell to cycle through states: empty, yes (a ✓), then no (an ×). Place a guess or rule one out with the same action, without committing to an answer. A readiness meter shows how many affirmative matches (✓) you have placed versus the total required. Submit when progress reaches full completion.
 
 2. **Undo** -- Revert the last mark. The undo stack is cleared whenever a new puzzle is fetched or you return to the landing page, so marks never carry over between puzzles.
 
