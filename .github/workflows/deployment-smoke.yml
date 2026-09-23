@@ -14,7 +14,7 @@ concurrency:
 jobs:
   health:
     name: Check production health
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     env:
       HEALTH_URL: https://tako-bako.vercel.app/api/health
@@ -23,8 +23,11 @@ jobs:
         run: |
           set -euo pipefail
           response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
           http_status="$(
-            curl --silent --show-error --max-time 20 \
+            curl --silent --show-error \
+              --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 60 \
+              --connect-timeout 10 --max-time 20 \
               --output "$response_file" \
               --write-out '%{http_code}' \
               "$HEALTH_URL"
