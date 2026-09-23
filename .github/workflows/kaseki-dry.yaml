@@ -99,6 +99,10 @@ jobs:
         run: |
           set -euo pipefail
 
+          : "${KASEKI_API_TOKEN:?KASEKI_API_TOKEN is not configured}"
+
+          response_file="$(mktemp)"
+
           response_file="$(mktemp)"
           trap 'rm -f "$response_file"' EXIT
 
