@@ -8,8 +8,7 @@ on:
 run-name: >-
   Docs sweep · ${{ github.repository }}@${{ github.event.repository.default_branch }}
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: kaseki-docs-${{ github.repository }}
@@ -26,7 +25,7 @@ jobs:
   system_status:
     name: Kaseki System Status
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     environment: kaseki-agent
     env:
@@ -65,7 +64,7 @@ jobs:
     name: Kaseki System Readiness
     needs: system_status
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     environment: kaseki-agent
     env:
@@ -103,7 +102,7 @@ jobs:
     name: Kaseki API Status
     needs: readiness
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 2
     environment: kaseki-agent
     env:
@@ -145,7 +144,7 @@ jobs:
     name: Submit Kaseki documentation sweep
     needs: api_connection
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: kaseki-agent
     env:
@@ -303,6 +302,8 @@ jobs:
 
       - name: Publish submission details
         shell: bash
+        env:
+          RUN_ID: ${{ steps.submit.outputs.run_id }}
         run: |
           {
             echo "## Kaseki submission"
@@ -314,7 +315,7 @@ jobs:
             echo "| Mode | \`patch\` → \`draft_pr\` |"
             echo "| Timeout | 3 hours |"
             echo "| Maximum diff | 100 KiB |"
-            echo "| Kaseki run | \`${{ steps.submit.outputs.run_id }}\` |"
+            echo "| Kaseki run | \`$RUN_ID\` |"
             echo
             echo "### Allowed paths"
             echo '```text'
