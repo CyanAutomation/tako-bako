@@ -11,6 +11,7 @@ import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scena
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
+import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
 import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
 import mascotUrl from "./brand/tako-bako-mascot-512.png";
@@ -90,12 +91,12 @@ function openSharedPuzzle(input: SharedPuzzleInput): void {
 
 function seedFromUrl(): string | undefined {
   const seed = new URL(window.location.href).searchParams.get("seed");
-  return seed && /^[a-zA-Z0-9-]{1,128}$/.test(seed) ? seed : undefined;
+  return seed !== null && isValidSeed(seed) ? seed : undefined;
 }
 
 function difficultyFromUrl(): number | undefined {
   const level = new URL(window.location.href).searchParams.get("difficulty");
-  return level && /^(?:[1-9]|1[0-2])$/.test(level) ? Number(level) : undefined;
+  return parseDifficultyLevel(level);
 }
 
 function templateFromUrl(): ScenarioId {
