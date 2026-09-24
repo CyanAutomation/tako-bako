@@ -1,36 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
 import { completeCourse, emptyProgress, isCourseUnlocked, parseProgress, resetProgress, shouldAdvanceProgress } from "./progress";
 
 describe("Puzzle Challenge progress", () => {
   it("starts with Beginner Level 1 as the only available course", () => {
     const progress = emptyProgress();
-    expect(isCourseUnlocked(progress, "beginner-1")).toBe(true);
-    expect(isCourseUnlocked(progress, "beginner-2")).toBe(false);
+    assert.strictEqual(isCourseUnlocked(progress, "beginner-1"), true);
+    assert.strictEqual(isCourseUnlocked(progress, "beginner-2"), false);
   });
 
   it("unlocks exactly the next course when the current one is completed", () => {
     const progress = completeCourse(emptyProgress(), "beginner-1");
-    expect(progress.completed).toEqual(["beginner-1"]);
-    expect(isCourseUnlocked(progress, "beginner-2")).toBe(true);
-    expect(isCourseUnlocked(progress, "beginner-3")).toBe(false);
+    assert.deepStrictEqual(progress.completed, ["beginner-1"]);
+    assert.strictEqual(isCourseUnlocked(progress, "beginner-2"), true);
+    assert.strictEqual(isCourseUnlocked(progress, "beginner-3"), false);
   });
 
   it("is idempotent and ignores malformed stored values", () => {
     const complete = completeCourse(completeCourse(emptyProgress(), "beginner-1"), "beginner-1");
-    expect(complete.completed).toEqual(["beginner-1"]);
-    expect(parseProgress('{"version":1,"completed":["beginner-1","not-a-course"]}')).toEqual({ version: 1, completed: ["beginner-1"] });
-    expect(parseProgress("not json")).toEqual(emptyProgress());
+    assert.deepStrictEqual(complete.completed, ["beginner-1"]);
+    assert.deepStrictEqual(parseProgress('{"version":1,"completed":["beginner-1","not-a-course"]}'), { version: 1, completed: ["beginner-1"] });
+    assert.deepStrictEqual(parseProgress("not json"), emptyProgress());
   });
 
   it("resets only Puzzle Challenge completion back to the first level", () => {
-    expect(resetProgress()).toEqual(emptyProgress());
-    expect(isCourseUnlocked(resetProgress(), "beginner-1")).toBe(true);
-    expect(isCourseUnlocked(resetProgress(), "beginner-2")).toBe(false);
+    assert.deepStrictEqual(resetProgress(), emptyProgress());
+    assert.strictEqual(isCourseUnlocked(resetProgress(), "beginner-1"), true);
+    assert.strictEqual(isCourseUnlocked(resetProgress(), "beginner-2"), false);
   });
 
   it("only awards course progression in Puzzle Challenge mode", () => {
-    expect(shouldAdvanceProgress("challenge")).toBe(true);
-    expect(shouldAdvanceProgress("shared")).toBe(false);
-    expect(shouldAdvanceProgress("daily")).toBe(false);
+    assert.strictEqual(shouldAdvanceProgress("challenge"), true);
+    assert.strictEqual(shouldAdvanceProgress("shared"), false);
+    assert.strictEqual(shouldAdvanceProgress("daily"), false);
   });
 });
