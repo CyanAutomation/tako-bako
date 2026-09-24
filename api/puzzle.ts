@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
+import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
 
 const YOKAIBA_ORIGIN = "https://yokaiba.scheimann.workers.dev";
 const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;
 const YOKAIBA_VERIFY_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/verify`;
-const SEED_PATTERN = /^[a-zA-Z0-9-]{1,128}$/;
 const MAX_TOKEN_LENGTH = 16_384;
 const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
@@ -182,7 +182,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const startedAt = Date.now();
   const templateId = typeof request.query.templateId === "string" ? request.query.templateId : DEFAULT_SCENARIO_ID;
   const difficultyLevel = typeof request.query.difficultyLevel === "string" ? request.query.difficultyLevel : undefined;
-  if (!SEED_PATTERN.test(seed)) {
+  if (!isValidSeed(seed)) {
     response.status(400).json({ error: "A valid puzzle seed is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
@@ -192,7 +192,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
-  if (difficultyLevel !== undefined && !/^(?:[1-9]|1[0-2])$/.test(difficultyLevel)) {
+  if (difficultyLevel !== undefined && !DIFFICULTY_LEVEL_PATTERN.test(difficultyLevel)) {
     response.status(400).json({ error: "A difficulty level from 1 to 12 is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
