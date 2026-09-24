@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+
 import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSegmentedControl, renderSelect, renderTabs } from "./ui";
 
 describe("shared UI primitives", () => {
@@ -11,58 +13,58 @@ describe("shared UI primitives", () => {
   it("renders a semantic tablist with one keyboard-focusable active tab", () => {
     const markup = renderTabs(tabs, "weight");
 
-    expect(markup).toContain('role="tablist"');
-    expect(markup).toContain('id="grid-select" aria-label="Choose working grid"');
-    expect(markup).toContain('<option value="weight" selected>Weight</option>');
-    expect(markup).toContain('id="grid-tab-weight" aria-selected="true" aria-controls="grid-weight" tabindex="0"');
-    expect(markup).toContain('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"');
+    assert.ok((markup).includes('role="tablist"'));
+    assert.ok((markup).includes('id="grid-select" aria-label="Choose working grid"'));
+    assert.ok((markup).includes('<option value="weight" selected>Weight</option>'));
+    assert.ok((markup).includes('id="grid-tab-weight" aria-selected="true" aria-controls="grid-weight" tabindex="0"'));
+    assert.ok((markup).includes('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"'));
   });
 
   it("uses tabs on wider layouts and one labelled selector on compact layouts", () => {
     const markup = renderTabs(tabs, "weight");
 
-    expect(markup).toContain('class="grid-picker"');
-    expect(markup).toContain('class="grid-navigation"');
-    expect(markup).toContain('class="grid-tabs"');
-    expect(markup).not.toContain('id="previous-grid"');
-    expect(markup).not.toContain('id="next-grid"');
-    expect(markup).not.toContain(" hidden");
+    assert.ok((markup).includes('class="grid-picker"'));
+    assert.ok((markup).includes('class="grid-navigation"'));
+    assert.ok((markup).includes('class="grid-tabs"'));
+    assert.ok(!(markup).includes('id="previous-grid"'));
+    assert.ok(!(markup).includes('id="next-grid"'));
+    assert.ok(!(markup).includes(" hidden"));
   });
 
   it("moves through tabs with the standard arrow, Home, and End keys", () => {
-    expect(nextTabId(tabs, "weight", "ArrowRight")).toBe("tatami");
-    expect(nextTabId(tabs, "weight", "ArrowLeft")).toBe("club");
-    expect(nextTabId(tabs, "club", "ArrowLeft")).toBe("tatami");
-    expect(nextTabId(tabs, "weight", "Home")).toBe("club");
-    expect(nextTabId(tabs, "weight", "End")).toBe("tatami");
+    assert.strictEqual(nextTabId(tabs, "weight", "ArrowRight"), "tatami");
+    assert.strictEqual(nextTabId(tabs, "weight", "ArrowLeft"), "club");
+    assert.strictEqual(nextTabId(tabs, "club", "ArrowLeft"), "tatami");
+    assert.strictEqual(nextTabId(tabs, "weight", "Home"), "club");
+    assert.strictEqual(nextTabId(tabs, "weight", "End"), "tatami");
   });
 
   it("moves a grid cell with arrow keys while staying within its grid", () => {
     const options = { categoryId: "club", rows: ["Aki", "Ben"], columns: ["Lions", "Wolves"] };
 
-    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowRight" })).toBe("club|Aki|Wolves");
-    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowUp" })).toBe("club|Aki|Lions");
-    expect(nextGridCellKey({ ...options, key: "club|Ben|Wolves", keyName: "ArrowDown" })).toBe("club|Ben|Wolves");
-    expect(nextGridCellKey({ ...options, key: "club|Ben|Lions", keyName: "ArrowUp" })).toBe("club|Aki|Lions");
-    expect(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" })).toBeUndefined();
+    assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowRight" }), "club|Aki|Wolves");
+    assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowUp" }), "club|Aki|Lions");
+    assert.strictEqual(nextGridCellKey({ ...options, key: "club|Ben|Wolves", keyName: "ArrowDown" }), "club|Ben|Wolves");
+    assert.strictEqual(nextGridCellKey({ ...options, key: "club|Ben|Lions", keyName: "ArrowUp" }), "club|Aki|Lions");
+    assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" }), undefined);
   });
 
   it("does not navigate grids without rows or columns", () => {
-    expect(nextGridCellKey({ categoryId: "club", rows: [], columns: ["Lions"], key: "club|Aki|Lions", keyName: "ArrowDown" })).toBeUndefined();
-    expect(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" })).toBeUndefined();
+    assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: [], columns: ["Lions"], key: "club|Aki|Lions", keyName: "ArrowDown" }), undefined);
+    assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" }), undefined);
   });
 
   it("uses a shared button primitive for regular and custom SVG icon actions", () => {
-    expect(renderButton({ id: "new", label: "New puzzle" })).toContain('class="button button--secondary"');
+    assert.ok((renderButton({ id: "new", label: "New puzzle" })).includes('class="button button--secondary"'));
     const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
-    expect(iconButton).toContain('class="button button--with-icon button--secondary"');
-    expect(iconButton).toContain('<svg');
-    expect(iconButton).toContain('<span>Undo</span>');
-    expect(iconButton).toContain('aria-hidden="true"');
-    expect(iconButton).not.toContain("↶");
+    assert.ok((iconButton).includes('class="button button--with-icon button--secondary"'));
+    assert.ok((iconButton).includes('<svg'));
+    assert.ok((iconButton).includes('<span>Undo</span>'));
+    assert.ok((iconButton).includes('aria-hidden="true"'));
+    assert.ok(!(iconButton).includes("↶"));
     const labelledIconButton = renderButton({ id: "smart-marking", label: "Smart marking: on", icon: "fast-forward", variant: "efficiency", pressed: true });
-    expect(labelledIconButton).toContain('class="button button--with-icon button--efficiency"');
-    expect(labelledIconButton).toContain('<span>Smart marking: on</span>');
+    assert.ok((labelledIconButton).includes('class="button button--with-icon button--efficiency"'));
+    assert.ok((labelledIconButton).includes('<span>Smart marking: on</span>'));
   });
 
   it("renders filter choices through one labelled segmented-control primitive", () => {
@@ -70,34 +72,34 @@ describe("shared UI primitives", () => {
       { id: "all", label: "All", selected: true, data: { clueFilter: "all" } },
       { id: "used", label: "Used", selected: false, data: { clueFilter: "used" } },
     ] });
-    expect(markup).toContain('class="segmented-control" role="group" aria-label="Filter clues"');
-    expect(markup).toContain('data-clue-filter="all"');
-    expect(markup).toContain('aria-pressed="true"');
+    assert.ok((markup).includes('class="segmented-control" role="group" aria-label="Filter clues"'));
+    assert.ok((markup).includes('data-clue-filter="all"'));
+    assert.ok((markup).includes('aria-pressed="true"'));
   });
 
   it("renders each Puzzle Challenge level through one stateful card primitive", () => {
     const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "locked" });
 
-    expect(markup).toContain('class="course course--locked"');
-    expect(markup).toContain('data-course="beginner-2"');
-    expect(markup).toContain('aria-label="Beginner Level 2, locked"');
-    expect(markup).toContain('disabled');
-    expect(markup).toContain('>Locked</span>');
+    assert.ok((markup).includes('class="course course--locked"'));
+    assert.ok((markup).includes('data-course="beginner-2"'));
+    assert.ok((markup).includes('aria-label="Beginner Level 2, locked"'));
+    assert.ok((markup).includes('disabled'));
+    assert.ok((markup).includes('>Locked</span>'));
   });
 
   it("makes the current Puzzle Challenge level informational rather than restartable", () => {
     const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "current" });
 
-    expect(markup).toContain('aria-label="Beginner Level 2, current"');
-    expect(markup).toContain("disabled");
-    expect(markup).toContain(">Current</span>");
+    assert.ok((markup).includes('aria-label="Beginner Level 2, current"'));
+    assert.ok((markup).includes("disabled"));
+    assert.ok((markup).includes(">Current</span>"));
   });
 
   it("exposes toggle-button state and safely encoded grid identifiers", () => {
     const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "lock", pressed: false, data: { gridLock: 'weight & "open"' } });
 
-    expect(markup).toContain('aria-pressed="false"');
-    expect(markup).toContain('data-grid-lock="weight &amp; &quot;open&quot;"');
+    assert.ok((markup).includes('aria-pressed="false"'));
+    assert.ok((markup).includes('data-grid-lock="weight &amp; &quot;open&quot;"'));
   });
 
   it("renders a reusable accessible dialog with labelled actions", () => {
@@ -109,32 +111,32 @@ describe("shared UI primitives", () => {
       actions: '<button id="cancel">Cancel</button>',
     });
 
-    expect(markup).toContain('<dialog id="reset-grid" class="confirm-modal" open');
-    expect(markup).toContain('aria-modal="true"');
-    expect(markup).toContain('aria-labelledby="reset-grid-title"');
-    expect(markup).toContain('aria-describedby="reset-grid-description"');
+    assert.ok((markup).includes('<dialog id="reset-grid" class="confirm-modal" open'));
+    assert.ok((markup).includes('aria-modal="true"'));
+    assert.ok((markup).includes('aria-labelledby="reset-grid-title"'));
+    assert.ok((markup).includes('aria-describedby="reset-grid-description"'));
     const picker = renderDialog({ id: "picker", title: "Pick", description: "Choose one.", content: "<section>choices</section>", actions: "<button>Close</button>", className: "course-dialog" });
-    expect(picker).toContain('class="confirm-modal course-dialog"');
-    expect(picker).toContain('<div class="dialog-content"><section>choices</section></div>');
+    assert.ok((picker).includes('class="confirm-modal course-dialog"'));
+    assert.ok((picker).includes('<div class="dialog-content"><section>choices</section></div>'));
   });
 
   it("renders a disclosure with its summary, content, and requested initial state", () => {
     const collapsed = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices" });
     const expanded = renderDisclosure({ className: "challenge-options", summary: "Choose challenge", content: "Choices", open: true });
 
-    expect(collapsed).toMatch(/^<details[ >]/);
-    expect(collapsed).toContain("<summary>Choose challenge</summary>");
-    expect(collapsed).toContain("Choices");
-    expect(collapsed).not.toMatch(/^<details[^>]*\sopen(?:\s|>)/);
-    expect(expanded).toMatch(/^<details[^>]*\sopen(?:\s|>)/);
+    assert.match(collapsed, /^<details[ >]/);
+    assert.ok((collapsed).includes("<summary>Choose challenge</summary>"));
+    assert.ok((collapsed).includes("Choices"));
+    assert.doesNotMatch(collapsed, /^<details[^>]*\sopen(?:\s|>)/);
+    assert.match(expanded, /^<details[^>]*\sopen(?:\s|>)/);
   });
 
   it("renders a compact, accessible information disclosure", () => {
     const markup = renderInfoDisclosure({ id: "beginner-info", label: "More information about Beginner", content: "A compact introduction." });
 
-    expect(markup).toContain('class="info-disclosure"');
-    expect(markup).toContain('<summary aria-label="More information about Beginner" title="More information about Beginner">i</summary>');
-    expect(markup).toContain('<div class="info-disclosure__content">A compact introduction.</div>');
+    assert.ok((markup).includes('class="info-disclosure"'));
+    assert.ok((markup).includes('<summary aria-label="More information about Beginner" title="More information about Beginner">i</summary>'));
+    assert.ok((markup).includes('<div class="info-disclosure__content">A compact introduction.</div>'));
   });
 
   it("uses a shared labelled select control for compact settings", () => {
@@ -142,29 +144,29 @@ describe("shared UI primitives", () => {
       { id: "", label: "Any" }, { id: "3", label: "Level 3" },
     ] });
 
-    expect(markup).toContain('<label class="select-control">Difficulty');
-    expect(markup).toContain('id="difficulty" aria-label="Puzzle difficulty"');
-    expect(markup).toContain('<option value="3" selected>Level 3</option>');
+    assert.ok((markup).includes('<label class="select-control">Difficulty'));
+    assert.ok((markup).includes('id="difficulty" aria-label="Puzzle difficulty"'));
+    assert.ok((markup).includes('<option value="3" selected>Level 3</option>'));
   });
 
   it("uses a shared grid-card primitive with an explicit active state", () => {
     const markup = renderGridCard({ id: "weight", label: "Judoka × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
 
-    expect(markup).toContain('id="grid-weight"');
-    expect(markup).toContain('class="grid-card is-active is-unlocked"');
-    expect(markup).toContain('class="grid-card-controls"');
-    expect(markup).toContain('is-unlocked');
-    expect(markup).not.toContain("hidden");
+    assert.ok((markup).includes('id="grid-weight"'));
+    assert.ok((markup).includes('class="grid-card is-active is-unlocked"'));
+    assert.ok((markup).includes('class="grid-card-controls"'));
+    assert.ok((markup).includes('is-unlocked'));
+    assert.ok(!(markup).includes("hidden"));
   });
 
   it("gives grid cells an accessible name, a roving tab stop, and disabled semantics", () => {
     const activeCell = renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "yes", tabIndex: 0 });
-    expect(activeCell).toContain('aria-label="Aki, Lions: yes. Select to change."');
-    expect(activeCell).toContain('tabindex="0"');
+    assert.ok((activeCell).includes('aria-label="Aki, Lions: yes. Select to change."'));
+    assert.ok((activeCell).includes('tabindex="0"'));
 
     const disabledCell = renderGridCell({ key: "club|Aki|Lions", row: "Aki", column: "Lions", mark: "unknown", disabled: true });
-    expect(disabledCell).toContain('aria-label="Aki, Lions: unknown. Grid locked."');
-    expect(disabledCell).toContain(" disabled");
-    expect(disabledCell).not.toContain("tabindex=");
+    assert.ok((disabledCell).includes('aria-label="Aki, Lions: unknown. Grid locked."'));
+    assert.ok((disabledCell).includes(" disabled"));
+    assert.ok(!(disabledCell).includes("tabindex="));
   });
 });
