@@ -6,25 +6,21 @@ export interface SharedPuzzleInput {
   level?: number;
 }
 
-const seedPattern = /^[a-zA-Z0-9-]{1,128}$/;
-
-function difficultyLevel(value: string | null): number | undefined {
-  return value && /^(?:[1-9]|1[0-2])$/.test(value) ? Number(value) : undefined;
-}
+import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
 
 /** Accept either the short puzzle code or the full link produced by Share. */
 export function parseSharedPuzzleInput(value: string): SharedPuzzleInput | undefined {
   const input = value.trim();
-  if (seedPattern.test(input)) return { seed: input };
+  if (isValidSeed(input)) return { seed: input };
 
   try {
     const url = new URL(input);
     const seed = url.searchParams.get("seed");
-    if (!seed || !seedPattern.test(seed)) return undefined;
+    if (!seed || !isValidSeed(seed)) return undefined;
     const templateId = url.searchParams.get("template") || undefined;
     const tier = url.searchParams.get("tier") || undefined;
-    const level = difficultyLevel(url.searchParams.get("level"));
-    const requestedDifficulty = difficultyLevel(url.searchParams.get("difficulty"));
+    const level = parseDifficultyLevel(url.searchParams.get("level"));
+    const requestedDifficulty = parseDifficultyLevel(url.searchParams.get("difficulty"));
     return {
       seed,
       ...(templateId ? { templateId } : {}),
