@@ -1,14 +1,15 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, it, mock } from "node:test";
+import assert from "node:assert/strict";
+import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+
 import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveUsedClues, squareKey, type Mark } from "./puzzle";
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+afterEach(restoreStubbedGlobals);
 
 describe("cycleMark", () => {
   it("moves an unmarked square through yes, no, and back to unknown", () => {
     const states: Mark[] = ["unknown", "yes", "no"];
-    expect(states.map(cycleMark)).toEqual(["yes", "no", "unknown"]);
+    assert.deepStrictEqual(states.map(cycleMark), ["yes", "no", "unknown"]);
   });
 });
 
@@ -35,8 +36,8 @@ describe("parsePuzzle", () => {
       },
     });
 
-    expect(puzzle.spec.categories).toHaveLength(2);
-    expect(puzzle.difficulty.label).toBe("Easy");
+    assert.strictEqual((puzzle.spec.categories).length, 2);
+    assert.strictEqual(puzzle.difficulty.label, "Easy");
   });
 
   it("retains an optional signed puzzle token for answer verification", () => {
@@ -55,7 +56,7 @@ describe("parsePuzzle", () => {
       },
     });
 
-    expect(puzzle.puzzleToken).toBe("signed-token");
+    assert.strictEqual(puzzle.puzzleToken, "signed-token");
   });
 
   it("retains Yokaiba's requested seed and accepts a five-by-five expert puzzle", () => {
@@ -73,48 +74,51 @@ describe("parsePuzzle", () => {
       },
     });
 
-    expect(puzzle.requestedSeed).toBe("shared-seed");
-    expect(puzzle.templateId).toBe("championship-circuit-v1");
-    expect(puzzle.spec.categories).toHaveLength(4);
-    expect(boardProgress({}, puzzle.spec)).toEqual({ marked: 0, total: 75 });
+    assert.strictEqual(puzzle.requestedSeed, "shared-seed");
+    assert.strictEqual(puzzle.templateId, "championship-circuit-v1");
+    assert.strictEqual((puzzle.spec.categories).length, 4);
+    assert.deepStrictEqual(boardProgress({}, puzzle.spec), { marked: 0, total: 75 });
   });
 
   it("rejects a malformed response before it reaches the board", () => {
-    expect(() => parsePuzzle({ id: "missing everything" })).toThrow("invalid puzzle response");
+    assert.throws(() => parsePuzzle({ id: "missing everything" }), new RegExp("invalid puzzle response"));
   });
 
-  it.each([
+  const unsafeCategories = [
     { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "club", label: "Club", values: ["Lions", "Lions"] }] },
     { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "judoka", label: "Duplicate", values: ["Lions", "Wolves"] }] },
     { categories: [{ id: "judoka", label: "Judoka", values: ["Aki", "Ben"] }, { id: "club", label: "Club", values: ["Lions"] }] },
-  ])("rejects unsafe category boundaries", ({ categories }) => {
-    expect(() => parsePuzzle({
+  ];
+  for (const [caseIndex, { categories }] of unsafeCategories.entries()) {
+    it(`rejects unsafe category boundaries (${caseIndex + 1})`, () => {
+    assert.throws(() => parsePuzzle({
       id: "bad-boundary", seed: "bad-boundary", clues: [],
       difficulty: { level: 3, label: "Moderate", modelVersion: "v1" },
       spec: { id: "test", title: "Test", baseCategory: "judoka", categories },
-    })).toThrow("invalid puzzle response");
-  });
+    }), new RegExp("invalid puzzle response"));
+    });
+  }
 
   it("accepts the full Yokaiba 1–12 difficulty scale", () => {
-    expect(parsePuzzle({
+    assert.strictEqual(parsePuzzle({
       id: "advanced", seed: "advanced", clues: [],
       difficulty: { level: 12, label: "Expert", modelVersion: "v4" },
       spec: { id: "advanced", title: "Advanced", baseCategory: "person", categories: [
         { id: "person", label: "Person", values: ["A", "B"] },
         { id: "colour", label: "Colour", values: ["Red", "Blue"] },
       ] },
-    }).difficulty.level).toBe(12);
+    }).difficulty.level, 12);
   });
 
   it("rejects a difficulty outside the supported Yokaiba range", () => {
-    expect(() => parsePuzzle({
+    assert.throws(() => parsePuzzle({
       id: "bad-difficulty", seed: "bad-difficulty", clues: [],
       difficulty: { level: 13, label: "Impossible", modelVersion: "v1" },
       spec: { id: "test", title: "Test", baseCategory: "judoka", categories: [
         { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
         { id: "club", label: "Club", values: ["Lions", "Wolves"] },
       ] },
-    })).toThrow("invalid puzzle response");
+    }), new RegExp("invalid puzzle response"));
   });
 });
 
@@ -123,7 +127,7 @@ describe("markBoard", () => {
     const category = { id: "club", label: "Club", values: ["Lions", "Wolves"] };
     const base = { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] };
 
-    expect(markBoard({}, squareKey("club", "Aki", "Lions"), category, base, true)).toEqual({
+    assert.deepStrictEqual(markBoard({}, squareKey("club", "Aki", "Lions"), category, base, true), {
       [squareKey("club", "Aki", "Lions")]: "yes",
       [squareKey("club", "Aki", "Wolves")]: "no",
       [squareKey("club", "Ben", "Lions")]: "no",
@@ -146,15 +150,15 @@ describe("answerFromBoard", () => {
       [squareKey("club", "Ben", "Wolves")]: "yes" as const,
     };
 
-    expect(answerFromBoard(board, spec)).toEqual({ assignments: { club: ["Lions", "Wolves"] } });
+    assert.deepStrictEqual(answerFromBoard(board, spec), { assignments: { club: ["Lions", "Wolves"] } });
   });
 
   it("refuses incomplete or contradictory boards", () => {
-    expect(answerFromBoard({ [squareKey("club", "Aki", "Lions")]: "yes" }, spec)).toBeUndefined();
-    expect(answerFromBoard({
+    assert.strictEqual(answerFromBoard({ [squareKey("club", "Aki", "Lions")]: "yes" }, spec), undefined);
+    assert.strictEqual(answerFromBoard({
       [squareKey("club", "Aki", "Lions")]: "yes",
       [squareKey("club", "Ben", "Lions")]: "yes",
-    }, spec)).toBeUndefined();
+    }, spec), undefined);
   });
 });
 
@@ -169,50 +173,53 @@ describe("boardProgress", () => {
   };
 
   it("counts marked squares across every non-base grid", () => {
-    expect(boardProgress({
+    assert.deepStrictEqual(boardProgress({
       [squareKey("club", "Aki", "Lions")]: "yes",
       [squareKey("weight", "Ben", "-66 kg")]: "no",
-    }, spec)).toEqual({ marked: 2, total: 8 });
+    }, spec), { marked: 2, total: 8 });
   });
 
   it("does not count stale marks from another puzzle category", () => {
-    expect(boardProgress({ [squareKey("stale", "Aki", "Lions")]: "yes" }, spec)).toEqual({ marked: 0, total: 8 });
+    assert.deepStrictEqual(boardProgress({ [squareKey("stale", "Aki", "Lions")]: "yes" }, spec), { marked: 0, total: 8 });
   });
 
   it("counts placed matches separately from general notes", () => {
-    expect(boardSolveProgress({
+    assert.deepStrictEqual(boardSolveProgress({
       [squareKey("club", "Aki", "Lions")]: "yes",
       [squareKey("club", "Ben", "Wolves")]: "yes",
       [squareKey("weight", "Ben", "-66 kg")]: "no",
-    }, spec)).toEqual({ matches: 2, total: 4 });
+    }, spec), { matches: 2, total: 4 });
   });
 });
 
 describe("loadBoard", () => {
   it("keeps valid marks while discarding prototype-related keys", () => {
-    vi.stubGlobal("localStorage", {
+    stubGlobal("localStorage", {
       getItem: () => JSON.stringify({ safe: "yes", constructor: "no", prototype: "yes", ignored: "unknown" }),
     });
 
-    expect(loadBoard("dojo-day")).toEqual({ safe: "yes" });
+    assert.deepStrictEqual(loadBoard("dojo-day"), { safe: "yes" });
   });
 });
 
 describe("used clue persistence", () => {
   it("restores only known clue IDs for the current puzzle", () => {
-    vi.stubGlobal("localStorage", {
+    stubGlobal("localStorage", {
       getItem: () => JSON.stringify(["clue-1", "stale", 42]),
     });
 
-    expect(loadUsedClues("dojo-day", ["clue-1", "clue-2"])).toEqual(new Set(["clue-1"]));
+    assert.deepStrictEqual(loadUsedClues("dojo-day", ["clue-1", "clue-2"]), new Set(["clue-1"]));
   });
 
   it("stores the used clue IDs independently from the puzzle board", () => {
-    const setItem = vi.fn();
-    vi.stubGlobal("localStorage", { setItem });
+    const setItem = mock.fn((...args: unknown[]) => {
+      void args;
+    });
+    stubGlobal("localStorage", { setItem });
 
     saveUsedClues("dojo-day", new Set(["clue-2", "clue-1"]));
 
-    expect(setItem).toHaveBeenCalledWith("tako-bako.clues.dojo-day", JSON.stringify(["clue-2", "clue-1"]));
+    assert.strictEqual(setItem.mock.callCount(), 1);
+    assert.deepStrictEqual(setItem.mock.calls[0].arguments, ["tako-bako.clues.dojo-day", JSON.stringify(["clue-2", "clue-1"])]);
   });
 });
