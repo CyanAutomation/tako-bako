@@ -18,6 +18,14 @@ interface CachedPuzzle<T> {
   value: T;
 }
 
+function removeCacheEntry(storage: SessionStorageLike, key: string): void {
+  try {
+    storage.removeItem(key);
+  } catch {
+    // Storage access can fail (for example, in private browsing); cleanup is best-effort.
+  }
+}
+
 /** Returns the stable session-cache key for one shareable puzzle variant. */
 export function puzzleCacheKey(seed: string, difficulty: number | undefined, templateId = "tournament-order-v1"): string {
   return `${CACHE_PREFIX}:${templateId}:${seed}:${difficulty ?? "any"}`;
@@ -33,7 +41,7 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
     if (typeof entry.expiresAt !== "number" || entry.expiresAt < now || !("value" in entry)) throw new TypeError("Expired cache entry");
     return entry.value as T;
   } catch {
-    storage.removeItem(key);
+    removeCacheEntry(storage, key);
     return undefined;
   }
 }

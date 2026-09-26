@@ -11,6 +11,20 @@ class MemoryStorage {
   removeItem(key: string): void { this.values.delete(key); }
 }
 
+class ThrowingReadStorage extends MemoryStorage {
+  override getItem(key: string): string | null {
+    void key;
+    throw new Error("read failed");
+  }
+}
+
+class ThrowingRemovalStorage extends MemoryStorage {
+  override removeItem(key: string): void {
+    void key;
+    throw new Error("cleanup failed");
+  }
+}
+
 describe("puzzle session cache", () => {
   it("separates puzzle variants by seed and difficulty", () => {
     assert.notStrictEqual(puzzleCacheKey("dojo-day", undefined), puzzleCacheKey("dojo-day", 3));
@@ -40,6 +54,19 @@ describe("puzzle session cache", () => {
     storage.setItem(puzzleCacheKey("bad", undefined), "not json");
     assert.strictEqual(loadPuzzleFromCache(storage, "bad", undefined, 10_000), undefined);
     assert.strictEqual(storage.getItem(puzzleCacheKey("bad", undefined)), null);
+  });
+
+  it("returns undefined when reading from storage throws", () => {
+    const storage = new ThrowingReadStorage();
+
+    assert.strictEqual(loadPuzzleFromCache(storage, "dojo-day", undefined, 10_000), undefined);
+  });
+
+  it("returns undefined when removing an invalid entry throws", () => {
+    const storage = new ThrowingRemovalStorage();
+    storage.setItem(puzzleCacheKey("bad", undefined), "not json");
+
+    assert.strictEqual(loadPuzzleFromCache(storage, "bad", undefined, 10_000), undefined);
   });
 
   it("keeps identically seeded scenarios in separate cache entries", () => {
