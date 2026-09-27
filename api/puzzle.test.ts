@@ -32,6 +32,16 @@ describe("puzzle proxy", () => {
     mock.restoreAll();
   });
 
+  it("prevents caching method errors", async () => {
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "PUT" } as never, response as never);
+
+    assertPartialMatch(result, { statusCode: 405, body: { error: "Method not allowed" } });
+    assert.strictEqual(result.headers.get("allow"), "GET, POST");
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
+  });
+
   it("forwards a signed completion check to Yokaiba", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ correct: true }), {
       status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-verify-123" },
@@ -49,6 +59,7 @@ describe("puzzle proxy", () => {
     });
     assertPartialMatch(result, { statusCode: 200, body: { correct: true } });
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "yokaiba-verify-123");
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
   });
 
   it("rejects an incomplete completion check before contacting Yokaiba", async () => {
@@ -60,6 +71,7 @@ describe("puzzle proxy", () => {
 
     assert.strictEqual(upstream.mock.callCount() > 0, false);
     assertPartialMatch(result, { statusCode: 400, body: { error: "A complete signed answer is required" } });
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
   });
 
   const malformedBodies = [
@@ -104,6 +116,24 @@ describe("puzzle proxy", () => {
     assertPartialMatch(init, { body: JSON.stringify({ puzzleToken: "signed-token", answer: { assignments: { club: ["Lions"] } } }) });
   });
 
+  it("prevents caching verification failures returned by Yokaiba", async () => {
+    stubGlobal("fetch", resolvedMock(new Response("service unavailable", {
+      status: 503, headers: { "content-type": "text/plain" },
+    })));
+    const { response, result } = responseRecorder();
+
+    await handler({
+      method: "POST",
+      body: { puzzleToken: "signed-token", answer: { assignments: { club: ["Lions"] } } },
+    } as never, response as never);
+
+    assertPartialMatch(result, {
+      statusCode: 502,
+      body: { error: "Yokaiba could not verify this puzzle. Please try again." },
+    });
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
+  });
+
   it("caches deterministic generated puzzles at the CDN", async () => {
     stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "dojo-day" }), {
       status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123", etag: '"yokaiba-v1-cached"' },
@@ -117,6 +147,7 @@ describe("puzzle proxy", () => {
     assert.ok(cacheControl);
     assert.ok(cacheControl.includes(`s-maxage=${CACHE_FRESH_LIFETIME_SECONDS}`));
     assert.ok(cacheControl.includes(`stale-while-revalidate=${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS}`));
+    assert.notStrictEqual(cacheControl, "no-store");
     const vercelCacheControl = result.headers.get("vercel-cdn-cache-control");
     assert.ok(vercelCacheControl);
     assert.ok(vercelCacheControl.includes(`s-maxage=${CACHE_FRESH_LIFETIME_SECONDS}`));
@@ -174,6 +205,7 @@ describe("puzzle proxy", () => {
 
     assertPartialMatch(result, { statusCode: 400, body: { error: "An available puzzle scenario is required" } });
     assert.strictEqual(upstream.mock.callCount() > 0, false);
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
   });
 
   it("emits a structured success metric", async () => {
@@ -196,6 +228,7 @@ describe("puzzle proxy", () => {
     await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);
 
     assertPartialMatch(result, { statusCode: 504, body: { error: "Yokaiba took too long to respond. Please try again." } });
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
     assert.strictEqual(error.mock.calls[0].arguments[0], "yokaiba_request_failed");
     assertPartialMatch(error.mock.calls[0].arguments[1], { operation: "generate", timedOut: true });
     error.mock.restore();
@@ -252,6 +285,7 @@ describe("puzzle proxy", () => {
       statusCode: 502,
       body: { error: "Yokaiba is unavailable. Please try again." },
     });
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
     assert.strictEqual(upstreamResponse.bodyUsed, false);
   });
 

@@ -17,6 +17,10 @@ const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 
 type Operation = "generate" | "verify";
 
+function preventCaching(response: VercelResponse): void {
+  response.setHeader("cache-control", "no-store");
+}
+
 function logMetric(operation: Operation, outcome: string, status: number, startedAt: number, details: Record<string, unknown> = {}): void {
   console.info("tako_bako_api_metric", {
     operation,
@@ -78,6 +82,7 @@ function upstreamFailure(response: VercelResponse, operation: Operation, error: 
   console.error("yokaiba_request_failed", { operation, timedOut, error: error instanceof Error ? error.message : String(error) });
   const status = timedOut ? 504 : 502;
   logMetric(operation, timedOut ? "timeout" : "upstream_error", status, startedAt);
+  preventCaching(response);
   response.status(status).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
 }
 
@@ -85,7 +90,7 @@ async function forwardRateLimit(upstream: Response, response: VercelResponse, op
   if (upstream.status !== 429) return false;
   const retryAfter = upstream.headers.get("retry-after");
   if (retryAfter) response.setHeader("retry-after", retryAfter);
-  response.setHeader("cache-control", "no-store");
+  preventCaching(response);
   let body: unknown = { error: "Too many dojo requests. Please wait a moment, then try again." };
   if (isJson(upstream)) {
     try {
@@ -135,7 +140,7 @@ async function forwardDifficultyUnavailable(upstream: Response, response: Vercel
   }
   const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
   if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
-  response.setHeader("cache-control", "no-store");
+  preventCaching(response);
   response.status(422).json({
     code: "difficulty_unavailable",
     error: "This seed cannot produce the selected difficulty. Try another puzzle.",
@@ -148,11 +153,14 @@ async function forwardDifficultyUnavailable(upstream: Response, response: Vercel
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "GET" && request.method !== "POST") {
     response.setHeader("allow", "GET, POST");
+    preventCaching(response);
     response.status(405).json({ error: "Method not allowed" });
     return;
   }
   if (request.method === "POST") {
     const startedAt = Date.now();
+    // Verification results depend on submitted answers and must never be cached.
+    preventCaching(response);
     const completion = parseCompletion(request.body);
     if (!completion) {
       response.status(400).json({ error: "A complete signed answer is required" });
@@ -173,7 +181,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
         logMetric("verify", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
         return;
       }
-      response.setHeader("cache-control", "no-store");
       response.status(200).json(await upstream.json());
       logMetric("verify", "success", 200, startedAt);
     } catch (error) {
@@ -186,16 +193,19 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const templateId = typeof request.query.templateId === "string" ? request.query.templateId : DEFAULT_SCENARIO_ID;
   const difficultyLevel = typeof request.query.difficultyLevel === "string" ? request.query.difficultyLevel : undefined;
   if (!isValidSeed(seed)) {
+    preventCaching(response);
     response.status(400).json({ error: "A valid puzzle seed is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
   if (!isScenarioId(templateId)) {
+    preventCaching(response);
     response.status(400).json({ error: "An available puzzle scenario is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
   }
   if (difficultyLevel !== undefined && !DIFFICULTY_LEVEL_PATTERN.test(difficultyLevel)) {
+    preventCaching(response);
     response.status(400).json({ error: "A difficulty level from 1 to 12 is required" });
     logMetric("generate", "invalid_request", 400, startedAt);
     return;
@@ -208,11 +218,13 @@ export default async function handler(request: VercelRequest, response: VercelRe
     if (await forwardRateLimit(upstream, response, "generate", startedAt)) return;
     if (await forwardDifficultyUnavailable(upstream, response, startedAt)) return;
     if (!upstream.ok) {
+      preventCaching(response);
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
       logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
       return;
     }
     if (!isJson(upstream)) {
+      preventCaching(response);
       response.status(502).json({ error: "Invalid response from Yokaiba." });
       logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
       return;
