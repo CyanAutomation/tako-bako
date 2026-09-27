@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { assertPartialMatch, rejectedMock, resolvedMock, resolvedSequenceMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
 
 import handler from "./puzzle.js";
 
@@ -114,12 +115,15 @@ describe("puzzle proxy", () => {
     assertPartialMatch(result, { statusCode: 200 });
     const cacheControl = result.headers.get("cache-control");
     assert.ok(cacheControl);
-    assert.ok(cacheControl.includes("s-maxage=300"));
-    assert.ok(cacheControl.includes("stale-while-revalidate=3600"));
+    assert.ok(cacheControl.includes(`s-maxage=${CACHE_FRESH_LIFETIME_SECONDS}`));
+    assert.ok(cacheControl.includes(`stale-while-revalidate=${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS}`));
     const vercelCacheControl = result.headers.get("vercel-cdn-cache-control");
     assert.ok(vercelCacheControl);
-    assert.ok(vercelCacheControl.includes("s-maxage=300"));
-    assert.strictEqual(result.headers.get("x-tako-bako-cache-policy"), "edge-5m-swr-1h");
+    assert.ok(vercelCacheControl.includes(`s-maxage=${CACHE_FRESH_LIFETIME_SECONDS}`));
+    assert.strictEqual(
+      result.headers.get("x-tako-bako-cache-policy"),
+      `edge-${CACHE_FRESH_LIFETIME_SECONDS / 60}m-swr-${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS / (60 * 60)}h`,
+    );
     const generatedAt = Number(result.headers.get("x-tako-bako-generated-at"));
     assert.ok(Number.isSafeInteger(generatedAt));
     assert.ok(Math.abs(Date.now() - generatedAt) < 1_000);
