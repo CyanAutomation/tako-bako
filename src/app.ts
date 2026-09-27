@@ -1,5 +1,5 @@
 import { answerFromBoard, boardSolveProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
-import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleResponseToCache } from "./puzzle-cache";
+import { loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleResponseToCache } from "./puzzle-cache";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
@@ -226,7 +226,8 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
       }
       try {
         data = parsePuzzle(await result.json());
-        savePuzzleResponseToCache(sessionStorage, cacheRequest, data, fetchId === currentFetchId, Date.now());
+        const now = Date.now();
+        savePuzzleResponseToCache(sessionStorage, cacheRequest, data, puzzleResponseExpiry(result.headers, now), fetchId === currentFetchId, now);
       } catch (error) {
         console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
         throw error;

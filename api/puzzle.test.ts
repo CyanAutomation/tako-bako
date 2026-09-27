@@ -120,6 +120,9 @@ describe("puzzle proxy", () => {
     assert.ok(vercelCacheControl);
     assert.ok(vercelCacheControl.includes("s-maxage=300"));
     assert.strictEqual(result.headers.get("x-tako-bako-cache-policy"), "edge-5m-swr-1h");
+    const generatedAt = Number(result.headers.get("x-tako-bako-generated-at"));
+    assert.ok(Number.isSafeInteger(generatedAt));
+    assert.ok(Math.abs(Date.now() - generatedAt) < 1_000);
     const serverTiming = result.headers.get("server-timing");
     assert.ok(serverTiming);
     assert.match(serverTiming, /^yokaiba;dur=\d+$/);
