@@ -1,22 +1,18 @@
 import { defineConfig } from "vite";
+import { DEFAULT_SCENARIO_ID } from "./src/scenarios.ts";
+import { yokaibaGenerateParams, YOKAIBA_GENERATE_URL, YOKAIBA_ORIGIN } from "./src/yokaiba.ts";
 
 export default defineConfig({
   server: {
     proxy: {
       "/api/puzzle": {
-        target: "https://yokaiba.scheimann.workers.dev",
+        target: YOKAIBA_ORIGIN,
         changeOrigin: true,
         rewrite: path => {
           const url = new URL(path, "http://localhost");
           const seed = url.searchParams.get("seed") ?? "";
-          const templateId = url.searchParams.get("templateId") ?? "tournament-order-v2";
-          const parameters = new URLSearchParams({ templateId, seed });
-          const difficultyLevel = url.searchParams.get("difficultyLevel");
-          if (difficultyLevel) {
-            parameters.set("difficultyLevel", difficultyLevel);
-            parameters.set("allowSeedFallback", "true");
-          }
-          return `/v1/puzzles/generate?${parameters}`;
+          const templateId = url.searchParams.get("templateId") ?? DEFAULT_SCENARIO_ID;
+          return `${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(templateId, seed, url.searchParams.get("difficultyLevel") ?? undefined)}`;
         },
       },
     },
