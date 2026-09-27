@@ -77,6 +77,8 @@ The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer
 
 Tako Bako forwards completed boards to Yokaiba via the `/api/puzzle` endpoint. Before deploying this feature, configure the same `PUZZLE_TOKEN_SECRET` on the Yokaiba Worker (using `wrangler secret put PUZZLE_TOKEN_SECRET`) and redeploy it. The token is issued with each generated puzzle and is never exposed as a solution; without the secret, the player keeps working normally but solution checking is unavailable.
 
+The intended maximum end-to-end puzzle age is five minutes from generation. The API stamps each newly generated response with `X-Tako-Bako-Generated-At`; that stamp survives edge caching, and the browser derives its session-cache expiry from it rather than starting a new five-minute window. Consequently an edge response served during the CDN's `stale-while-revalidate=3600` period is usable for the current request but is not saved in session storage once it is five minutes old. Missing, malformed, expired, or implausibly future generation stamps disable browser caching, and every accepted expiry is capped to five minutes from the browser's current time. A one-minute future tolerance accommodates modest server/client clock skew.
+
 The API caches puzzle responses at the edge with `s-maxage=300` and `stale-while-revalidate=3600`. Upstream rate-limit headers are forwarded to the client. A single transient upstream 5xx is retried before the API returns a user-friendly 502/504 failure, while rate-limit and validation responses are never retried. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events never include a player identifier, seed, or answer cells.
 
 ## Project Structure
@@ -86,7 +88,7 @@ src/       Application source
   main.ts    Entry point: app shell, event handling, rendering, state management
   puzzle.ts  Core puzzle model: Board, Mark, Puzzle types, parsePuzzle, markBoard,
              answerFromBoard, boardSolveProgress, save/load helpers
-  puzzle-cache.ts  Session storage cache with 5-minute TTL for puzzle data
+  puzzle-cache.ts  Freshness-aware session cache enforcing a 5-minute end-to-end puzzle age
   curriculum.ts   Tier/course definitions, level mapping, course resolution
   progress.ts     Puzzle Challenge progress storage (localStorage v1)
   scenarios.ts    Scenario catalog and ID resolution
