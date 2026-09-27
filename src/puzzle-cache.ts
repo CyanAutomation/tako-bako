@@ -1,8 +1,12 @@
 const CACHE_PREFIX = "tako-bako.puzzle.v2";
 const CACHE_TTL_MS = 5 * 60 * 1_000;
+const MAX_CACHE_ENTRIES = 20;
+const OWNED_CACHE_PREFIX = `${CACHE_PREFIX}:`;
 
 export interface SessionStorageLike {
+  readonly length: number;
   getItem(key: string): string | null;
+  key(index: number): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
@@ -14,8 +18,14 @@ export interface PuzzleCacheRequest {
 }
 
 interface CachedPuzzle<T> {
+  createdAt: number;
   expiresAt: number;
   value: T;
+}
+
+interface CacheEntryMetadata {
+  key: string;
+  createdAt: number;
 }
 
 function removeCacheEntry(storage: SessionStorageLike, key: string): void {
@@ -24,6 +34,48 @@ function removeCacheEntry(storage: SessionStorageLike, key: string): void {
   } catch {
     // Storage access can fail (for example, in private browsing); cleanup is best-effort.
   }
+}
+
+function ownedCacheKeys(storage: SessionStorageLike): string[] {
+  try {
+    const keys: string[] = [];
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (key?.startsWith(OWNED_CACHE_PREFIX)) keys.push(key);
+    }
+    return keys;
+  } catch {
+    return [];
+  }
+}
+
+function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedKey?: string): CacheEntryMetadata[] {
+  const entries: CacheEntryMetadata[] = [];
+  for (const key of ownedCacheKeys(storage)) {
+    if (key === excludedKey) continue;
+    try {
+      const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("Malformed cache entry");
+      const entry = parsed as Partial<CachedPuzzle<unknown>>;
+      if (typeof entry.expiresAt !== "number" || entry.expiresAt < now || !("value" in entry)) {
+        removeCacheEntry(storage, key);
+        continue;
+      }
+      // Entries written before createdAt was introduced remain eligible for bounded cleanup.
+      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - CACHE_TTL_MS;
+      entries.push({ key, createdAt });
+    } catch {
+      removeCacheEntry(storage, key);
+    }
+  }
+  return entries.sort((left, right) => left.createdAt - right.createdAt || left.key.localeCompare(right.key));
+}
+
+function maintainCache(storage: SessionStorageLike, now: number, excludedKey: string): CacheEntryMetadata[] {
+  const entries = inspectOwnedEntries(storage, now, excludedKey);
+  const excess = Math.max(0, entries.length - (MAX_CACHE_ENTRIES - 1));
+  for (const entry of entries.slice(0, excess)) removeCacheEntry(storage, entry.key);
+  return entries.slice(excess);
 }
 
 /** Returns the stable session-cache key for one shareable puzzle variant. */
@@ -48,10 +100,25 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
 
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
 export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, now = Date.now(), templateId = "tournament-order-v1"): void {
+  const key = puzzleCacheKey(seed, difficulty, templateId);
+  let serialized: string;
   try {
-    storage.setItem(puzzleCacheKey(seed, difficulty, templateId), JSON.stringify({ expiresAt: now + CACHE_TTL_MS, value } satisfies CachedPuzzle<T>));
+    serialized = JSON.stringify({ createdAt: now, expiresAt: now + CACHE_TTL_MS, value } satisfies CachedPuzzle<T>);
   } catch {
-    // Private browsing or quota failures should never block play.
+    return;
+  }
+  const entries = maintainCache(storage, now, key);
+  try {
+    storage.setItem(key, serialized);
+  } catch {
+    // A quota can be tighter than the entry limit. Reclaim one owned entry and retry once.
+    const oldest = entries[0] ?? inspectOwnedEntries(storage, now, key)[0];
+    if (oldest) removeCacheEntry(storage, oldest.key);
+    try {
+      storage.setItem(key, serialized);
+    } catch {
+      // Private browsing or persistent quota failures should never block play.
+    }
   }
 }
 
