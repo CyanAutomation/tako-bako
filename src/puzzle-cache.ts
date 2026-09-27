@@ -1,6 +1,8 @@
+import { CACHE_FRESH_LIFETIME_SECONDS } from "./cache-policy";
+
 const CACHE_PREFIX = "tako-bako.puzzle.v2";
 /** A puzzle must never be retained more than five minutes after it was generated. */
-export const MAX_PUZZLE_AGE_MS = 5 * 60 * 1_000;
+export const CACHE_TTL_MS = CACHE_FRESH_LIFETIME_SECONDS * 1_000;
 const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
 export const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 const MAX_CACHE_ENTRIES = 20;
@@ -65,7 +67,7 @@ function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedK
         continue;
       }
       // Entries written before createdAt was introduced remain eligible for bounded cleanup.
-      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - MAX_PUZZLE_AGE_MS;
+      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - CACHE_TTL_MS;
       entries.push({ key, createdAt });
     } catch {
       removeCacheEntry(storage, key);
@@ -112,14 +114,14 @@ export function puzzleResponseExpiry(headers: Pick<Headers, "get"> | undefined, 
   if (!rawGeneratedAt || !/^\d+$/.test(rawGeneratedAt)) return undefined;
   const generatedAt = Number(rawGeneratedAt);
   if (!Number.isSafeInteger(generatedAt) || generatedAt > now + MAX_GENERATED_AT_CLOCK_SKEW_MS) return undefined;
-  const expiresAt = generatedAt + MAX_PUZZLE_AGE_MS;
-  return expiresAt > now ? Math.min(expiresAt, now + MAX_PUZZLE_AGE_MS) : undefined;
+  const expiresAt = generatedAt + CACHE_TTL_MS;
+  return expiresAt > now ? Math.min(expiresAt, now + CACHE_TTL_MS) : undefined;
 }
 
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
 export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1"): void {
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return;
-  const boundedExpiresAt = Math.min(expiresAt, now + MAX_PUZZLE_AGE_MS);
+  const boundedExpiresAt = Math.min(expiresAt, now + CACHE_TTL_MS);
   const key = puzzleCacheKey(seed, difficulty, templateId);
   let serialized: string;
   try {
