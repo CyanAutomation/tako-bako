@@ -35,7 +35,7 @@ jobs:
 
           if [[ "$http_status" != "200" ]] || ! jq -e '.status == "ok" and .dependencies.yokaiba == "ok"' "$response_file" >/dev/null; then
             echo "::error title=Production health check failed::GET $HEALTH_URL returned HTTP $http_status"
-            cat "$response_file"
+            echo "Health response body omitted from logs."
             exit 1
           fi
 
