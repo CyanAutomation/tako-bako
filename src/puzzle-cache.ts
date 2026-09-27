@@ -1,5 +1,8 @@
 const CACHE_PREFIX = "tako-bako.puzzle.v2";
-const CACHE_TTL_MS = 5 * 60 * 1_000;
+/** A puzzle must never be retained more than five minutes after it was generated. */
+export const MAX_PUZZLE_AGE_MS = 5 * 60 * 1_000;
+const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
+export const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 const MAX_CACHE_ENTRIES = 20;
 const OWNED_CACHE_PREFIX = `${CACHE_PREFIX}:`;
 
@@ -62,7 +65,7 @@ function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedK
         continue;
       }
       // Entries written before createdAt was introduced remain eligible for bounded cleanup.
-      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - CACHE_TTL_MS;
+      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - MAX_PUZZLE_AGE_MS;
       entries.push({ key, createdAt });
     } catch {
       removeCacheEntry(storage, key);
@@ -98,12 +101,29 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
   }
 }
 
+/**
+ * Derives the browser-cache deadline from the generation time attached by our API.
+ * Missing, malformed, stale, or implausibly future metadata is deliberately not
+ * cacheable. A small future tolerance avoids disabling caching for clock skew.
+ */
+export function puzzleResponseExpiry(headers: Pick<Headers, "get"> | undefined, now = Date.now()): number | undefined {
+  if (!headers) return undefined;
+  const rawGeneratedAt = headers.get(PUZZLE_GENERATED_AT_HEADER);
+  if (!rawGeneratedAt || !/^\d+$/.test(rawGeneratedAt)) return undefined;
+  const generatedAt = Number(rawGeneratedAt);
+  if (!Number.isSafeInteger(generatedAt) || generatedAt > now + MAX_GENERATED_AT_CLOCK_SKEW_MS) return undefined;
+  const expiresAt = generatedAt + MAX_PUZZLE_AGE_MS;
+  return expiresAt > now ? Math.min(expiresAt, now + MAX_PUZZLE_AGE_MS) : undefined;
+}
+
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
-export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, now = Date.now(), templateId = "tournament-order-v1"): void {
+export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1"): void {
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) return;
+  const boundedExpiresAt = Math.min(expiresAt, now + MAX_PUZZLE_AGE_MS);
   const key = puzzleCacheKey(seed, difficulty, templateId);
   let serialized: string;
   try {
-    serialized = JSON.stringify({ createdAt: now, expiresAt: now + CACHE_TTL_MS, value } satisfies CachedPuzzle<T>);
+    serialized = JSON.stringify({ createdAt: now, expiresAt: boundedExpiresAt, value } satisfies CachedPuzzle<T>);
   } catch {
     return;
   }
@@ -123,7 +143,8 @@ export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, 
 }
 
 /** Stores a response only while its request is current, using that request's immutable identity. */
-export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, isCurrent: boolean, now = Date.now()): void {
+export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, expiresAt: number | undefined, isCurrent: boolean, now = Date.now()): void {
   if (!isCurrent) return;
-  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, now, request.templateId);
+  if (expiresAt === undefined) return;
+  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, expiresAt, now, request.templateId);
 }

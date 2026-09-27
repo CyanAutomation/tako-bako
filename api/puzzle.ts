@@ -11,6 +11,7 @@ const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
 const UPSTREAM_TIMEOUT_MS = 8_000;
 const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=3600";
+const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 
 type Operation = "generate" | "verify";
 
@@ -215,6 +216,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
     const body: unknown = await upstream.json();
+    response.setHeader(PUZZLE_GENERATED_AT_HEADER, String(Date.now()));
     response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("cdn-cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("vercel-cdn-cache-control", PUZZLE_CACHE_CONTROL);
