@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
 import { yokaibaGenerateParams, YOKAIBA_GENERATE_URL, YOKAIBA_ORIGIN } from "../src/yokaiba.js";
@@ -10,7 +11,8 @@ const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
 const UPSTREAM_TIMEOUT_MS = 8_000;
-const PUZZLE_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=3600";
+const PUZZLE_CACHE_CONTROL = `public, max-age=0, s-maxage=${CACHE_FRESH_LIFETIME_SECONDS}, stale-while-revalidate=${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS}`;
+const PUZZLE_CACHE_POLICY = `edge-${CACHE_FRESH_LIFETIME_SECONDS / 60}m-swr-${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS / (60 * 60)}h`;
 const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 
 type Operation = "generate" | "verify";
@@ -220,7 +222,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("cdn-cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("vercel-cdn-cache-control", PUZZLE_CACHE_CONTROL);
-    response.setHeader("x-tako-bako-cache-policy", "edge-5m-swr-1h");
+    response.setHeader("x-tako-bako-cache-policy", PUZZLE_CACHE_POLICY);
     response.setHeader("server-timing", `yokaiba;dur=${Date.now() - startedAt}`);
     response.setHeader("content-type", "application/json");
     response.status(200).json(body);
