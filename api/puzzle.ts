@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
+import { yokaibaGenerateParams, YOKAIBA_GENERATE_URL, YOKAIBA_ORIGIN } from "../src/yokaiba.js";
 
-const YOKAIBA_ORIGIN = "https://yokaiba.scheimann.workers.dev";
-const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;
 const YOKAIBA_VERIFY_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/verify`;
+
 const MAX_TOKEN_LENGTH = 16_384;
 const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
@@ -198,12 +198,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     return;
   }
   try {
-    const parameters = new URLSearchParams({ templateId, seed });
-    if (difficultyLevel) {
-      parameters.set("difficultyLevel", difficultyLevel);
-      parameters.set("allowSeedFallback", "true");
-    }
-    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${parameters}`);
+    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(templateId, seed, difficultyLevel)}`);
     forwardUpstreamRequestId(upstream, response);
     forwardEtag(upstream, response);
     forwardRateLimitHeaders(upstream, response);
