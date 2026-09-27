@@ -4,11 +4,25 @@ import assert from "node:assert/strict";
 import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleResponseToCache, savePuzzleToCache, type PuzzleCacheRequest } from "./puzzle-cache";
 
 class MemoryStorage {
-  private readonly values = new Map<string, string>();
+  protected readonly values = new Map<string, string>();
 
+  get length(): number { return this.values.size; }
   getItem(key: string): string | null { return this.values.get(key) ?? null; }
+  key(index: number): string | null { return [...this.values.keys()][index] ?? null; }
   setItem(key: string, value: string): void { this.values.set(key, value); }
   removeItem(key: string): void { this.values.delete(key); }
+}
+
+class OneTimeQuotaFailureStorage extends MemoryStorage {
+  failed = false;
+
+  override setItem(key: string, value: string): void {
+    if (!this.failed && key === puzzleCacheKey("new", undefined)) {
+      this.failed = true;
+      throw new Error("quota exceeded");
+    }
+    super.setItem(key, value);
+  }
 }
 
 class ThrowingReadStorage extends MemoryStorage {
@@ -54,6 +68,49 @@ describe("puzzle session cache", () => {
     storage.setItem(puzzleCacheKey("bad", undefined), "not json");
     assert.strictEqual(loadPuzzleFromCache(storage, "bad", undefined, 10_000), undefined);
     assert.strictEqual(storage.getItem(puzzleCacheKey("bad", undefined)), null);
+  });
+
+  it("prunes expired owned entries while saving", () => {
+    const storage = new MemoryStorage();
+    savePuzzleToCache(storage, "expired", undefined, { id: "old" }, 10_000);
+
+    savePuzzleToCache(storage, "fresh", undefined, { id: "new" }, 310_001);
+
+    assert.strictEqual(storage.getItem(puzzleCacheKey("expired", undefined)), null);
+    assert.deepStrictEqual(loadPuzzleFromCache(storage, "fresh", undefined, 310_001), { id: "new" });
+  });
+
+  it("evicts the oldest owned entry when the cache reaches its maximum size", () => {
+    const storage = new MemoryStorage();
+    for (let index = 0; index < 21; index += 1) {
+      savePuzzleToCache(storage, `seed-${index}`, undefined, { index }, 10_000 + index);
+    }
+
+    assert.strictEqual(storage.length, 20);
+    assert.strictEqual(storage.getItem(puzzleCacheKey("seed-0", undefined)), null);
+    assert.notStrictEqual(storage.getItem(puzzleCacheKey("seed-20", undefined)), null);
+  });
+
+  it("preserves unrelated session storage while maintaining the cache", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("another-feature", "keep me");
+    for (let index = 0; index < 21; index += 1) {
+      savePuzzleToCache(storage, `seed-${index}`, undefined, { index }, 10_000 + index);
+    }
+
+    assert.strictEqual(storage.getItem("another-feature"), "keep me");
+    assert.strictEqual(storage.length, 21);
+  });
+
+  it("prunes the oldest owned entry and retries once after a quota failure", () => {
+    const storage = new OneTimeQuotaFailureStorage();
+    savePuzzleToCache(storage, "old", undefined, { id: "old" }, 10_000);
+
+    savePuzzleToCache(storage, "new", undefined, { id: "new" }, 10_001);
+
+    assert.strictEqual(storage.failed, true);
+    assert.strictEqual(storage.getItem(puzzleCacheKey("old", undefined)), null);
+    assert.deepStrictEqual(loadPuzzleFromCache(storage, "new", undefined, 10_002), { id: "new" });
   });
 
   it("returns undefined when reading from storage throws", () => {
