@@ -66,10 +66,10 @@ describe("hint proxy", () => {
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "hint-123");
   });
 
-  it("falls back to the primary Yokaiba hint when Jev returns a choice outside the candidate set", async () => {
+  it("falls back to the primary Yokaiba hint when Jev returns an out-of-bounds candidate index", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     const fetchMock = mock.fn(async (input: string | URL | Request) => String(input).includes("openrouter.ai")
-      ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "invented", confidence: 1 } } }), { status: 200 })
+      ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_2", confidence: 1 } } }), { status: 200 })
       : new Response(JSON.stringify({ kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } }), { status: 200, headers: { "content-type": "application/json" } }));
     stubGlobal("fetch", fetchMock);
     const { response, result } = responseRecorder();
