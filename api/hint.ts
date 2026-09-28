@@ -107,7 +107,7 @@ function selectCandidateWithJev(context: SelectionContext, candidates: HintCandi
     if (answer.type !== "choice" || typeof answer.choice !== "string") return undefined;
     const match = /^candidate_(\d+)$/.exec(answer.choice);
     const selectedIndex = match ? Number(match[1]) : -1;
-    return Number.isInteger(selectedIndex) ? candidates[selectedIndex] : undefined;
+    return Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < candidates.length ? candidates[selectedIndex] : undefined;
   });
 }
 
