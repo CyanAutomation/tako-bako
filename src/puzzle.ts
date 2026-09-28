@@ -1,4 +1,13 @@
+import { isClueStrategy, strategyForConstraintKind, type ClueStrategy } from "./clue-strategy";
+
 export type Mark = "unknown" | "yes" | "no";
+
+export interface Clue {
+  id: string;
+  text: string;
+  constraintKind?: string;
+  strategy?: ClueStrategy;
+}
 
 export interface Category {
   id: string;
@@ -12,7 +21,7 @@ export interface Puzzle {
   requestedSeed: string;
   templateId: string;
   puzzleToken?: string;
-  clues: { id: string; text: string }[];
+  clues: Clue[];
   difficulty: { level: number; label: string; modelVersion: string };
   spec: { id: string; title: string; baseCategory: string; categories: Category[] };
 }
@@ -45,7 +54,11 @@ export function parsePuzzle(value: unknown): Puzzle {
   }
   const clues = value.clues.map(clue => {
     if (!isRecord(clue) || typeof clue.id !== "string" || typeof clue.text !== "string") throw new Error("invalid puzzle response");
-    return { id: clue.id, text: clue.text };
+    const constraint = isRecord(clue.constraint) ? clue.constraint : undefined;
+    const candidateKind = typeof clue.constraintKind === "string" ? clue.constraintKind : constraint?.kind;
+    const constraintKind = typeof candidateKind === "string" && candidateKind.length <= MAX_TEXT_LENGTH ? candidateKind : undefined;
+    const strategy = strategyForConstraintKind(constraintKind) ?? (isClueStrategy(clue.strategy) ? clue.strategy : undefined);
+    return { id: clue.id, text: clue.text, ...(constraintKind ? { constraintKind } : {}), ...(strategy ? { strategy } : {}) };
   });
   const categories = spec.categories.map(category => {
     if (!isRecord(category) || typeof category.id !== "string" || category.id.length === 0 || category.id.length > MAX_TEXT_LENGTH || typeof category.label !== "string" || category.label.length === 0 || category.label.length > MAX_TEXT_LENGTH || !isStringArray(category.values) || !isNonEmptyUniqueStrings(category.values)) throw new Error("invalid puzzle response");

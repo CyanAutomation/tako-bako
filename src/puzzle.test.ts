@@ -38,6 +38,8 @@ describe("parsePuzzle", () => {
 
     assert.strictEqual((puzzle.spec.categories).length, 2);
     assert.strictEqual(puzzle.difficulty.label, "Easy");
+    assert.strictEqual(puzzle.clues[0].constraintKind, "matches");
+    assert.strictEqual(puzzle.clues[0].strategy, "direct_match");
   });
 
   it("retains an optional signed puzzle token for answer verification", () => {
@@ -57,6 +59,20 @@ describe("parsePuzzle", () => {
     });
 
     assert.strictEqual(puzzle.puzzleToken, "signed-token");
+  });
+
+  it("retains parsed clue strategy metadata when loading a cached puzzle", () => {
+    const puzzle = parsePuzzle({
+      id: "cached", seed: "cached", clues: [{ id: "distance", text: "Two places apart", constraintKind: "distance", strategy: "distance" }],
+      difficulty: { level: 2, label: "Easy", modelVersion: "test" },
+      spec: { id: "cached", title: "Cached", baseCategory: "person", categories: [
+        { id: "person", label: "Person", values: ["A", "B"] },
+        { id: "place", label: "Place", values: ["One", "Two"] },
+      ] },
+    });
+
+    assert.strictEqual(puzzle.clues[0].constraintKind, "distance");
+    assert.strictEqual(puzzle.clues[0].strategy, "distance");
   });
 
   it("retains Yokaiba's requested seed and accepts a five-by-five expert puzzle", () => {
