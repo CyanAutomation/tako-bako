@@ -1,4 +1,5 @@
 import type { Category } from "./puzzle";
+import { clueStrategyLabel, type ClueStrategy } from "./clue-strategy";
 import { courses, TIERS, type CourseId } from "./curriculum";
 import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderInfoDisclosure, renderLevelCard, renderPanel, renderSegmentedControl, renderStatus, renderTabs } from "./ui";
 
@@ -39,11 +40,11 @@ function clueIsRelated(clue: string, category: Category): boolean {
   return category.values.some(value => normalised.includes(value.toLocaleLowerCase()));
 }
 
-export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds, clueFilter = "all" }: { clues: { id: string; text: string }[]; activeCategory: Category; cluesOpen: boolean; usedClueIds: ReadonlySet<string>; clueFilter?: ClueFilter }): string {
+export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds, clueFilter = "all" }: { clues: { id: string; text: string; strategy?: ClueStrategy }[]; activeCategory: Category; cluesOpen: boolean; usedClueIds: ReadonlySet<string>; clueFilter?: ClueFilter }): string {
   const visibleClues = clues.filter(clue => clueFilter === "all" || (clueFilter === "used" ? usedClueIds.has(clue.id) : !usedClueIds.has(clue.id)));
   const filterControls = renderSegmentedControl({ label: "Filter clues", className: "clue-filters", items: (["all", "remaining", "used"] as const).map(filter => ({ id: filter, label: filter === "all" ? "All" : filter === "remaining" ? "To review" : "Used", selected: clueFilter === filter, data: { clueFilter: filter } })) });
   return renderPanel({
     tag: "aside", className: "clues", labelledBy: "clues-title",
-    content: `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Tako’s notes</span><strong>Clues</strong></span>${renderBadge(`${clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Tako’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint"><span class="category-chip">${escapeHtml(activeCategory.label)}</span> clues that mention this grid are highlighted.</p>${filterControls}<ol>${visibleClues.map(clue => { const index = clues.indexOf(clue); const related = clueIsRelated(clue.text, activeCategory); return `<li class="clue-item${related ? " clue-item--related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span>${escapeHtml(clue.text)}</span></li>`; }).join("")}</ol></div></details>`,
+    content: `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Tako’s notes</span><strong>Clues</strong></span>${renderBadge(`${clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Tako’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint"><span class="category-chip">${escapeHtml(activeCategory.label)}</span> clues that mention this grid are highlighted.</p>${filterControls}<ol>${visibleClues.map(clue => { const index = clues.indexOf(clue); const related = clueIsRelated(clue.text, activeCategory); const strategy = clue.strategy ? `<span class="clue-strategy" title="Reasoning strategy">${escapeHtml(clueStrategyLabel(clue.strategy))}</span>` : ""; return `<li class="clue-item${related ? " clue-item--related" : ""}"><button class="clue-used ${usedClueIds.has(clue.id) ? "is-used" : ""}" data-clue-id="${escapeHtml(clue.id)}" aria-pressed="${usedClueIds.has(clue.id)}" aria-label="Mark clue ${index + 1} as ${usedClueIds.has(clue.id) ? "unused" : "used"}">${usedClueIds.has(clue.id) ? "✓" : index + 1}</button><span class="clue-item__content"><span>${escapeHtml(clue.text)}</span>${strategy}</span></li>`; }).join("")}</ol></div></details>`,
   });
 }

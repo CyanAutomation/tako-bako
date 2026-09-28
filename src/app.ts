@@ -6,6 +6,7 @@ import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzl
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
 import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
+import { parseClueStrategyResults, type ClueStrategy } from "./clue-strategy";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
 import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
 
@@ -37,6 +38,7 @@ let difficultyLevel = playMode === "challenge" ? activeCourse.difficultyLevel : 
 let templateId: ScenarioId = playMode === "challenge" ? activeCourse.templateId : templateFromUrl();
 let activeGridId: string | undefined;
 let usedClueIds = new Set<string>();
+let clueStrategies: Record<string, ClueStrategy> = {};
 let pendingResetGridId: string | undefined;
 let pendingNewChallenge = false;
 let pendingProgressReset = false;
@@ -139,10 +141,13 @@ let verificationGeneration = 0;
 let activeVerificationRequest: AbortController | undefined;
 let hintGeneration = 0;
 let activeHintRequest: AbortController | undefined;
+let clueStrategyGeneration = 0;
+let activeClueStrategyRequest: AbortController | undefined;
 
 function showLandingPage(): void {
   invalidateVerification();
   invalidateHint();
+  invalidateClueStrategies();
   currentFetchId += 1;
   activePuzzleRequest?.abort();
   activePuzzleRequest = undefined;
@@ -154,6 +159,7 @@ function showLandingPage(): void {
   undoStack = [];
   activeGridId = undefined;
   usedClueIds = new Set();
+  clueStrategies = {};
   pendingResetGridId = undefined;
   pendingNewChallenge = false;
   pendingProgressReset = false;
@@ -181,9 +187,42 @@ function invalidateHint(): void {
   activeHintRequest = undefined;
 }
 
+function invalidateClueStrategies(): void {
+  clueStrategyGeneration += 1;
+  activeClueStrategyRequest?.abort();
+  activeClueStrategyRequest = undefined;
+}
+
+async function loadClueStrategies(requestedPuzzle: Puzzle): Promise<void> {
+  const unresolved = requestedPuzzle.clues.filter(clue => !clue.strategy);
+  if (unresolved.length === 0 || !requestedPuzzle.puzzleToken) return;
+  const requestGeneration = ++clueStrategyGeneration;
+  activeClueStrategyRequest?.abort();
+  const requestController = new AbortController();
+  activeClueStrategyRequest = requestController;
+  try {
+    const result = await fetch("/api/clue-strategies", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ puzzleToken: requestedPuzzle.puzzleToken, clues: unresolved.map(({ id, text, constraintKind }) => ({ id, text, ...(constraintKind ? { constraintKind } : {}) })) }),
+      signal: requestController.signal,
+    });
+    if (!result.ok) return;
+    const strategies = parseClueStrategyResults(await result.json(), unresolved.map(clue => clue.id));
+    if (requestGeneration !== clueStrategyGeneration || puzzle?.id !== requestedPuzzle.id) return;
+    clueStrategies = { ...clueStrategies, ...Object.fromEntries(strategies) };
+    render();
+  } catch {
+    // Clue labels are optional and must not block puzzle play.
+  } finally {
+    if (requestGeneration === clueStrategyGeneration) activeClueStrategyRequest = undefined;
+  }
+}
+
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
   invalidateVerification();
   invalidateHint();
+  invalidateClueStrategies();
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
@@ -235,6 +274,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     }
     if (fetchId !== currentFetchId) return;
     puzzle = data;
+    clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
     puzzleLoadFailed = false;
     puzzleStartedAt = Date.now();
     hintsUsed = 0;
@@ -246,6 +286,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     const active = data.spec.categories.find(category => category.id === activeGridId);
     activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
     usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
+    void loadClueStrategies(data);
     // Keep the requested seed in the URL: Yokaiba may derive a different
     // internal seed while searching for the chosen difficulty level.
     setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
@@ -404,11 +445,27 @@ async function requestHint(): Promise<void> {
     && puzzle.puzzleToken === requestedPuzzleToken;
   const progress = boardSolveProgress(requestedBoard, requestedPuzzle.spec);
   const kind = progress.matches === 0 ? "clue" : progress.matches < Math.ceil(progress.total / 2) ? "elimination" : "placement";
+  const base = requestedPuzzle.spec.categories.find(category => category.id === requestedPuzzle.spec.baseCategory);
+  const boardContext = base ? requestedPuzzle.spec.categories.filter(category => category.id !== base.id).flatMap(category => base.values.flatMap(subject => category.values.flatMap(value => {
+    const mark = requestedBoard[squareKey(category.id, subject, value)];
+    return mark === "yes" || mark === "no" ? [{ category: category.label, subject, value, mark }] : [];
+  }))) : [];
   loading = true;
   message = "Tako is finding the next helpful nudge…";
   render();
   try {
-    const result = await fetch("/api/hint", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ puzzleToken: requestedPuzzleToken, kind }), signal: requestController.signal });
+    const result = await fetch("/api/hint", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        puzzleToken: requestedPuzzleToken,
+        kind,
+        clues: requestedPuzzle.clues.map(clue => ({ id: clue.id, text: clue.text, strategy: clue.strategy ?? clueStrategies[clue.id] })),
+        usedClueIds: [...requestedUsedClueIds],
+        board: boardContext,
+      }),
+      signal: requestController.signal,
+    });
     if (!isActiveRequest()) return;
     const hint: unknown = await result.json();
     if (!isActiveRequest()) return;
@@ -525,7 +582,7 @@ function renderPuzzle(current: Puzzle): string {
   const progress = boardSolveProgress(board, current.spec);
   const title = playMode === "challenge" ? activeCourse.label : current.spec.title;
   const courseLabel = playMode === "challenge" ? `${activeCourse.tier[0]!.toUpperCase()}${activeCourse.tier.slice(1)} · Level ${activeCourse.level}` : `Shared · Level ${current.difficulty.level}`;
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, smartMarking }), grids })}${renderCluePanel({ clues: current.clues, activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
+  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, smartMarking }), grids })}${renderCluePanel({ clues: current.clues.map(clue => ({ ...clue, strategy: clue.strategy ?? clueStrategies[clue.id] })), activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
 }
 
 function renderLandingAction(): string {

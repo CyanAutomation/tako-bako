@@ -13,11 +13,11 @@ interface FakeButton {
   dataset: Record<string, string>;
 }
 
-const puzzleResponse = (id: string, token: string) => ({
+const puzzleResponse = (id: string, token: string, clues: { id: string; text: string; constraint?: { kind: string } }[] = []) => ({
   id,
   seed: id,
   puzzleToken: token,
-  clues: [],
+  clues,
   difficulty: { level: 1, label: "Very easy", modelVersion: "test" },
   spec: {
     id: "tournament-order-v2",
@@ -132,24 +132,40 @@ describe("answer verification navigation", () => {
     stubGlobal("crypto", { randomUUID: () => "puzzle-b" });
 
     const hint = deferred<{ ok: boolean; json: () => Promise<{ kind: string; clue: { id: string; text: string } }> }>();
-    const fetchMock = mock.fn(async (input: string | URL) => {
+    const fetchMock = mock.fn(async (input: string | URL, init?: RequestInit) => {
       const url = String(input);
+      void init;
       if (url === "/api/events") return { ok: true, json: async () => ({}) };
       if (url === "/api/hint") return hint.promise;
+      if (url === "/api/clue-strategies") return { ok: true, json: async () => ({ strategies: [{ clueId: "adjacent", strategy: "adjacency", confidence: 0.91 }] }) };
       const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
-      return { ok: true, status: 200, json: async () => puzzleResponse(seed, `${seed}-token`) };
+      const clues = seed === "puzzle-a" ? [
+        { id: "direct", text: "Aki trains at Lions.", constraint: { kind: "matches" } },
+        { id: "adjacent", text: "Hana lives next to the fish keeper." },
+      ] : [];
+      return { ok: true, status: 200, json: async () => puzzleResponse(seed, `${seed}-token`, clues) };
     });
     stubGlobal("fetch", fetchMock);
 
     mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
     await flush();
+    assert.ok((root.innerHTML).includes('class="clue-strategy" title="Reasoning strategy">Neighbours</span>'));
 
     const click = (button: Partial<FakeButton>) => listeners.get("click")!({
       target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
     });
+    click({ dataset: { square: "club|Aki|Lions" } });
     click({ id: "hint" });
     await flush();
     assert.ok((root.innerHTML).includes("Tako is finding the next helpful nudge"));
+    const hintRequest = fetchMock.mock.calls.find(({ arguments: [input] }) => String(input) === "/api/hint");
+    assert.ok(hintRequest);
+    const hintBody = JSON.parse(String(hintRequest.arguments[1]?.body));
+    assert.deepStrictEqual(hintBody.clues, [
+      { id: "direct", text: "Aki trains at Lions.", strategy: "direct_match" },
+      { id: "adjacent", text: "Hana lives next to the fish keeper.", strategy: "adjacency" },
+    ]);
+    assert.deepStrictEqual(hintBody.board, [{ category: "Club", subject: "Aki", value: "Lions", mark: "yes" }]);
 
     click({ dataset: { course: "beginner-2" } });
     await flush();

@@ -81,6 +81,12 @@ The intended maximum end-to-end puzzle age is five minutes from generation. The 
 
 The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and a 3,600-second stale-while-revalidate lifetime. The API uses those values for `s-maxage=300` and `stale-while-revalidate=3600`, while the browser derives its five-minute session-cache deadline from the same fresh lifetime. Upstream rate-limit headers are forwarded to the client. A single transient upstream 5xx is retried before the API returns a user-friendly 502/504 failure, while rate-limit and validation responses are never retried. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events never include a player identifier, seed, or answer cells.
 
+### Optional Jev clue labels and hint selection
+
+Set `OPENROUTER_API_KEY` in the Vercel project's server-side environment variables to enable Jev. `JEV_MODEL` is optional and defaults to `~typesafe/jev-latest`; set it to a pinned model ID when repeatable labels matter. Keep both values out of browser code and the repository.
+
+Known Yokaiba clue constraint kinds receive deterministic strategy labels. Jev classifies unrecognized clue text and, when the player requests a hint, can choose among unused puzzle clues and the hint returned by Yokaiba for the current progress stage. The OpenRouter request contains clue text and the player's marked cells, but never the signed puzzle token or solution. Jev's result is accepted only when it selects one of those supplied candidates; a missing key, provider error, malformed answer, or low-confidence clue label leaves the existing fallback in place. Clue labels require a signed puzzle token so the API can validate the puzzle with Yokaiba before making a model request.
+
 ## Project Structure
 
 ```
@@ -96,6 +102,7 @@ src/       Application source
   daily.ts        Daily puzzle seed generation from UTC date parts
   sections.ts     Curricular rendering: curriculum cards, puzzle header, board toolbar,
                   grid workspace tabs, clue panel with filtering
+  clue-strategy.ts Reasoning strategy labels and validated Jev classification results
   ui.ts           Reusable HTML rendering primitives: buttons, badges, dialogs, panels, tabs
   style.css       Base stylesheet
   expert-grid.css Expert-grid layout overrides
@@ -103,6 +110,8 @@ src/       Application source
 api/         Vercel API functions
   puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
   hint.ts     POST /hint assistance proxy
+  clue-strategies.ts POST /clue-strategies Jev-assisted clue classification
+  jev.ts      Server-side OpenRouter Decisions API client
   events.ts   POST /events anonymous calibration proxy
   health.ts   GET /health readiness check
 index.html      App entry HTML
