@@ -44,6 +44,12 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('aria-label="Mark clue 1 as unused"'));
   });
 
+  it("labels a clue with its reasoning strategy when one is available", () => {
+    const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions.", strategy: "direct_match" }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set() });
+
+    assert.ok((markup).includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
+  });
+
   it("offers focused clue views without changing the original clue numbering", () => {
     const clues = [{ id: "one", text: "Aki was associated with Lions." }, { id: "two", text: "Hana was associated with Wolves." }];
     const markup = renderCluePanel({ clues, activeCategory: { id: "club", label: "Club", values: ["Lions", "Wolves"] }, cluesOpen: true, usedClueIds: new Set(["two"]), clueFilter: "remaining" });
