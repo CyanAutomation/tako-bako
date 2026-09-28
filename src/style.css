@@ -677,6 +677,22 @@ td {
   color: var(--muted);
   font-size: 0.82rem;
 }
+.clue-item__content {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+.clue-strategy {
+  display: inline-flex;
+  padding: 0.12rem 0.4rem;
+  color: var(--navy);
+  background: var(--jade-light);
+  border: 1px solid var(--jade);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
 .clues li.is-related {
   color: var(--ink);
   font-weight: 700;
