@@ -215,6 +215,28 @@ describe("hint proxy", () => {
     assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "c1", text: "Start here." } });
   });
 
+  const malformedContexts = [
+    { clues: [{ id: "duplicate", text: "First clue." }, { id: "duplicate", text: "Second clue." }] },
+    { board: [
+      { category: "Club", subject: "Aki", value: "Lions", mark: "yes" },
+      { category: "Club", subject: "Aki", value: "Lions", mark: "no" },
+    ] },
+    { usedClueIds: Array.from({ length: 65 }, (_, index) => `clue-${index}`) },
+  ];
+  for (const [caseIndex, context] of malformedContexts.entries()) {
+    it(`keeps the solver hint when optional context has an invalid boundary (${caseIndex + 1})`, async () => {
+      const payload = { kind: "clue", clue: { id: "c1", text: "Start here." } };
+      const upstream = resolvedMock(new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } }));
+      stubGlobal("fetch", upstream);
+      const { response, result } = responseRecorder();
+
+      await handler({ method: "POST", body: { puzzleToken: "signed-token", kind: "clue", ...context } } as never, response as never);
+
+      assert.strictEqual(upstream.mock.callCount(), 1);
+      assert.deepStrictEqual(result.body, payload);
+    });
+  }
+
   it("uses the sole unused clue when Yokaiba's clue has already been marked used", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     const upstream = resolvedMock(new Response(JSON.stringify({ kind: "clue", clue: { id: "used", text: "Already used." } }), { status: 200, headers: { "content-type": "application/json" } }));

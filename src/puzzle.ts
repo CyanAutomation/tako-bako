@@ -117,26 +117,30 @@ export function answerFromBoard(board: Board, spec: Puzzle["spec"]): Answer | un
 }
 
 /** Counts only marks that belong to the current puzzle's playable grids. */
-export function boardProgress(board: Board, spec: Puzzle["spec"]): { marked: number; total: number } {
+function playableGridKeys(spec: Puzzle["spec"]): { validKeys: Set<string>; totalMatches: number } | undefined {
   const base = spec.categories.find(category => category.id === spec.baseCategory);
-  if (!base) return { marked: 0, total: 0 };
+  if (!base) return undefined;
   const categories = spec.categories.filter(category => category.id !== base.id);
   const validKeys = new Set(categories.flatMap(category => base.values.flatMap(row => category.values.map(column => squareKey(category.id, row, column)))));
+  return { validKeys, totalMatches: categories.length * base.values.length };
+}
+
+export function boardProgress(board: Board, spec: Puzzle["spec"]): { marked: number; total: number } {
+  const playable = playableGridKeys(spec);
+  if (!playable) return { marked: 0, total: 0 };
   return {
-    marked: Object.entries(board).filter(([key, mark]) => validKeys.has(key) && mark !== "unknown").length,
-    total: validKeys.size,
+    marked: Object.entries(board).filter(([key, mark]) => playable.validKeys.has(key) && mark !== "unknown").length,
+    total: playable.validKeys.size,
   };
 }
 
 /** Counts affirmative matches separately from tentative notes and rule-outs. */
 export function boardSolveProgress(board: Board, spec: Puzzle["spec"]): { matches: number; total: number } {
-  const base = spec.categories.find(category => category.id === spec.baseCategory);
-  if (!base) return { matches: 0, total: 0 };
-  const categories = spec.categories.filter(category => category.id !== base.id);
-  const validKeys = new Set(categories.flatMap(category => base.values.flatMap(row => category.values.map(column => squareKey(category.id, row, column)))));
+  const playable = playableGridKeys(spec);
+  if (!playable) return { matches: 0, total: 0 };
   return {
-    matches: Object.entries(board).filter(([key, mark]) => validKeys.has(key) && mark === "yes").length,
-    total: categories.length * base.values.length,
+    matches: Object.entries(board).filter(([key, mark]) => playable.validKeys.has(key) && mark === "yes").length,
+    total: playable.totalMatches,
   };
 }
 

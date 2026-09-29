@@ -32,6 +32,13 @@ function parseClues(value: unknown): InputClue[] | undefined {
   return clues;
 }
 
+function strategyResults(clues: readonly InputClue[], results: ReadonlyMap<string, { strategy: ClueStrategy; confidence: number }>) {
+  return clues.flatMap(clue => {
+    const result = results.get(clue.id);
+    return result ? [{ clueId: clue.id, ...result }] : [];
+  });
+}
+
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "POST") { response.setHeader("allow", "POST"); response.status(405).json({ error: "Method not allowed" }); return; }
   const body = request.body;
@@ -61,17 +68,11 @@ export default async function handler(request: VercelRequest, response: VercelRe
         signal: AbortSignal.timeout(8_000),
       });
       if (!tokenCheck.ok) {
-        response.status(200).json({ strategies: clues.flatMap(clue => {
-          const result = results.get(clue.id);
-          return result ? [{ clueId: clue.id, ...result }] : [];
-        }) });
+        response.status(200).json({ strategies: strategyResults(clues, results) });
         return;
       }
     } catch {
-      response.status(200).json({ strategies: clues.flatMap(clue => {
-        const result = results.get(clue.id);
-        return result ? [{ clueId: clue.id, ...result }] : [];
-      }) });
+      response.status(200).json({ strategies: strategyResults(clues, results) });
       return;
     }
     const questionToClueId = new Map<string, string>();
@@ -103,8 +104,5 @@ export default async function handler(request: VercelRequest, response: VercelRe
     }
   }
 
-  response.status(200).json({ strategies: clues.flatMap(clue => {
-    const result = results.get(clue.id);
-    return result ? [{ clueId: clue.id, ...result }] : [];
-  }) });
+  response.status(200).json({ strategies: strategyResults(clues, results) });
 }

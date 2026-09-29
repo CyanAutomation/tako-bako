@@ -36,22 +36,37 @@ interface Completion {
   answer: { assignments: Record<string, string[]> };
 }
 
-function parseCompletion(value: unknown): Completion | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const completion = value as Record<string, unknown>;
-  if (typeof completion.puzzleToken !== "string" || completion.puzzleToken.length === 0 || completion.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
-  if (!completion.answer || typeof completion.answer !== "object" || Array.isArray(completion.answer)) return undefined;
-  const answer = completion.answer as Record<string, unknown>;
-  if (!answer.assignments || typeof answer.assignments !== "object" || Array.isArray(answer.assignments)) return undefined;
-  const entries = Object.entries(answer.assignments);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseAssignmentValues(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_VALUES_PER_ASSIGNMENT) return undefined;
+  if (!value.every(item => typeof item === "string" && item.length > 0 && item.length <= MAX_ANSWER_STRING_LENGTH)) return undefined;
+  return [...value];
+}
+
+function parseAssignments(value: unknown): Record<string, string[]> | undefined {
+  if (!isRecord(value)) return undefined;
+  const entries = Object.entries(value);
   if (entries.length === 0 || entries.length > MAX_ASSIGNMENTS) return undefined;
   const assignments: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
   for (const [category, assignedValues] of entries) {
-    if (category.length === 0 || category.length > MAX_ANSWER_STRING_LENGTH || !Array.isArray(assignedValues) || assignedValues.length === 0 || assignedValues.length > MAX_VALUES_PER_ASSIGNMENT) return undefined;
-    if (!assignedValues.every(item => typeof item === "string" && item.length > 0 && item.length <= MAX_ANSWER_STRING_LENGTH)) return undefined;
-    assignments[category] = [...assignedValues];
+    if (category.length === 0 || category.length > MAX_ANSWER_STRING_LENGTH) return undefined;
+    const values = parseAssignmentValues(assignedValues);
+    if (!values) return undefined;
+    assignments[category] = values;
   }
-  return { puzzleToken: completion.puzzleToken, answer: { assignments } };
+  return assignments;
+}
+
+function parseCompletion(value: unknown): Completion | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
+  if (!isRecord(value.answer)) return undefined;
+  const assignments = parseAssignments(value.answer.assignments);
+  if (!assignments) return undefined;
+  return { puzzleToken: value.puzzleToken, answer: { assignments } };
 }
 
 function isJson(response: Response): boolean {
@@ -123,10 +138,14 @@ function forwardRateLimitHeaders(upstream: Response, response: VercelResponse): 
 }
 
 function availableDifficultyLevels(body: unknown): number[] | undefined {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
-  const levels = (body as Record<string, unknown>).availableDifficultyLevels;
+  if (!isRecord(body)) return undefined;
+  const levels = body.availableDifficultyLevels;
   if (!Array.isArray(levels) || !levels.every(level => typeof level === "number" && Number.isInteger(level) && level >= 1 && level <= 12)) return undefined;
   return [...new Set(levels)].sort((left, right) => left - right);
+}
+
+function isDifficultyUnavailable(body: unknown): body is Record<string, unknown> {
+  return isRecord(body) && isRecord(body.error) && body.error.code === "difficulty_unavailable";
 }
 
 async function forwardDifficultyUnavailable(upstream: Response, response: VercelResponse, startedAt: number): Promise<boolean> {
@@ -138,80 +157,83 @@ async function forwardDifficultyUnavailable(upstream: Response, response: Vercel
   } catch {
     return false;
   }
-  const error = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).error : undefined;
-  if (!error || typeof error !== "object" || Array.isArray(error) || (error as Record<string, unknown>).code !== "difficulty_unavailable") return false;
+  if (!isDifficultyUnavailable(body)) return false;
+  const levels = availableDifficultyLevels(body);
   preventCaching(response);
   response.status(422).json({
     code: "difficulty_unavailable",
     error: "This seed cannot produce the selected difficulty. Try another puzzle.",
-    ...(availableDifficultyLevels(body) ? { availableDifficultyLevels: availableDifficultyLevels(body) } : {}),
+    ...(levels ? { availableDifficultyLevels: levels } : {}),
   });
   logMetric("generate", "difficulty_unavailable", 422, startedAt);
   return true;
 }
 
-export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
-  if (request.method !== "GET" && request.method !== "POST") {
-    response.setHeader("allow", "GET, POST");
-    preventCaching(response);
-    response.status(405).json({ error: "Method not allowed" });
-    return;
-  }
-  if (request.method === "POST") {
-    const startedAt = Date.now();
-    // Verification results depend on submitted answers and must never be cached.
-    preventCaching(response);
-    const completion = parseCompletion(request.body);
-    if (!completion) {
-      response.status(400).json({ error: "A complete signed answer is required" });
-      logMetric("verify", "invalid_request", 400, startedAt);
-      return;
-    }
-    try {
-      const { response: upstream } = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(completion),
-      });
-      forwardUpstreamRequestId(upstream, response);
-      forwardRateLimitHeaders(upstream, response);
-      if (await forwardRateLimit(upstream, response, "verify", startedAt)) return;
-      if (!upstream.ok || !isJson(upstream)) {
-        response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
-        logMetric("verify", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
-        return;
-      }
-      response.status(200).json(await upstream.json());
-      logMetric("verify", "success", 200, startedAt);
-    } catch (error) {
-      upstreamFailure(response, "verify", error, startedAt);
-    }
-    return;
-  }
-  const seed = typeof request.query.seed === "string" ? request.query.seed : "";
+async function handleVerification(body: unknown, response: VercelResponse): Promise<void> {
   const startedAt = Date.now();
-  const templateId = typeof request.query.templateId === "string" ? request.query.templateId : DEFAULT_SCENARIO_ID;
-  const difficultyLevel = typeof request.query.difficultyLevel === "string" ? request.query.difficultyLevel : undefined;
-  if (!isValidSeed(seed)) {
-    preventCaching(response);
-    response.status(400).json({ error: "A valid puzzle seed is required" });
-    logMetric("generate", "invalid_request", 400, startedAt);
-    return;
-  }
-  if (!isScenarioId(templateId)) {
-    preventCaching(response);
-    response.status(400).json({ error: "An available puzzle scenario is required" });
-    logMetric("generate", "invalid_request", 400, startedAt);
-    return;
-  }
-  if (difficultyLevel !== undefined && !DIFFICULTY_LEVEL_PATTERN.test(difficultyLevel)) {
-    preventCaching(response);
-    response.status(400).json({ error: "A difficulty level from 1 to 12 is required" });
-    logMetric("generate", "invalid_request", 400, startedAt);
+  // Verification results depend on submitted answers and must never be cached.
+  preventCaching(response);
+  const completion = parseCompletion(body);
+  if (!completion) {
+    response.status(400).json({ error: "A complete signed answer is required" });
+    logMetric("verify", "invalid_request", 400, startedAt);
     return;
   }
   try {
-    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(templateId, seed, difficultyLevel)}`);
+    const { response: upstream } = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(completion),
+    });
+    forwardUpstreamRequestId(upstream, response);
+    forwardRateLimitHeaders(upstream, response);
+    if (await forwardRateLimit(upstream, response, "verify", startedAt)) return;
+    if (!upstream.ok || !isJson(upstream)) {
+      response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
+      logMetric("verify", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
+      return;
+    }
+    response.status(200).json(await upstream.json());
+    logMetric("verify", "success", 200, startedAt);
+  } catch (error) {
+    upstreamFailure(response, "verify", error, startedAt);
+  }
+}
+
+interface GenerationParameters {
+  seed: string;
+  templateId: string;
+  difficultyLevel?: string;
+}
+
+function invalidGenerationRequest(response: VercelResponse, startedAt: number, message: string): void {
+  preventCaching(response);
+  response.status(400).json({ error: message });
+  logMetric("generate", "invalid_request", 400, startedAt);
+}
+
+function parseGenerationParameters(query: VercelRequest["query"], response: VercelResponse, startedAt: number): GenerationParameters | undefined {
+  const seed = typeof query.seed === "string" ? query.seed : "";
+  const templateId = typeof query.templateId === "string" ? query.templateId : DEFAULT_SCENARIO_ID;
+  const difficultyLevel = typeof query.difficultyLevel === "string" ? query.difficultyLevel : undefined;
+  if (!isValidSeed(seed)) {
+    invalidGenerationRequest(response, startedAt, "A valid puzzle seed is required");
+    return;
+  }
+  if (!isScenarioId(templateId)) {
+    invalidGenerationRequest(response, startedAt, "An available puzzle scenario is required");
+    return;
+  }
+  if (difficultyLevel !== undefined && !DIFFICULTY_LEVEL_PATTERN.test(difficultyLevel)) {
+    invalidGenerationRequest(response, startedAt, "A difficulty level from 1 to 12 is required");
+    return;
+  }
+  return { seed, templateId, difficultyLevel };
+}
+
+async function forwardGeneratedPuzzle(parameters: GenerationParameters, response: VercelResponse, startedAt: number): Promise<void> {
+  try {
+    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(parameters.templateId, parameters.seed, parameters.difficultyLevel)}`);
     forwardUpstreamRequestId(upstream, response);
     forwardEtag(upstream, response);
     forwardRateLimitHeaders(upstream, response);
@@ -242,4 +264,24 @@ export default async function handler(request: VercelRequest, response: VercelRe
   } catch (error) {
     upstreamFailure(response, "generate", error, startedAt);
   }
+}
+
+async function handleGeneration(query: VercelRequest["query"], response: VercelResponse): Promise<void> {
+  const startedAt = Date.now();
+  const parameters = parseGenerationParameters(query, response, startedAt);
+  if (parameters) await forwardGeneratedPuzzle(parameters, response, startedAt);
+}
+
+export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
+  if (request.method !== "GET" && request.method !== "POST") {
+    response.setHeader("allow", "GET, POST");
+    preventCaching(response);
+    response.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+  if (request.method === "POST") {
+    await handleVerification(request.body, response);
+    return;
+  }
+  await handleGeneration(request.query, response);
 }

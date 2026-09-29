@@ -36,8 +36,28 @@ const iconPaths: Record<IconName, string> = {
   "arrow-right": '<path d="m10 5 7 7-7 7"/><path d="M17 12H6"/>',
 };
 
-export function renderIcon(icon: IconName): string {
+function renderIcon(icon: IconName): string {
   return `<svg class="icon icon--${icon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[icon]}</svg>`;
+}
+
+const DIALOG_FOCUSABLE_SELECTOR = "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
+
+/** Moves focus to the next or previous available control and wraps at the dialog ends. */
+export function trapDialogTab(
+  event: Pick<KeyboardEvent, "preventDefault">,
+  dialog: Pick<HTMLDialogElement, "querySelectorAll"> | null,
+  activeElement: Element | null,
+  shiftKey = false,
+): boolean {
+  const focusable = [...(dialog?.querySelectorAll<HTMLElement>(DIALOG_FOCUSABLE_SELECTOR) ?? [])];
+  if (focusable.length === 0) return false;
+  const currentIndex = focusable.indexOf(activeElement as HTMLElement);
+  const nextIndex = shiftKey
+    ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+    : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+  event.preventDefault();
+  focusable[nextIndex]?.focus();
+  return true;
 }
 
 export interface DialogOptions {

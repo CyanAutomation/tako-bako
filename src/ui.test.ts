@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSegmentedControl, renderSelect, renderTabs } from "./ui";
+import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSegmentedControl, renderSelect, renderTabs, trapDialogTab } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -168,5 +168,29 @@ describe("shared UI primitives", () => {
     assert.ok((disabledCell).includes('aria-label="Aki, Lions: unknown. Grid locked."'));
     assert.ok((disabledCell).includes(" disabled"));
     assert.ok(!(disabledCell).includes("tabindex="));
+  });
+
+  it("traps Tab and Shift+Tab within a dialog, including both ends", () => {
+    const firstFocus = { count: 0 };
+    const lastFocus = { count: 0 };
+    const first = { focus: () => { firstFocus.count += 1; } } as HTMLElement;
+    const last = { focus: () => { lastFocus.count += 1; } } as HTMLElement;
+    const dialog = { querySelectorAll: () => [first, last] } as unknown as HTMLDialogElement;
+    const event = { preventDefaultCount: 0, preventDefault() { this.preventDefaultCount += 1; } };
+
+    assert.strictEqual(trapDialogTab(event as never, dialog, first), true);
+    assert.strictEqual(lastFocus.count, 1);
+    assert.strictEqual(event.preventDefaultCount, 1);
+    assert.strictEqual(trapDialogTab(event as never, dialog, last, true), true);
+    assert.strictEqual(firstFocus.count, 1);
+    assert.strictEqual(event.preventDefaultCount, 2);
+  });
+
+  it("does not prevent Tab when a dialog has no focusable controls", () => {
+    const event = { preventDefaultCount: 0, preventDefault() { this.preventDefaultCount += 1; } };
+    const dialog = { querySelectorAll: () => [] } as unknown as HTMLDialogElement;
+
+    assert.strictEqual(trapDialogTab(event as never, dialog, null), false);
+    assert.strictEqual(event.preventDefaultCount, 0);
   });
 });

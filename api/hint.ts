@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { clueStrategyLabel, isClueStrategy, type ClueStrategy } from "../src/clue-strategy.js";
-import { derivePlayerStateFeatures, hintStrengthForProgress, hintStrengthRank, MIN_PLAYER_STATE_CONFIDENCE, parsePlayerStateAssessment, policyForPlayerState, serializePlayerStateFeatures, type PlayerStateFeatures, type PlayerStatePolicy } from "../src/player-state.js";
+import { derivePlayerStateFeatures, hintStrengthForProgress, hintStrengthRank, MIN_PLAYER_STATE_CONFIDENCE, parsePlayerStateAssessment, policyForPlayerState, serializePlayerStateFeatures, type HintStrength, type PlayerStateFeatures, type PlayerStatePolicy } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "./jev.js";
 
 const URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
@@ -40,6 +40,12 @@ interface HintCandidate {
   clueId?: string;
 }
 
+interface ParsedHintRequest {
+  body: Record<string, unknown>;
+  puzzleToken: string;
+  kind?: HintStrength;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -48,39 +54,68 @@ function recordJevMetric(metric: { operation: string; questionCount: number; can
   try { console.info("tako_bako_jev_metric", metric); } catch { /* Observability must not affect hint delivery. */ }
 }
 
-function parseSelectionContext(value: Record<string, unknown>): SelectionContext | undefined {
-  let clues: HintClue[] | undefined;
-  if (value.clues !== undefined) {
-    if (!Array.isArray(value.clues) || value.clues.length > MAX_CLUES) return undefined;
-    const seen = new Set<string>();
-    clues = [];
-    for (const clue of value.clues) {
-      if (!isRecord(clue) || typeof clue.id !== "string" || clue.id.length === 0 || clue.id.length > MAX_CLUE_ID_LENGTH || typeof clue.text !== "string" || clue.text.length === 0 || clue.text.length > MAX_CLUE_TEXT_LENGTH || seen.has(clue.id)) return undefined;
-      seen.add(clue.id);
-      clues.push({ id: clue.id, text: clue.text, ...(isClueStrategy(clue.strategy) ? { strategy: clue.strategy } : {}) });
-    }
-  }
+function parseHintClue(value: unknown): HintClue | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.id !== "string" || value.id.length === 0 || value.id.length > MAX_CLUE_ID_LENGTH) return undefined;
+  if (typeof value.text !== "string" || value.text.length === 0 || value.text.length > MAX_CLUE_TEXT_LENGTH) return undefined;
+  return { id: value.id, text: value.text, ...(isClueStrategy(value.strategy) ? { strategy: value.strategy } : {}) };
+}
 
-  const usedClueIds = new Set<string>();
-  if (value.usedClueIds !== undefined) {
-    if (!Array.isArray(value.usedClueIds) || value.usedClueIds.length > MAX_CLUES || !value.usedClueIds.every(id => typeof id === "string" && id.length > 0 && id.length <= MAX_CLUE_ID_LENGTH)) return undefined;
-    value.usedClueIds.forEach(id => usedClueIds.add(id as string));
+function parseHintClues(value: unknown): HintClue[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_CLUES) return undefined;
+  const clues: HintClue[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const clue = parseHintClue(item);
+    if (!clue || seen.has(clue.id)) return undefined;
+    seen.add(clue.id);
+    clues.push(clue);
   }
+  return clues;
+}
 
+function parseUsedClueIds(value: unknown): Set<string> | undefined {
+  if (value === undefined) return new Set();
+  if (!Array.isArray(value) || value.length > MAX_CLUES || !value.every(id => typeof id === "string" && id.length > 0 && id.length <= MAX_CLUE_ID_LENGTH)) return undefined;
+  return new Set(value as string[]);
+}
+
+function parseBoardMark(value: unknown): BoardMark | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.category !== "string" || value.category.length === 0 || value.category.length > MAX_BOARD_VALUE_LENGTH) return undefined;
+  if (typeof value.subject !== "string" || value.subject.length === 0 || value.subject.length > MAX_BOARD_VALUE_LENGTH) return undefined;
+  if (typeof value.value !== "string" || value.value.length === 0 || value.value.length > MAX_BOARD_VALUE_LENGTH) return undefined;
+  if (value.mark !== "yes" && value.mark !== "no") return undefined;
+  return { category: value.category, subject: value.subject, value: value.value, mark: value.mark };
+}
+
+function parseBoardMarks(value: unknown): BoardMark[] | undefined {
+  if (!Array.isArray(value) || value.length > MAX_BOARD_MARKS) return undefined;
   const board: BoardMark[] = [];
-  const seenMarks = new Set<string>();
-  if (value.board !== undefined) {
-    if (!Array.isArray(value.board) || value.board.length > MAX_BOARD_MARKS) return undefined;
-    for (const mark of value.board) {
-      if (!isRecord(mark) || typeof mark.category !== "string" || mark.category.length === 0 || mark.category.length > MAX_BOARD_VALUE_LENGTH || typeof mark.subject !== "string" || mark.subject.length === 0 || mark.subject.length > MAX_BOARD_VALUE_LENGTH || typeof mark.value !== "string" || mark.value.length === 0 || mark.value.length > MAX_BOARD_VALUE_LENGTH || (mark.mark !== "yes" && mark.mark !== "no")) return undefined;
-      const key = JSON.stringify([mark.category, mark.subject, mark.value]);
-      if (seenMarks.has(key)) return undefined;
-      seenMarks.add(key);
-      board.push({ category: mark.category, subject: mark.subject, value: mark.value, mark: mark.mark });
-    }
+  const seen = new Set<string>();
+  for (const item of value) {
+    const mark = parseBoardMark(item);
+    if (!mark) return undefined;
+    const key = JSON.stringify([mark.category, mark.subject, mark.value]);
+    if (seen.has(key)) return undefined;
+    seen.add(key);
+    board.push(mark);
   }
+  return board;
+}
 
+function parseSelectionContext(value: Record<string, unknown>): SelectionContext | undefined {
+  const clues = value.clues === undefined ? undefined : parseHintClues(value.clues);
+  const usedClueIds = parseUsedClueIds(value.usedClueIds);
+  const board = value.board === undefined ? [] : parseBoardMarks(value.board);
+  if ((value.clues !== undefined && !clues) || !usedClueIds || !board) return undefined;
   return { clues, usedClueIds, board };
+}
+
+function parseHintRequest(value: Record<string, unknown>): ParsedHintRequest | undefined {
+  if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
+  if (value.kind !== undefined && value.kind !== "clue" && value.kind !== "elimination" && value.kind !== "placement") return undefined;
+  return { body: value, puzzleToken: value.puzzleToken, kind: value.kind as HintStrength | undefined };
 }
 
 function playerStateFeatures(value: Record<string, unknown>, context: SelectionContext): PlayerStateFeatures | undefined {
@@ -139,6 +174,15 @@ function solverCandidate(id: string, payload: unknown): HintCandidate | undefine
   return undefined;
 }
 
+function candidateFromJevResult(result: unknown, candidates: HintCandidate[]): HintCandidate | undefined {
+  if (!isRecord(result) || !isRecord(result.answers) || !isRecord(result.answers.next_hint)) return undefined;
+  const answer = result.answers.next_hint;
+  if (answer.type !== "choice" || typeof answer.choice !== "string" || typeof answer.confidence !== "number" || !Number.isFinite(answer.confidence) || answer.confidence < MIN_PLAYER_STATE_CONFIDENCE || answer.confidence > 1) return undefined;
+  const match = /^candidate_(\d+)$/.exec(answer.choice);
+  const selectedIndex = match ? Number(match[1]) : -1;
+  return Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < candidates.length ? candidates[selectedIndex] : undefined;
+}
+
 function selectCandidateWithJev(context: SelectionContext, candidates: HintCandidate[], features?: PlayerStateFeatures, policy?: PlayerStatePolicy, assessment?: { state: string; confidence: number }): Promise<HintCandidate | undefined> {
   const startedAt = Date.now();
   const questionOptions = Object.fromEntries(candidates.map((_candidate, index) => [`candidate_${index}`, `Candidate: ${candidates[index]!.type}. ${candidates[index]!.text}`]));
@@ -159,71 +203,92 @@ function selectCandidateWithJev(context: SelectionContext, candidates: HintCandi
       },
     },
   }).then(result => {
-    if (!result || !isRecord(result.answers) || !isRecord(result.answers.next_hint)) {
-      recordJevMetric({ operation: "hint_selection", questionCount: 1, candidateCount: candidates.length, durationMs: Date.now() - startedAt, outcome: "fallback" });
-      return undefined;
-    }
-    const answer = result.answers.next_hint;
-    if (answer.type !== "choice" || typeof answer.choice !== "string" || typeof answer.confidence !== "number" || !Number.isFinite(answer.confidence) || answer.confidence < MIN_PLAYER_STATE_CONFIDENCE || answer.confidence > 1) {
-      recordJevMetric({ operation: "hint_selection", questionCount: 1, candidateCount: candidates.length, durationMs: Date.now() - startedAt, outcome: "fallback" });
-      return undefined;
-    }
-    const match = /^candidate_(\d+)$/.exec(answer.choice);
-    const selectedIndex = match ? Number(match[1]) : -1;
-    const selected = Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < candidates.length ? candidates[selectedIndex] : undefined;
+    const selected = candidateFromJevResult(result, candidates);
     recordJevMetric({ operation: "hint_selection", questionCount: 1, candidateCount: candidates.length, durationMs: Date.now() - startedAt, outcome: selected ? "success" : "fallback" });
     return selected;
   });
 }
 
-export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
-  if (request.method !== "POST") { response.setHeader("allow", "POST"); response.status(405).json({ error: "Method not allowed" }); return; }
-  const body = request.body;
-  if (!isRecord(body)) { response.status(400).json({ error: "A signed hint request is required" }); return; }
-  const value = body;
-  if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH || (value.kind !== undefined && value.kind !== "clue" && value.kind !== "elimination" && value.kind !== "placement")) { response.status(400).json({ error: "A valid signed hint request is required" }); return; }
-  const context = parseSelectionContext(value);
-  const features = context ? playerStateFeatures(value, context) : undefined;
+function hintCandidates(payload: unknown, context: SelectionContext): HintCandidate[] {
+  const candidates: HintCandidate[] = [];
+  const primaryCandidate = solverCandidate("solver_primary", payload);
+  if (primaryCandidate && !(primaryCandidate.type === "clue" && primaryCandidate.clueId && context.usedClueIds.has(primaryCandidate.clueId))) candidates.push(primaryCandidate);
+  for (const clue of context.clues ?? []) {
+    if (!context.usedClueIds.has(clue.id) && primaryCandidate?.clueId !== clue.id) candidates.push({
+      id: `clue:${clue.id}`,
+      payload: { kind: "clue", clue: { id: clue.id, text: clue.text } },
+      type: "clue",
+      text: `${clue.text}${clue.strategy ? ` (reasoning strategy: ${clueStrategyLabel(clue.strategy)})` : ""}`,
+    });
+  }
+  return candidates;
+}
+
+async function chooseHintPayload(
+  context: SelectionContext,
+  payload: unknown,
+  features: PlayerStateFeatures | undefined,
+  policy: PlayerStatePolicy | undefined,
+  assessment: Awaited<ReturnType<typeof classifyPlayerState>>,
+): Promise<unknown> {
+  const candidates = hintCandidates(payload, context);
+  const boundedCandidates = policy
+    ? candidates.filter(candidate => hintStrengthRank(candidate.type) <= hintStrengthRank(policy.hintKind))
+    : candidates;
+  if (boundedCandidates.length === 0) return policy ? { error: "A suitable hint is unavailable." } : payload;
+  if (boundedCandidates.length === 1) return boundedCandidates[0]!.payload;
+  const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment);
+  const safeFallback = policy
+    ? boundedCandidates.find(candidate => candidate.id === "solver_primary") ?? boundedCandidates[0]
+    : undefined;
+  return selected?.payload ?? safeFallback?.payload ?? payload;
+}
+
+async function fetchPrimaryHint(puzzleToken: string, hintKind: HintStrength | undefined, response: VercelResponse): Promise<{ upstream: Response; payload: unknown } | undefined> {
+  const upstream = await fetch(URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ puzzleToken, ...(hintKind === undefined ? {} : { kind: hintKind }) }),
+    signal: AbortSignal.timeout(8_000),
+  });
+  const requestId = upstream.headers.get("x-request-id");
+  if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
+  response.setHeader("cache-control", "no-store");
+  let payload: unknown = { error: "Yokaiba assistance is unavailable. Please try again." };
+  if (upstream.headers.get("content-type")?.includes("application/json")) payload = await upstream.json().catch(() => payload);
+  if (!upstream.ok) {
+    response.status(upstream.status).json(payload);
+    return undefined;
+  }
+  return { upstream, payload };
+}
+
+async function deliverHint(request: ParsedHintRequest, context: SelectionContext | undefined, features: PlayerStateFeatures | undefined, response: VercelResponse): Promise<void> {
   let assessment: Awaited<ReturnType<typeof classifyPlayerState>>;
   if (features && context?.clues?.length && hasJevApiKey()) assessment = await classifyPlayerState(features);
   const policy = assessment && features ? policyForPlayerState(assessment.state, features) : undefined;
-  const defaultKind = features ? hintStrengthForProgress(features.affirmativeCount, features.totalMatches) : value.kind;
+  const defaultKind = features ? hintStrengthForProgress(features.affirmativeCount, features.totalMatches) : request.kind;
   const hintKind = policy?.hintKind ?? defaultKind;
   try {
-    const upstream = await fetch(URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ puzzleToken: value.puzzleToken, ...(hintKind === undefined ? {} : { kind: hintKind }) }), signal: AbortSignal.timeout(8_000) });
-    const requestId = upstream.headers.get("x-request-id"); if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
-    response.setHeader("cache-control", "no-store");
-    let payload: unknown = { error: "Yokaiba assistance is unavailable. Please try again." };
-    if (upstream.headers.get("content-type")?.includes("application/json")) payload = await upstream.json().catch(() => payload);
-    if (!upstream.ok) { response.status(upstream.status).json(payload); return; }
-    if (!context || !hasJevApiKey() || !context.clues || context.clues.length === 0) { response.status(upstream.status).json(payload); return; }
-
-    const candidates: HintCandidate[] = [];
-    const primaryCandidate = solverCandidate("solver_primary", payload);
-    if (primaryCandidate && !(primaryCandidate.type === "clue" && primaryCandidate.clueId && context.usedClueIds.has(primaryCandidate.clueId))) candidates.push(primaryCandidate);
-    for (const clue of context.clues) {
-      if (!context.usedClueIds.has(clue.id) && primaryCandidate?.clueId !== clue.id) candidates.push({
-        id: `clue:${clue.id}`,
-        payload: { kind: "clue", clue: { id: clue.id, text: clue.text } },
-        type: "clue",
-        text: `${clue.text}${clue.strategy ? ` (reasoning strategy: ${clueStrategyLabel(clue.strategy)})` : ""}`,
-      });
-    }
-    const boundedCandidates = policy
-      ? candidates.filter(candidate => hintStrengthRank(candidate.type) <= hintStrengthRank(policy.hintKind))
-      : candidates;
-    if (boundedCandidates.length === 0) {
-      response.status(upstream.status).json(policy ? { error: "A suitable hint is unavailable." } : payload);
+    const result = await fetchPrimaryHint(request.puzzleToken, hintKind, response);
+    if (!result) return;
+    if (!context || !hasJevApiKey() || !context.clues?.length) {
+      response.status(result.upstream.status).json(result.payload);
       return;
     }
-    if (boundedCandidates.length === 1) { response.status(upstream.status).json(boundedCandidates[0]!.payload); return; }
-
-    const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment);
-    const safeFallback = policy
-      ? boundedCandidates.find(candidate => candidate.id === primaryCandidate?.id) ?? boundedCandidates[0]
-      : undefined;
-    response.status(upstream.status).json(selected?.payload ?? safeFallback?.payload ?? payload);
+    const selected = await chooseHintPayload(context, result.payload, features, policy, assessment);
+    response.status(result.upstream.status).json(selected);
   } catch {
     response.status(502).json({ error: "Yokaiba assistance is unavailable. Please try again." });
   }
+}
+
+export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
+  if (request.method !== "POST") { response.setHeader("allow", "POST"); response.status(405).json({ error: "Method not allowed" }); return; }
+  if (!isRecord(request.body)) { response.status(400).json({ error: "A signed hint request is required" }); return; }
+  const parsedRequest = parseHintRequest(request.body);
+  if (!parsedRequest) { response.status(400).json({ error: "A valid signed hint request is required" }); return; }
+  const context = parseSelectionContext(parsedRequest.body);
+  const features = context ? playerStateFeatures(parsedRequest.body, context) : undefined;
+  await deliverHint(parsedRequest, context, features, response);
 }

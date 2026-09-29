@@ -94,6 +94,26 @@ describe("puzzle proxy", () => {
     });
   }
 
+  const oversizedBodies = [
+    { puzzleToken: "x".repeat(16_385), answer: { assignments: { club: ["Lions"] } } },
+    { puzzleToken: "signed-token", answer: { assignments: Object.fromEntries(Array.from({ length: 33 }, (_, index) => [`category-${index}`, ["value"]])) } },
+    { puzzleToken: "signed-token", answer: { assignments: { club: Array.from({ length: 33 }, (_, index) => `value-${index}`) } } },
+    { puzzleToken: "signed-token", answer: { assignments: { ["c".repeat(257)]: ["Lions"] } } },
+    { puzzleToken: "signed-token", answer: { assignments: { club: ["v".repeat(257)] } } },
+  ];
+  for (const [caseIndex, body] of oversizedBodies.entries()) {
+    it(`rejects completion payload beyond a size limit (${caseIndex + 1}) before contacting Yokaiba`, async () => {
+      const upstream = mock.fn();
+      stubGlobal("fetch", upstream);
+      const { response, result } = responseRecorder();
+
+      await handler({ method: "POST", body } as never, response as never);
+
+      assert.strictEqual(result.statusCode, 400);
+      assert.strictEqual(upstream.mock.callCount(), 0);
+    });
+  }
+
   it("forwards only validated completion fields", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ correct: true }), {
       status: 200, headers: { "content-type": "application/json" },
@@ -268,6 +288,33 @@ describe("puzzle proxy", () => {
     assert.strictEqual(result.headers.get("cache-control"), "no-store");
     assert.strictEqual(metricCalls[0]?.[0], "tako_bako_api_metric");
     assertPartialMatch(metricCalls[0]?.[1], { operation: "generate", outcome: "difficulty_unavailable", status: 422 });
+  });
+
+  it("sorts and deduplicates valid available difficulty levels", async () => {
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({
+      error: { code: "difficulty_unavailable" }, availableDifficultyLevels: [4, 2, 4],
+    }), { status: 422, headers: { "content-type": "application/json" } })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day", difficultyLevel: "3" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 422);
+    assert.deepStrictEqual((result.body as { availableDifficultyLevels: number[] }).availableDifficultyLevels, [2, 4]);
+  });
+
+  it("omits the difficulty list when Yokaiba includes any invalid level", async () => {
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({
+      error: { code: "difficulty_unavailable" }, availableDifficultyLevels: [1, 2.5, 13],
+    }), { status: 422, headers: { "content-type": "application/json" } })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "dojo-day", difficultyLevel: "3" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 422);
+    assert.deepStrictEqual(result.body, {
+      code: "difficulty_unavailable",
+      error: "This seed cannot produce the selected difficulty. Try another puzzle.",
+    });
   });
 
   it("does not consume an unrecognized Yokaiba 422 response while inspecting it", async () => {

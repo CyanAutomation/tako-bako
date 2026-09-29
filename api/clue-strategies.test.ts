@@ -1,6 +1,6 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { rejectedMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
 import handler from "./clue-strategies.js";
 
@@ -64,5 +64,33 @@ describe("clue strategy endpoint", () => {
 
     assert.strictEqual(result.statusCode, 400);
     assert.strictEqual(upstream.mock.callCount(), 0);
+  });
+
+  it("keeps known labels when Yokaiba rejects the model-assisted token check", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    stubGlobal("fetch", async () => new Response("unavailable", { status: 503 }));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token", clues: [
+      { id: "known", text: "Aki matches Lions.", constraintKind: "matches" },
+      { id: "unknown", text: "Hana is next to the fish keeper." },
+    ] } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, { strategies: [{ clueId: "known", strategy: "direct_match", confidence: 1 }] });
+  });
+
+  it("keeps known labels when the model-assisted token check throws", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    stubGlobal("fetch", rejectedMock(new Error("network unavailable")));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token", clues: [
+      { id: "known", text: "Aki matches Lions.", constraintKind: "matches" },
+      { id: "unknown", text: "Hana is next to the fish keeper." },
+    ] } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, { strategies: [{ clueId: "known", strategy: "direct_match", confidence: 1 }] });
   });
 });

@@ -10,7 +10,7 @@ export const CLUE_STRATEGIES = {
 } as const;
 
 export type ClueStrategy = keyof typeof CLUE_STRATEGIES;
-export const MIN_CLUE_STRATEGY_CONFIDENCE = 0.75;
+const MIN_CLUE_STRATEGY_CONFIDENCE = 0.75;
 
 const knownConstraintStrategies: Record<string, ClueStrategy> = {
   matches: "direct_match",
