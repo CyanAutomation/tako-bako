@@ -51,6 +51,7 @@ let challengeOptionsOpen = false;
 let sharedPuzzleOpen = false;
 let puzzleStartedAt = 0;
 let hintsUsed = 0;
+let mistakes = 0;
 
 function newSeed(): string {
   return crypto.randomUUID();
@@ -171,6 +172,7 @@ function showLandingPage(): void {
   sharedPuzzleOpen = false;
   puzzleStartedAt = 0;
   hintsUsed = 0;
+  mistakes = 0;
   message = "Choose your next puzzle when you are ready.";
   render();
 }
@@ -278,6 +280,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     puzzleLoadFailed = false;
     puzzleStartedAt = Date.now();
     hintsUsed = 0;
+    mistakes = 0;
     recordOutcome("puzzle_started");
     board = loadBoard(puzzle.id);
     undoStack = [];
@@ -413,7 +416,7 @@ async function checkAnswer(): Promise<void> {
         message = next ? `Beautifully solved — ${requestedCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
       } else message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
       pendingCelebration = true;
-    } else { recordOutcome("mistake"); message = "Not quite yet. Your notes are saved, so keep refining the grid."; }
+    } else { mistakes = Math.min(100, mistakes + 1); recordOutcome("mistake"); message = "Not quite yet. Your notes are saved, so keep refining the grid."; }
   } catch {
     if (!isActiveRequest()) return;
     message = "Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.";
@@ -463,6 +466,11 @@ async function requestHint(): Promise<void> {
         clues: requestedPuzzle.clues.map(clue => ({ id: clue.id, text: clue.text, strategy: clue.strategy ?? clueStrategies[clue.id] })),
         usedClueIds: [...requestedUsedClueIds],
         board: boardContext,
+        totalMatches: progress.total,
+        hintsUsed: requestedHintsUsed,
+        mistakes,
+        elapsedMs: requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : 0,
+        smartMarking,
       }),
       signal: requestController.signal,
     });
