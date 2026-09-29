@@ -237,3 +237,48 @@ describe("answer verification navigation", () => {
     assert.strictEqual(fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 1);
   });
 });
+
+describe("dialog keyboard navigation", () => {
+  it("routes Tab and Shift+Tab through the active dialog focus trap", () => {
+    const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
+    let activeElement: HTMLElement | null = null;
+    const first = { focus: () => { activeElement = first; } } as HTMLElement;
+    const last = { focus: () => { activeElement = last; } } as HTMLElement;
+    const dialog = { querySelectorAll: () => [first, last] };
+    const root = {
+      innerHTML: "",
+      addEventListener: (name: string, listener: (event: { target: { closest: () => FakeButton | null } }) => void) => listeners.set(name, listener),
+      querySelector: (selector: string) => selector === "#challenge-menu-dialog" ? dialog : null,
+    };
+    stubGlobal("document", { querySelector: () => root, get activeElement() { return activeElement; } });
+    stubGlobal("window", {
+      location: new URL("https://example.test/"),
+      matchMedia: () => ({ matches: false }),
+      addEventListener: () => undefined,
+      history: { pushState: () => undefined, replaceState: () => undefined },
+    });
+    const storage = new Map<string, string>();
+    const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+    stubGlobal("localStorage", storageApi);
+    stubGlobal("sessionStorage", storageApi);
+    stubGlobal("CSS", { escape: (value: string) => value });
+    stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+
+    mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
+    listeners.get("click")!({ target: { closest: () => ({ id: "challenge-menu", disabled: false, dataset: {} }) } });
+    activeElement = first;
+    let prevented = false;
+    const keydown = (shiftKey: boolean) => listeners.get("keydown")!({
+      target: { closest: () => null },
+      key: "Tab",
+      shiftKey,
+      preventDefault: () => { prevented = true; },
+    } as never);
+
+    keydown(false);
+    assert.strictEqual(activeElement, last);
+    keydown(true);
+    assert.strictEqual(activeElement, first);
+    assert.strictEqual(prevented, true);
+  });
+});

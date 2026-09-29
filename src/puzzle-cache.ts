@@ -4,7 +4,7 @@ const CACHE_PREFIX = "tako-bako.puzzle.v2";
 /** A puzzle must never be retained more than five minutes after it was generated. */
 export const CACHE_TTL_MS = CACHE_FRESH_LIFETIME_SECONDS * 1_000;
 const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
-export const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
+const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 const MAX_CACHE_ENTRIES = 20;
 const OWNED_CACHE_PREFIX = `${CACHE_PREFIX}:`;
 

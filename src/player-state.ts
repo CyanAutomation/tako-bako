@@ -44,7 +44,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function isPlayerPuzzleState(value: unknown): value is PlayerPuzzleState {
+function isPlayerPuzzleState(value: unknown): value is PlayerPuzzleState {
   return typeof value === "string" && (PLAYER_PUZZLE_STATES as readonly string[]).includes(value);
 }
 

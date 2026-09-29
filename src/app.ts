@@ -8,7 +8,7 @@ import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle"
 import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
 import { parseClueStrategyResults, type ClueStrategy } from "./clue-strategy";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus } from "./ui";
+import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus, trapDialogTab } from "./ui";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -661,229 +661,271 @@ function selectGrid(gridId: string, focus = false): void {
   if (focus) root.querySelector<HTMLButtonElement>(`[data-grid-tab="${CSS.escape(gridId)}"]`)?.focus();
 }
 
-root.addEventListener("click", event => {
-  const button = (event.target as Element).closest<HTMLButtonElement>("button");
-  if (!button || button.disabled) return;
+function handlePuzzleNavigationClick(button: HTMLButtonElement): boolean {
   if (button.id === "start-puzzle") startCourse(activeCourse);
-  if (button.id === "try-another-puzzle") void fetchPuzzle(newSeed(), "push");
-  if (button.id === "new-puzzle") {
+  else if (button.id === "try-another-puzzle") void fetchPuzzle(newSeed(), "push");
+  else if (button.id === "new-puzzle") {
     if (Object.keys(board).length === 0) {
       if (playMode === "challenge") startCourse(activeCourse); else void fetchPuzzle(newSeed(), "push");
-    }
-    else {
+    } else {
       pendingNewChallenge = true;
       render();
       root.querySelector<HTMLButtonElement>("#cancel-new-challenge")?.focus();
     }
-  }
-  if (button.id === "daily-puzzle") startCourse(activeCourse, dailySeed());
+  } else if (button.id === "daily-puzzle") startCourse(activeCourse, dailySeed());
+  else return false;
+  return true;
+}
+
+function handleBoardActionClick(button: HTMLButtonElement): boolean {
   if (button.id === "check-solution") void checkAnswer();
-  if (button.id === "hint") void requestHint();
-  if (button.id === "undo") restoreBoard();
-  if (button.id === "cancel-grid-reset") {
-    dismissResetDialog();
-  }
-  if (button.id === "confirm-grid-reset" && pendingResetGridId) resetGrid(pendingResetGridId);
-  if (button.id === "cancel-new-challenge") {
-    pendingNewChallenge = false;
-    render();
-    root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
-  }
+  else if (button.id === "hint") void requestHint();
+  else if (button.id === "undo") restoreBoard();
+  else return false;
+  return true;
+}
+
+function handleGridResetClick(button: HTMLButtonElement): boolean {
+  if (button.id === "cancel-grid-reset") dismissResetDialog();
+  else if (button.id === "confirm-grid-reset" && pendingResetGridId) resetGrid(pendingResetGridId);
+  else return false;
+  return true;
+}
+
+function confirmProgressReset(): void {
+  invalidateVerification();
+  invalidateHint();
+  currentFetchId += 1;
+  loading = false;
+  difficultyUnavailable = false;
+  progress = resetProgress();
+  saveProgress(localStorage, progress);
+  activeCourse = firstAvailableCourse(progress.completed);
+  ({ templateId, difficultyLevel } = puzzleParametersForCourse(activeCourse));
+  puzzle = null;
+  board = {};
+  undoStack = [];
+  usedClueIds = new Set();
+  playMode = "challenge";
+  challengeOptionsOpen = false;
+  pendingProgressReset = false;
+  window.history.pushState({}, "", window.location.pathname);
+  message = "Your dojo route has been reset. Beginner Level 1 is ready.";
+  render();
+}
+
+function handleProgressResetClick(button: HTMLButtonElement): boolean {
   if (button.id === "open-progress-reset") {
     pendingProgressReset = true;
     render();
     root.querySelector<HTMLButtonElement>("#cancel-progress-reset")?.focus();
-    return;
-  }
+  } else if (button.id === "cancel-progress-reset") {
+    pendingProgressReset = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
+  } else if (button.id === "confirm-progress-reset") confirmProgressReset();
+  else return false;
+  return true;
+}
+
+function handleNewChallengeClick(button: HTMLButtonElement): boolean {
+  if (button.id === "cancel-new-challenge") {
+    pendingNewChallenge = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
+  } else if (button.id === "confirm-new-challenge") {
+    pendingNewChallenge = false;
+    if (playMode === "challenge") startCourse(activeCourse); else void fetchPuzzle(newSeed(), "push");
+  } else return false;
+  return true;
+}
+
+function handleSharedPuzzleDialogClick(button: HTMLButtonElement): boolean {
   if (button.id === "open-shared-puzzle") {
     sharedPuzzleOpen = true;
     render();
     root.querySelector<HTMLInputElement>("#landing-seed-input")?.focus();
-    return;
-  }
-  if (button.id === "close-shared-puzzle") {
+  } else if (button.id === "close-shared-puzzle") {
     sharedPuzzleOpen = false;
     render();
     root.querySelector<HTMLButtonElement>("#open-shared-puzzle")?.focus();
-    return;
-  }
-  if (button.id === "cancel-progress-reset") {
-    pendingProgressReset = false;
-    render();
-    root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
-    return;
-  }
-  if (button.id === "confirm-progress-reset") {
-    invalidateVerification();
-    invalidateHint();
-    currentFetchId += 1;
-    loading = false;
-    difficultyUnavailable = false;
-    progress = resetProgress();
-    saveProgress(localStorage, progress);
-    activeCourse = firstAvailableCourse(progress.completed);
-    ({ templateId, difficultyLevel } = puzzleParametersForCourse(activeCourse));
-    puzzle = null;
-    board = {};
-    undoStack = [];
-    usedClueIds = new Set();
-    playMode = "challenge";
-    challengeOptionsOpen = false;
-    pendingProgressReset = false;
-    window.history.pushState({}, "", window.location.pathname);
-    message = "Your dojo route has been reset. Beginner Level 1 is ready.";
-    render();
-    return;
-  }
-  if (button.id === "confirm-new-challenge") {
-    pendingNewChallenge = false;
-    if (playMode === "challenge") startCourse(activeCourse); else void fetchPuzzle(newSeed(), "push");
-  }
+  } else return false;
+  return true;
+}
+
+function handleCelebrationClick(button: HTMLButtonElement): boolean {
   if (button.id === "celebration-close") {
     pendingCelebration = false;
     render();
-    return;
-  }
-  if (button.id === "celebration-continue") {
+  } else if (button.id === "celebration-continue") {
     pendingCelebration = false;
     const next = nextCourse(activeCourse);
     if (next) startCourse(next);
-    return;
-  }
+  } else return false;
+  return true;
+}
+
+function handleChallengeOptionsClick(button: HTMLButtonElement): boolean {
   if (button.id === "share-puzzle") void sharePuzzle();
-  if (button.id === "challenge-menu") {
+  else if (button.id === "challenge-menu") {
     challengeOptionsOpen = true;
     render();
     root.querySelector<HTMLButtonElement>("#close-challenge-menu")?.focus();
-    return;
-  }
-  if (button.id === "close-challenge-menu") {
+  } else if (button.id === "close-challenge-menu") {
     challengeOptionsOpen = false;
     render();
     root.querySelector<HTMLButtonElement>("#challenge-menu")?.focus();
-    return;
-  }
-  if (button.id === "smart-marking-toggle") {
+  } else if (button.id === "smart-marking-toggle") {
     smartMarking = !smartMarking;
     localStorage.setItem(SMART_MARKING_STORAGE_KEY, smartMarking ? "on" : "off");
     message = smartMarking ? "Smart marking is on. New ✓ marks will rule out the other squares in their row and column." : "Smart marking is off. You are in full control of every mark.";
     render();
     root.querySelector<HTMLButtonElement>("#smart-marking-toggle")?.focus();
-    return;
-  }
-  if (button.dataset.gridTab) {
-    selectGrid(button.dataset.gridTab);
-  }
-  if (button.dataset.gridReset) {
-    openResetDialog(button.dataset.gridReset, button.id);
-  }
+  } else return false;
+  return true;
+}
+
+function handleGridControlClick(button: HTMLButtonElement): boolean {
+  if (button.dataset.gridTab) selectGrid(button.dataset.gridTab);
+  else if (button.dataset.gridReset) openResetDialog(button.dataset.gridReset, button.id);
+  else return false;
+  return true;
+}
+
+function handleClueClick(button: HTMLButtonElement): boolean {
   if (button.dataset.clueId) {
     const clueId = button.dataset.clueId;
     if (usedClueIds.has(clueId)) usedClueIds.delete(clueId); else usedClueIds.add(clueId);
     if (puzzle) saveUsedClues(puzzle.id, usedClueIds);
     render();
-  }
-  if (button.dataset.clueFilter) {
+  } else if (button.dataset.clueFilter) {
     clueFilter = button.dataset.clueFilter as ClueFilter;
     render();
     root.querySelector<HTMLButtonElement>(`[data-clue-filter="${CSS.escape(clueFilter)}"]`)?.focus();
-    return;
-  }
-  if (button.id === "open-landing-seed") {
-    const input = parseSharedPuzzleInput(root.querySelector<HTMLInputElement>("#landing-seed-input")?.value ?? "");
-    if (!input) {
-      message = "Paste a shared puzzle link or a code using 1–128 letters, numbers, or hyphens.";
-      render();
-    } else {
-      sharedPuzzleOpen = false;
-      openSharedPuzzle(input);
-    }
-  }
-  if (button.dataset.course) {
-    const [tier, rawLevel] = button.dataset.course.split("-");
-    const course = courseFor(tier, Number(rawLevel));
-    if (course) startCourse(course);
-  }
-  const current = puzzle;
-  if (button.dataset.square && current) {
-    const categoryId = button.dataset.square.split("|")[0];
-    const category = current.spec.categories.find(candidate => candidate.id === categoryId);
-    const base = current.spec.categories.find(candidate => candidate.id === current.spec.baseCategory);
-    if (!category || !base) return;
-    const key = button.dataset.square;
-    const previous = board;
-    saveCurrentBoard(markBoard(board, key, category, base, smartMarking));
-    updateBoardView(previous, current);
-    focusGridCell(key);
-  }
-});
+  } else return false;
+  return true;
+}
 
-root.addEventListener("keydown", event => {
-  if (challengeOptionsOpen && event.key === "Escape") {
-    event.preventDefault();
+function handleSharedPuzzleSubmit(button: HTMLButtonElement): boolean {
+  if (button.id !== "open-landing-seed") return false;
+  const input = parseSharedPuzzleInput(root.querySelector<HTMLInputElement>("#landing-seed-input")?.value ?? "");
+  if (!input) {
+    message = "Paste a shared puzzle link or a code using 1–128 letters, numbers, or hyphens.";
+    render();
+  } else {
+    sharedPuzzleOpen = false;
+    openSharedPuzzle(input);
+  }
+  return true;
+}
+
+function handleCourseClick(button: HTMLButtonElement): boolean {
+  if (!button.dataset.course) return false;
+  const [tier, rawLevel] = button.dataset.course.split("-");
+  const course = courseFor(tier, Number(rawLevel));
+  if (course) startCourse(course);
+  return true;
+}
+
+function handleBoardSquareClick(button: HTMLButtonElement): boolean {
+  const current = puzzle;
+  const key = button.dataset.square;
+  if (!key || !current) return false;
+  const categoryId = key.split("|")[0];
+  const category = current.spec.categories.find(candidate => candidate.id === categoryId);
+  const base = current.spec.categories.find(candidate => candidate.id === current.spec.baseCategory);
+  if (!category || !base) return true;
+  const previous = board;
+  saveCurrentBoard(markBoard(board, key, category, base, smartMarking));
+  updateBoardView(previous, current);
+  focusGridCell(key);
+  return true;
+}
+
+const clickActions: ((button: HTMLButtonElement) => boolean)[] = [
+  handlePuzzleNavigationClick,
+  handleBoardActionClick,
+  handleGridResetClick,
+  handleNewChallengeClick,
+  handleProgressResetClick,
+  handleSharedPuzzleDialogClick,
+  handleCelebrationClick,
+  handleChallengeOptionsClick,
+  handleGridControlClick,
+  handleClueClick,
+  handleSharedPuzzleSubmit,
+  handleCourseClick,
+  handleBoardSquareClick,
+];
+
+function handleClick(event: MouseEvent): void {
+  const button = (event.target as Element).closest<HTMLButtonElement>("button");
+  if (!button || button.disabled) return;
+  for (const handleAction of clickActions) if (handleAction(button)) return;
+}
+
+root.addEventListener("click", handleClick);
+
+function activeDialogSelector(): string | undefined {
+  if (challengeOptionsOpen) return "#challenge-menu-dialog";
+  if (sharedPuzzleOpen) return "#shared-puzzle";
+  if (pendingResetGridId) return "#reset-grid";
+  if (pendingNewChallenge) return "#new-challenge";
+  if (pendingProgressReset) return "#reset-progress";
+  return undefined;
+}
+
+function handleDialogEscape(): void {
+  if (challengeOptionsOpen) {
     challengeOptionsOpen = false;
     render();
     root.querySelector<HTMLButtonElement>("#challenge-menu")?.focus();
     return;
   }
-  if (challengeOptionsOpen && event.key === "Tab") {
-    const dialog = root.querySelector<HTMLDialogElement>("#challenge-menu-dialog");
-    const focusable = [...(dialog?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") ?? [])];
-    if (focusable.length > 0) {
-      const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-      const nextIndex = event.shiftKey ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1) : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
-      event.preventDefault();
-      focusable[nextIndex]?.focus();
-    }
-    return;
+  if (sharedPuzzleOpen) {
+    sharedPuzzleOpen = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#open-shared-puzzle")?.focus();
   }
-  if (sharedPuzzleOpen || pendingResetGridId || pendingNewChallenge || pendingProgressReset) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      if (sharedPuzzleOpen) {
-        sharedPuzzleOpen = false;
-        render();
-        root.querySelector<HTMLButtonElement>("#open-shared-puzzle")?.focus();
-      }
-      if (pendingResetGridId) dismissResetDialog();
-      if (pendingNewChallenge) {
-        pendingNewChallenge = false;
-        render();
-        root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
-      }
-      if (pendingProgressReset) {
-        pendingProgressReset = false;
-        render();
-        root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
-      }
-      return;
-    }
-    if (event.key === "Tab") {
-      const dialogId = sharedPuzzleOpen ? "#shared-puzzle" : pendingResetGridId ? "#reset-grid" : pendingNewChallenge ? "#new-challenge" : "#reset-progress";
-      const dialog = root.querySelector<HTMLDialogElement>(dialogId);
-      const focusable = [...(dialog?.querySelectorAll<HTMLElement>("button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])") ?? [])];
-      if (focusable.length > 0) {
-        const currentIndex = focusable.indexOf(document.activeElement as HTMLElement);
-        const nextIndex = event.shiftKey ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1) : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
-        event.preventDefault();
-        focusable[nextIndex]?.focus();
-      }
-      return;
-    }
+  if (pendingResetGridId) dismissResetDialog();
+  if (pendingNewChallenge) {
+    pendingNewChallenge = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#new-puzzle")?.focus();
   }
+  if (pendingProgressReset) {
+    pendingProgressReset = false;
+    render();
+    root.querySelector<HTMLButtonElement>("#open-progress-reset")?.focus();
+  }
+}
+
+function handleDialogKeydown(event: KeyboardEvent): boolean {
+  const dialogSelector = activeDialogSelector();
+  if (!dialogSelector || (event.key !== "Escape" && event.key !== "Tab")) return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    handleDialogEscape();
+    return true;
+  }
+  trapDialogTab(event, root.querySelector<HTMLDialogElement>(dialogSelector), document.activeElement, event.shiftKey);
+  return true;
+}
+
+function handleGridCellKeydown(event: KeyboardEvent): boolean {
   const cell = (event.target as Element).closest<HTMLButtonElement>("button[data-square]");
-  if (cell && puzzle && !cell.disabled && cell.dataset.square) {
-    const category = puzzle.spec.categories.find(candidate => candidate.id === cell.dataset.square!.split("|")[0]);
-    const base = puzzle.spec.categories.find(candidate => candidate.id === puzzle!.spec.baseCategory);
-    if (category && base) {
-      const nextKey = nextGridCellKey({ categoryId: category.id, rows: base.values, columns: category.values, key: cell.dataset.square, keyName: event.key });
-      if (nextKey) {
-        event.preventDefault();
-        focusGridCell(nextKey);
-        return;
-      }
-    }
-  }
+  if (!cell || !puzzle || cell.disabled || !cell.dataset.square) return false;
+  const category = puzzle.spec.categories.find(candidate => candidate.id === cell.dataset.square!.split("|")[0]);
+  const base = puzzle.spec.categories.find(candidate => candidate.id === puzzle!.spec.baseCategory);
+  if (!category || !base) return false;
+  const nextKey = nextGridCellKey({ categoryId: category.id, rows: base.values, columns: category.values, key: cell.dataset.square, keyName: event.key });
+  if (!nextKey) return false;
+  event.preventDefault();
+  focusGridCell(nextKey);
+  return true;
+}
+
+function handleGridTabKeydown(event: KeyboardEvent): void {
   const tab = (event.target as Element).closest<HTMLButtonElement>("button[data-grid-tab]");
   if (!tab || !puzzle || !tab.dataset.gridTab) return;
   const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
@@ -891,6 +933,16 @@ root.addEventListener("keydown", event => {
   if (!nextGridId) return;
   event.preventDefault();
   selectGrid(nextGridId, true);
+}
+
+function handleGridKeydown(event: KeyboardEvent): void {
+  if (handleGridCellKeydown(event)) return;
+  handleGridTabKeydown(event);
+}
+
+root.addEventListener("keydown", event => {
+  if (handleDialogKeydown(event)) return;
+  handleGridKeydown(event);
 });
 
 root.addEventListener("toggle", event => {

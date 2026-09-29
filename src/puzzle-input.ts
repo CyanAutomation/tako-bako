@@ -1,5 +1,5 @@
 /** Seed format shared by the player app and the API: 1-128 chars of [a-zA-Z0-9-]. */
-export const SEED_PATTERN = /^[a-zA-Z0-9-]{1,128}$/;
+const SEED_PATTERN = /^[a-zA-Z0-9-]{1,128}$/;
 
 /** Difficulty level shared by the player app and the API: 1 through 12. */
 export const DIFFICULTY_LEVEL_PATTERN = /^(?:[1-9]|1[0-2])$/;
