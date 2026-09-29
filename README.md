@@ -85,7 +85,11 @@ The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and 
 
 Set `OPENROUTER_API_KEY` in the Vercel project's server-side environment variables to enable Jev. `JEV_MODEL` is optional and defaults to `~typesafe/jev-latest`; set it to a pinned model ID when repeatable labels matter. Keep both values out of browser code and the repository.
 
-Known Yokaiba clue constraint kinds receive deterministic strategy labels. Jev classifies unrecognized clue text and, when the player requests a hint, can choose among unused puzzle clues and the hint returned by Yokaiba for the current progress stage. The OpenRouter request contains clue text and the player's marked cells, but never the signed puzzle token or solution. Jev's result is accepted only when it selects one of those supplied candidates; a missing key, provider error, malformed answer, or low-confidence clue label leaves the existing fallback in place. Clue labels require a signed puzzle token so the API can validate the puzzle with Yokaiba before making a model request.
+Known Yokaiba clue constraint kinds receive deterministic strategy labels. Jev classifies unrecognized clue text. On an explicit hint request, Tako Bako derives compact counts for affirmative and negative marks, readiness, hints, mistakes, elapsed time, used clues, and used clue strategies, then asks Jev for one bounded player-state label. Deterministic policy maps that label to a Yokaiba hint kind: a first request stays within the existing progress-based strength, and later escalation can advance by at most one strength step. The server then asks Yokaiba for solver-safe assistance and Jev may rank only that result and unused clue candidates. Stronger candidates outside the policy's limit are removed before ranking.
+
+Jev never decides puzzle correctness and cannot invent a hint. The OpenRouter classification request receives only aggregate gameplay features; the ranking request receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Missing provider configuration or an unusable player-state result falls back to the deterministic progress-based strength. A failed or invalid candidate-ranking result falls back to the solver hint or, while a state policy is active, an in-policy supplied candidate. Clue labels still require a signed puzzle token so the API can validate the puzzle with Yokaiba before making a model request.
+
+Puzzle Challenge's 1–12 progression remains deterministic. A future Practice mode could use local, anonymous counts by reasoning strategy to identify current gameplay patterns, while keeping obvious easier/same/harder decisions deterministic and asking Jev only when signals conflict. Such a profile should describe recent play rather than infer fixed ability, and should remain local or aggregated without identity.
 
 ## Project Structure
 
@@ -103,6 +107,7 @@ src/       Application source
   sections.ts     Curricular rendering: curriculum cards, puzzle header, board toolbar,
                   grid workspace tabs, clue panel with filtering
   clue-strategy.ts Reasoning strategy labels and validated Jev classification results
+  player-state.ts Bounded player-state response parsing and deterministic hint policy
   ui.ts           Reusable HTML rendering primitives: buttons, badges, dialogs, panels, tabs
   style.css       Base stylesheet
   expert-grid.css Expert-grid layout overrides
