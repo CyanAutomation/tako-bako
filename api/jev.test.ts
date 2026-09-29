@@ -45,4 +45,11 @@ describe("OpenRouter Jev client", () => {
 
     assert.strictEqual(await requestJevDecision({ state: "text", questions: {} }), undefined);
   });
+
+  it("returns undefined when the provider request times out or rejects", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    stubGlobal("fetch", mock.fn(async () => { throw new Error("request timed out"); }));
+
+    assert.strictEqual(await requestJevDecision({ state: "compact state", questions: {} }), undefined);
+  });
 });
