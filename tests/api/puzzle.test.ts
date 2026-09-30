@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { assertPartialMatch, rejectedMock, resolvedMock, resolvedSequenceMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
-import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
+import { assertPartialMatch, rejectedMock, resolvedMock, resolvedSequenceMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
+import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../../src/cache-policy.js";
 
-import handler from "./puzzle.js";
+import handler from "../../api/puzzle.js";
 
 afterEach(restoreStubbedGlobals);
 

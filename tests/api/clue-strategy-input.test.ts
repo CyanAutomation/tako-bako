@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseClues } from "./clue-strategy-input.js";
+import { parseClues } from "../../server/clue-strategy-input.js";
 
 describe("parseClues", () => {
   it("accepts bounded unique clues and keeps bounded constraint kinds", () => {
