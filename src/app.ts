@@ -408,10 +408,11 @@ function applyAnswerResult(correct: boolean, requestedPlayMode: PlayMode, reques
 }
 
 async function requestHint(): Promise<void> {
-  if (!puzzle?.puzzleToken) return;
+  if (!puzzle) return;
   const requestedPuzzle = puzzle;
   const requestedPuzzleId = requestedPuzzle.id;
   const requestedPuzzleToken = requestedPuzzle.puzzleToken;
+  if (!requestedPuzzleToken) return;
   const requestedBoard = { ...board };
   const requestedUsedClueIds = new Set(usedClueIds);
   const requestedDifficultyLevel = difficultyLevel;
@@ -425,7 +426,7 @@ async function requestHint(): Promise<void> {
     && puzzle?.id === requestedPuzzleId
     && puzzle.puzzleToken === requestedPuzzleToken;
   const body = createHintRequestBody({
-    puzzle: requestedPuzzle,
+    puzzle: { ...requestedPuzzle, puzzleToken: requestedPuzzleToken },
     board: requestedBoard,
     usedClueIds: requestedUsedClueIds,
     clueStrategies,
