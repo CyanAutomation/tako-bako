@@ -16,12 +16,12 @@ async function findTests(directory) {
   return found.flat();
 }
 
-const testFiles = (await Promise.all(["src", "api"].map(directory => findTests(join(projectRoot, directory)))))
+const testFiles = (await Promise.all(["src", "tests"].map(directory => findTests(join(projectRoot, directory)))))
   .flat()
   .sort();
 
 if (testFiles.length === 0) {
-  throw new Error("No TypeScript test files were found in src or api.");
+  throw new Error("No TypeScript test files were found in src or tests.");
 }
 
 const child = spawn(process.execPath, [

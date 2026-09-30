@@ -3,8 +3,8 @@ import { CLUE_STRATEGIES } from "../src/clue-strategy-catalog.js";
 import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
 import { parseClueStrategyResults } from "../src/clue-strategy-results.js";
-import { hasJevApiKey, requestJevDecision } from "./jev.js";
-import { parseClues, type InputClue } from "./clue-strategy-input.js";
+import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
+import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
 
 const MAX_TOKEN_LENGTH = 16_384;
 const YOKAIBA_HINT_URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";

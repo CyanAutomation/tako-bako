@@ -67,7 +67,7 @@ Vite proxies `/api/puzzle` requests to Yokaiba during development, routing queri
 
 ## Deployment
 
-`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. Vercel serverless functions live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` and `/api/events` proxy bounded assistance and anonymous calibration outcomes; `/api/health` reports app and upstream puzzle-service readiness. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
+`vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. The five Vercel serverless function handlers live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` provides bounded assistance; `/api/clue-strategies` classifies clues; `/api/events` forwards anonymous calibration outcomes; and `/api/health` reports app and upstream puzzle-service readiness. Supporting server modules live in `server/`, and API tests live in `tests/api/`. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
 
 The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options headers for all non-asset routes (`/(.*)`). Static assets at `/assets/(.*)` receive immutable caching for one year with `Cache-Control: public, max-age=31536000, immutable`.
 
@@ -112,13 +112,14 @@ src/       Application source
   style.css       Base stylesheet
   expert-grid.css Expert-grid layout overrides
   brand/          Brand assets (PNG sprites)
-api/         Vercel API functions
+api/         Five Vercel API function handlers
   puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
   hint.ts     POST /hint assistance proxy
   clue-strategies.ts POST /clue-strategies Jev-assisted clue classification
-  jev.ts      Server-side OpenRouter Decisions API client
   events.ts   POST /events anonymous calibration proxy
   health.ts   GET /health readiness check
+server/      Shared API modules, including the OpenRouter Decisions API client
+tests/api/   API tests, kept outside Vercel's function discovery directory
 index.html      App entry HTML
 vite.config.ts  Dev proxy: /api/puzzle → /v1/puzzles/generate
 vercel.json     Vercel deployment config, security headers, output dir
