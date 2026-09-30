@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { clueStrategyLabel, isClueStrategy, type ClueStrategy } from "../src/clue-strategy.js";
+import { clueStrategyLabel, isClueStrategy } from "../src/clue-strategy-catalog.js";
+import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { derivePlayerStateFeatures, hintStrengthForProgress, hintStrengthRank, MIN_PLAYER_STATE_CONFIDENCE, parsePlayerStateAssessment, policyForPlayerState, serializePlayerStateFeatures, type HintStrength, type PlayerStateFeatures, type PlayerStatePolicy } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "./jev.js";
 

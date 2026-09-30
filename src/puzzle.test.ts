@@ -2,7 +2,10 @@ import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
-import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveUsedClues, squareKey, type Mark } from "./puzzle";
+import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, markBoard, squareKey } from "./puzzle-board";
+import { parsePuzzle } from "./puzzle-parser";
+import { loadBoard, loadUsedClues, saveUsedClues } from "./puzzle-storage";
+import type { Mark } from "./puzzle";
 
 afterEach(restoreStubbedGlobals);
 
@@ -98,6 +101,29 @@ describe("parsePuzzle", () => {
 
   it("rejects a malformed response before it reaches the board", () => {
     assert.throws(() => parsePuzzle({ id: "missing everything" }), new RegExp("invalid puzzle response"));
+  });
+
+  it("rejects malformed nested records and optional metadata at their boundaries", () => {
+    const valid = {
+      id: "valid", seed: "valid", clues: [],
+      difficulty: { level: 1, label: "Easy", modelVersion: "v1" },
+      spec: { id: "test", title: "Test", baseCategory: "person", categories: [
+        { id: "person", label: "Person", values: ["A", "B"] },
+        { id: "place", label: "Place", values: ["One", "Two"] },
+      ] },
+    };
+    const malformed: unknown[] = [
+      { ...valid, clues: [null] },
+      { ...valid, difficulty: { ...valid.difficulty, label: "" } },
+      { ...valid, spec: { ...valid.spec, categories: [valid.spec.categories[0], { ...valid.spec.categories[1], id: "" }] } },
+      { ...valid, requestedSeed: "" },
+      { ...valid, templateId: "x".repeat(257) },
+      { ...valid, puzzleToken: 5 },
+    ];
+
+    for (const value of malformed) {
+      assert.throws(() => parsePuzzle(value), new RegExp("invalid puzzle response"));
+    }
   });
 
   const unsafeCategories = [
