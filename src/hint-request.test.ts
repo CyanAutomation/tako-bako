@@ -5,7 +5,7 @@ import { createHintRequestBody, parseHintResponse } from "./hint-request";
 import { squareKey } from "./puzzle-board";
 import type { Puzzle } from "./puzzle";
 
-const puzzle: Puzzle = {
+const puzzle: Puzzle & { puzzleToken: string } = {
   id: "puzzle", seed: "seed", requestedSeed: "seed", templateId: "tournament-order-v1", puzzleToken: "signed",
   clues: [{ id: "known", text: "Aki matches Lions.", constraintKind: "matches", strategy: "direct_match" }, { id: "other", text: "Hana is next to the fish keeper." }],
   difficulty: { level: 2, label: "Easy", modelVersion: "v1" },
