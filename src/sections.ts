@@ -1,7 +1,10 @@
 import type { Category } from "./puzzle";
-import { clueStrategyLabel, type ClueStrategy } from "./clue-strategy";
+import { clueStrategyLabel } from "./clue-strategy-catalog";
+import type { ClueStrategy } from "./clue-strategy-catalog";
 import { courses, TIERS, type CourseId } from "./curriculum";
-import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderInfoDisclosure, renderLevelCard, renderPanel, renderSegmentedControl, renderStatus, renderTabs } from "./ui";
+import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderLevelCard, renderPanel, renderSegmentedControl, renderStatus } from "./ui-controls";
+import { renderInfoDisclosure } from "./ui-dialog";
+import { renderTabs } from "./ui-grid";
 
 export type ClueFilter = "all" | "remaining" | "used";
 
