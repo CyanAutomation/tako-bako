@@ -1,8 +1,8 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { assertPartialMatch, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { assertPartialMatch, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
-import handler from "./events.js";
+import handler from "../../api/events.js";
 
 afterEach(restoreStubbedGlobals);
 

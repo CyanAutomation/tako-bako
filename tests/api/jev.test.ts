@@ -1,8 +1,8 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
-import { requestJevDecision } from "./jev.js";
+import { requestJevDecision } from "../../server/jev.js";
 
 afterEach(() => {
   restoreStubbedGlobals();
