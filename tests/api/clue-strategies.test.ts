@@ -1,8 +1,8 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { rejectedMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { rejectedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
-import handler from "./clue-strategies.js";
+import handler from "../../api/clue-strategies.js";
 
 afterEach(() => {
   restoreStubbedGlobals();

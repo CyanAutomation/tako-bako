@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { assertPartialMatch, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
+import { assertPartialMatch, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
-import handler from "./hint.js";
+import handler from "../../api/hint.js";
 
 const jevMetrics: unknown[][] = [];
 

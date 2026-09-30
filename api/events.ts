@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { parseEventPayload } from "./event-payload.js";
+import { parseEventPayload } from "../server/event-payload.js";
 
 const URL = "https://yokaiba.scheimann.workers.dev/v1/events";
 
