@@ -44,6 +44,17 @@ describe("hint proxy", () => {
     assert.strictEqual(result.statusCode, 400);
   });
 
+  it("sets an allow header for unsupported methods", async () => {
+    const upstream = mock.fn(); stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", body: {} } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 405);
+    assert.strictEqual(result.headers.get("allow"), "POST");
+    assert.strictEqual(upstream.mock.callCount(), 0);
+  });
+
   it("lets Jev choose only from the supplied clues and Yokaiba's solver-verified hint", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     const calls: { url: string; body: Record<string, unknown> }[] = [];
@@ -215,12 +226,38 @@ describe("hint proxy", () => {
     assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "c1", text: "Start here." } });
   });
 
+  it("forwards an upstream error status and payload", async () => {
+    const upstream = resolvedMock(new Response(JSON.stringify({ error: "temporarily unavailable" }), { status: 503, headers: { "content-type": "application/json" } }));
+    stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 503);
+    assert.deepStrictEqual(result.body, { error: "temporarily unavailable" });
+  });
+
+  it("returns a bounded gateway error when the solver request throws", async () => {
+    stubGlobal("fetch", mock.fn(async () => { throw new Error("network unavailable"); }));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 502);
+    assert.deepStrictEqual(result.body, { error: "Yokaiba assistance is unavailable. Please try again." });
+  });
+
   const malformedContexts = [
+    { clues: [{ id: "", text: "Missing ID." }] },
     { clues: [{ id: "duplicate", text: "First clue." }, { id: "duplicate", text: "Second clue." }] },
+    { usedClueIds: [""] },
+    { board: [{ category: "", subject: "Aki", value: "Lions", mark: "yes" }] },
+    { board: [{ category: "Club", subject: "Aki", value: "Lions", mark: "unknown" }] },
     { board: [
       { category: "Club", subject: "Aki", value: "Lions", mark: "yes" },
       { category: "Club", subject: "Aki", value: "Lions", mark: "no" },
     ] },
+    { board: Array.from({ length: 257 }, (_, index) => ({ category: "Club", subject: `Aki-${index}`, value: "Lions", mark: "no" })) },
     { usedClueIds: Array.from({ length: 65 }, (_, index) => `clue-${index}`) },
   ];
   for (const [caseIndex, context] of malformedContexts.entries()) {

@@ -66,6 +66,36 @@ describe("clue strategy endpoint", () => {
     assert.strictEqual(upstream.mock.callCount(), 0);
   });
 
+  it("requires a signed token before requesting model labels", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const upstream = mock.fn();
+    stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { clues: [{ id: "unknown", text: "An unclassified clue." }] } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 400);
+    assert.deepStrictEqual(result.body, { error: "A signed puzzle token is required for model-assisted labels" });
+    assert.strictEqual(upstream.mock.callCount(), 0);
+  });
+
+  it("keeps deterministic labels when Jev returns no usable answers", async () => {
+    process.env.OPENROUTER_API_KEY = "test-key";
+    const upstream = mock.fn(async (url: string | URL | Request) => String(url).includes("yokaiba")
+      ? new Response(JSON.stringify({ kind: "clue" }), { status: 200 })
+      : new Response(JSON.stringify({ answers: null }), { status: 200 }));
+    stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token", clues: [
+      { id: "known", text: "Aki matches Lions.", constraintKind: "matches" },
+      { id: "unknown", text: "Hana is next to the fish keeper." },
+    ] } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, { strategies: [{ clueId: "known", strategy: "direct_match", confidence: 1 }] });
+  });
+
   it("keeps known labels when Yokaiba rejects the model-assisted token check", async () => {
     process.env.OPENROUTER_API_KEY = "test-key";
     stubGlobal("fetch", async () => new Response("unavailable", { status: 503 }));

@@ -38,6 +38,37 @@ function deferred<T>() {
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
+function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL | Request, init?: RequestInit) => Promise<unknown>) {
+  const listeners = new Map<string, (event: never) => void>();
+  let href = `https://example.test/?seed=${seed}&mode=challenge&tier=beginner&level=1`;
+  const root = {
+    innerHTML: "",
+    addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
+    querySelector: () => null,
+  };
+  const storage = new Map<string, string>();
+  const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+  stubGlobal("document", { querySelector: () => root, activeElement: null });
+  stubGlobal("window", {
+    get location() { return new URL(href); },
+    matchMedia: () => ({ matches: false }),
+    addEventListener: () => undefined,
+    history: { pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); }, replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); } },
+  });
+  stubGlobal("localStorage", storageApi);
+  stubGlobal("sessionStorage", storageApi);
+  stubGlobal("CSS", { escape: (value: string) => value });
+  stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+  const fetchMock = mock.fn(fetchImplementation);
+  stubGlobal("fetch", fetchMock);
+  mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
+
+  const click = (button: Partial<FakeButton>) => listeners.get("click")!({
+    target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
+  } as never);
+  return { root, listeners, storage, fetchMock, click };
+}
+
 describe("answer verification navigation", () => {
   beforeEach(() => {
     mock.restoreAll();
@@ -185,10 +216,11 @@ describe("answer verification navigation", () => {
   it("returns to the seedless landing page when navigating Back from a started puzzle", async () => {
     const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
     const windowListeners = new Map<string, () => void>();
+    const seedInput = { value: "https://example.test/?seed=shared-seed&template=tournament-order-v2&difficulty=2", focus: () => undefined };
     const root = {
       innerHTML: "",
       addEventListener: (name: string, listener: (event: { target: { closest: () => FakeButton | null } }) => void) => listeners.set(name, listener),
-      querySelector: () => null,
+      querySelector: (selector: string) => selector === "#landing-seed-input" ? seedInput : null,
     };
     let href = "https://example.test/";
     const storage = new Map<string, string>();
@@ -235,6 +267,53 @@ describe("answer verification navigation", () => {
     assert.ok((root.innerHTML).includes('id="start-puzzle"'));
     assert.ok(!(root.innerHTML).includes('id="share-puzzle"'));
     assert.strictEqual(fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 1);
+
+    click({ id: "open-shared-puzzle" });
+    assert.ok((root.innerHTML).includes('id="shared-puzzle"'));
+    click({ id: "open-landing-seed" });
+    await flush();
+
+    const sharedRequest = fetchMock.mock.calls.find(({ arguments: [input] }) => String(input).includes("seed=shared-seed"));
+    assert.ok(sharedRequest);
+    const sharedUrl = new URL(String(sharedRequest.arguments[0]), "https://example.test");
+    assert.strictEqual(sharedUrl.searchParams.get("templateId"), "tournament-order-v2");
+    assert.strictEqual(sharedUrl.searchParams.get("difficultyLevel"), "2");
+    assert.ok((href).includes("mode=shared"));
+  });
+
+  it("records an incorrect answer without completing course progress", async () => {
+    const app = mountTestPuzzle("incorrect-answer", async (input, init) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/puzzle" && init?.method === "POST") return new Response(JSON.stringify({ correct: false }), { status: 200 });
+      return new Response(JSON.stringify(puzzleResponse("incorrect-answer", "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ dataset: { square: "club|Aki|Lions" } });
+    app.click({ dataset: { square: "club|Ben|Wolves" } });
+    app.click({ id: "check-solution" });
+    await flush();
+
+    assert.ok(app.root.innerHTML.includes("Not quite yet. Your notes are saved"));
+    assert.strictEqual(app.storage.get(PROGRESS_STORAGE_KEY), undefined);
+  });
+
+  it("applies a successful clue hint and persists the used clue ID", async () => {
+    const app = mountTestPuzzle("hint-success", async (input) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/clue-strategies") return new Response(JSON.stringify({ strategies: [] }), { status: 200 });
+      if (url === "/api/hint") return new Response(JSON.stringify({ kind: "clue", clue: { id: "first", text: "Start with the order clue." } }), { status: 200 });
+      return new Response(JSON.stringify(puzzleResponse("hint-success", "signed-token", [{ id: "first", text: "Start with the order clue." }])), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ id: "hint" });
+    await flush();
+
+    assert.ok(app.root.innerHTML.includes("Hint: Start with the order clue."));
+    assert.strictEqual(app.storage.get("tako-bako.clues.hint-success"), JSON.stringify(["first"]));
   });
 });
 
@@ -280,5 +359,85 @@ describe("dialog keyboard navigation", () => {
     keydown(true);
     assert.strictEqual(activeElement, first);
     assert.strictEqual(prevented, true);
+  });
+
+  it("moves focus through grid cells and tabs, then closes the challenge dialog with Escape", async () => {
+    const listeners = new Map<string, (event: never) => void>();
+    let activeElement: unknown = null;
+    let href = "https://example.test/?seed=keyboard&mode=challenge&tier=beginner&level=1";
+    const symbols = new Map<string, { textContent: string }>();
+    const cells = new Map<string, { dataset: Record<string, string>; disabled: boolean; className: string; focus: () => void; setAttribute: (name: string, value: string) => void; querySelector: () => { textContent: string } }>();
+    const tabs = new Map<string, { dataset: Record<string, string>; focus: () => void }>();
+    const getCell = (key: string) => {
+      if (!cells.has(key)) {
+        const symbol = { textContent: "" };
+        symbols.set(key, symbol);
+        const cell = { dataset: { square: key }, disabled: false, className: "mark mark-unknown", focus: () => { activeElement = cell; }, setAttribute: () => undefined, querySelector: () => symbol };
+        cells.set(key, cell);
+      }
+      return cells.get(key)!;
+    };
+    const getTab = (id: string) => {
+      if (!tabs.has(id)) {
+        const tab = { dataset: { gridTab: id }, focus: () => { activeElement = tab; } };
+        tabs.set(id, tab);
+      }
+      return tabs.get(id)!;
+    };
+    const returnFocusButton = { focus: () => { activeElement = returnFocusButton; } };
+    const root = {
+      innerHTML: "",
+      addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
+      querySelector: (selector: string) => {
+        const cellMatch = /^\[data-square="(.*)"\]$/.exec(selector);
+        if (cellMatch) return getCell(cellMatch[1]!);
+        const tabMatch = /^\[data-grid-tab="(.*)"\]$/.exec(selector);
+        if (tabMatch) return getTab(tabMatch[1]!);
+        if (selector === "#challenge-menu") return returnFocusButton;
+        return null;
+      },
+    };
+    const storage = new Map<string, string>();
+    const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+    stubGlobal("document", { querySelector: () => root, get activeElement() { return activeElement; } });
+    stubGlobal("window", {
+      get location() { return new URL(href); },
+      matchMedia: () => ({ matches: false }),
+      addEventListener: () => undefined,
+      history: { pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); }, replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); } },
+    });
+    stubGlobal("localStorage", storageApi);
+    stubGlobal("sessionStorage", storageApi);
+    stubGlobal("CSS", { escape: (value: string) => value });
+    stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+    stubGlobal("fetch", mock.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      const data = puzzleResponse(seed, `${seed}-token`);
+      data.spec.categories.push({ id: "weight", label: "Weight", values: ["-60 kg", "-66 kg"] });
+      return new Response(JSON.stringify(data), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+
+    mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
+    await flush();
+    const click = (button: Partial<FakeButton>) => listeners.get("click")!({ target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) } } as never);
+    let prevented = false;
+    const keydown = (target: { closest: (selector: string) => unknown }, key: string) => listeners.get("keydown")!({ target, key, shiftKey: false, preventDefault: () => { prevented = true; } } as never);
+
+    const firstCell = getCell("club|Aki|Lions");
+    keydown({ closest: selector => selector === "button[data-square]" ? firstCell : null }, "ArrowRight");
+    assert.strictEqual(activeElement, getCell("club|Aki|Wolves"));
+    assert.strictEqual(prevented, true);
+
+    const firstTab = getTab("club");
+    keydown({ closest: selector => selector === "button[data-grid-tab]" ? firstTab : null }, "ArrowRight");
+    assert.strictEqual(activeElement, getTab("weight"));
+
+    click({ id: "challenge-menu" });
+    keydown({ closest: () => null }, "Escape");
+    assert.ok(!root.innerHTML.includes("challenge-menu-dialog"));
+    assert.strictEqual(activeElement, returnFocusButton);
+    assert.strictEqual(symbols.get("club|Aki|Lions")?.textContent, "");
   });
 });
