@@ -1,14 +1,21 @@
-import { answerFromBoard, boardSolveProgress, loadBoard, loadUsedClues, markBoard, parsePuzzle, saveBoard, saveUsedClues, squareKey, type Board, type Puzzle } from "./puzzle";
-import { loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleResponseToCache } from "./puzzle-cache";
+import { answerFromBoard, boardSolveProgress, markBoard, squareKey } from "./puzzle-board";
+import { parseAnswerVerification } from "./answer-verification";
+import { createHintRequestBody, parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
+import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
+import type { Board, Puzzle } from "./puzzle";
+import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
 import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
-import { parseClueStrategyResults, type ClueStrategy } from "./clue-strategy";
+import { parseClueStrategyResults } from "./clue-strategy-results";
+import type { ClueStrategy } from "./clue-strategy-catalog";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { escapeHtml, gridCellLabel, nextGridCellKey, nextTabId, renderBadge, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderStatus, trapDialogTab } from "./ui";
+import { escapeHtml, renderBadge, renderButton, renderStatus } from "./ui-controls";
+import { renderDialog, renderDisclosure, trapDialogTab } from "./ui-dialog";
+import { gridCellLabel, nextGridCellKey, nextTabId, renderGridCard, renderGridCell } from "./ui-grid";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -55,14 +62,6 @@ let mistakes = 0;
 
 function newSeed(): string {
   return crypto.randomUUID();
-}
-
-class DifficultyUnavailableError extends Error {
-  constructor(availableLevels: number[] = []) {
-    super(availableLevels.length
-      ? `This seed cannot produce the selected difficulty. It can make Level${availableLevels.length === 1 ? "" : "s"} ${availableLevels.join(", ")}. Try another puzzle.`
-      : "This seed cannot produce the selected difficulty. Try another puzzle.");
-  }
 }
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
@@ -228,7 +227,6 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
-  const cacheRequest = { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel } as const;
   const requestedPlayMode = playMode;
   const requestedCourse = activeCourse;
   if (puzzle) recordOutcome("puzzle_abandoned");
@@ -242,58 +240,12 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   activePuzzleRequest = requestController;
   render();
   try {
-    const parameters = new URLSearchParams({ seed: requestedSeed, templateId: requestedTemplateId, ...(requestedDifficultyLevel ? { difficultyLevel: String(requestedDifficultyLevel) } : {}) });
-    const endpoint = `/api/puzzle?${parameters}`;
-    let data: Puzzle | undefined;
-    const cached = loadPuzzleFromCache<unknown>(sessionStorage, requestedSeed, requestedDifficultyLevel, Date.now(), requestedTemplateId);
-    if (cached) {
-      try {
-        data = parsePuzzle(cached);
-      } catch {
-        sessionStorage.removeItem(puzzleCacheKey(requestedSeed, requestedDifficultyLevel, requestedTemplateId));
-      }
-    }
-    if (!data) {
-      const result = await fetch(endpoint, { signal: requestController.signal });
-      if (!result.ok) {
-        if (result.status === 422) {
-          const error = await result.json().catch(() => undefined) as { availableDifficultyLevels?: unknown } | undefined;
-          const levels = Array.isArray(error?.availableDifficultyLevels) && error.availableDifficultyLevels.every(level => typeof level === "number" && Number.isInteger(level) && level >= 1 && level <= 12)
-            ? [...new Set(error.availableDifficultyLevels)].sort((left, right) => left - right)
-            : [];
-          throw new DifficultyUnavailableError(levels);
-        }
-        throw new Error(result.status === 429 ? retryAfterMessage(result.headers.get("retry-after")) : "The puzzle could not be collected. Please try again.");
-      }
-      try {
-        data = parsePuzzle(await result.json());
-        const now = Date.now();
-        savePuzzleResponseToCache(sessionStorage, cacheRequest, data, puzzleResponseExpiry(result.headers, now), fetchId === currentFetchId, now);
-      } catch (error) {
-        console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
-        throw error;
-      }
-    }
+    const data = await loadPuzzle(
+      { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel },
+      { storage: sessionStorage, signal: requestController.signal, isCurrent: () => fetchId === currentFetchId },
+    );
     if (fetchId !== currentFetchId) return;
-    puzzle = data;
-    clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
-    puzzleLoadFailed = false;
-    puzzleStartedAt = Date.now();
-    hintsUsed = 0;
-    mistakes = 0;
-    recordOutcome("puzzle_started");
-    board = loadBoard(puzzle.id);
-    undoStack = [];
-    activeGridId = data.spec.categories.find(category => category.id !== data.spec.baseCategory)?.id;
-    const base = data.spec.categories.find(category => category.id === data.spec.baseCategory);
-    const active = data.spec.categories.find(category => category.id === activeGridId);
-    activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
-    usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
-    void loadClueStrategies(data);
-    // Keep the requested seed in the URL: Yokaiba may derive a different
-    // internal seed while searching for the chosen difficulty level.
-    setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
-    message = "Mark each square: leave it blank, confirm a match ✓, or rule it out ×.";
+    activatePuzzle(data, requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
   } catch (error) {
     if (fetchId !== currentFetchId) return;
     puzzle = null;
@@ -309,16 +261,26 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   }
 }
 
-function retryAfterMessage(value: string | null): string {
-  if (!value) return "The dojo is busy. Please wait a moment, then try again.";
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds > 0) return `The dojo is busy. Try again in ${Math.ceil(seconds)} second${Math.ceil(seconds) === 1 ? "" : "s"}.`;
-  const retryAt = Date.parse(value);
-  if (Number.isFinite(retryAt)) {
-    const remaining = Math.max(1, Math.ceil((retryAt - Date.now()) / 1_000));
-    return `The dojo is busy. Try again in ${remaining} second${remaining === 1 ? "" : "s"}.`;
-  }
-  return "The dojo is busy. Please wait a moment, then try again.";
+function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course): void {
+  puzzle = data;
+  clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
+  puzzleLoadFailed = false;
+  puzzleStartedAt = Date.now();
+  hintsUsed = 0;
+  mistakes = 0;
+  recordOutcome("puzzle_started");
+  board = loadBoard(data.id);
+  undoStack = [];
+  activeGridId = data.spec.categories.find(category => category.id !== data.spec.baseCategory)?.id;
+  const base = data.spec.categories.find(category => category.id === data.spec.baseCategory);
+  const active = data.spec.categories.find(category => category.id === activeGridId);
+  activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
+  usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
+  void loadClueStrategies(data);
+  // Keep the requested seed in the URL: Yokaiba may derive a different
+  // internal seed while searching for the chosen difficulty level.
+  setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
+  message = "Mark each square: leave it blank, confirm a match ✓, or rule it out ×.";
 }
 
 function saveCurrentBoard(next: Board): void {
@@ -396,27 +358,8 @@ async function checkAnswer(): Promise<void> {
   message = "Tako is checking your solution…";
   render();
   try {
-    const result = await fetch("/api/puzzle", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ puzzleToken: requestedPuzzleToken, answer }),
-      signal: requestController.signal,
-    });
-    if (!isActiveRequest()) return;
-    if (!result.ok) throw new Error("Verification is unavailable");
-    const response: unknown = await result.json();
-    if (!isActiveRequest()) return;
-    if (!response || typeof response !== "object" || typeof (response as { correct?: unknown }).correct !== "boolean") throw new Error("Invalid verification response");
-    if ((response as { correct: boolean }).correct) {
-      recordOutcome("puzzle_completed");
-      if (shouldAdvanceProgress(requestedPlayMode)) {
-        progress = completeCourse(progress, requestedCourse.id);
-        saveProgress(localStorage, progress);
-        const next = nextCourse(requestedCourse);
-        message = next ? `Beautifully solved — ${requestedCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
-      } else message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
-      pendingCelebration = true;
-    } else { mistakes = Math.min(100, mistakes + 1); recordOutcome("mistake"); message = "Not quite yet. Your notes are saved, so keep refining the grid."; }
+    const correct = await requestAnswerVerification(requestedPuzzleToken, answer, requestController.signal, isActiveRequest);
+    if (correct !== undefined) applyAnswerResult(correct, requestedPlayMode, requestedCourse);
   } catch {
     if (!isActiveRequest()) return;
     message = "Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.";
@@ -427,6 +370,41 @@ async function checkAnswer(): Promise<void> {
       render();
     }
   }
+}
+
+async function requestAnswerVerification(token: string, answer: NonNullable<ReturnType<typeof answerFromBoard>>, signal: AbortSignal, isActive: () => boolean): Promise<boolean | undefined> {
+  const result = await fetch("/api/puzzle", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ puzzleToken: token, answer }),
+    signal,
+  });
+  if (!isActive()) return undefined;
+  if (!result.ok) throw new Error("Verification is unavailable");
+  const correct = parseAnswerVerification(await result.json());
+  if (!isActive()) return undefined;
+  if (correct === undefined) throw new Error("Invalid verification response");
+  return correct;
+}
+
+function applyAnswerResult(correct: boolean, requestedPlayMode: PlayMode, requestedCourse: Course): void {
+  if (!correct) {
+    mistakes = Math.min(100, mistakes + 1);
+    recordOutcome("mistake");
+    message = "Not quite yet. Your notes are saved, so keep refining the grid.";
+    return;
+  }
+  recordOutcome("puzzle_completed");
+  if (!shouldAdvanceProgress(requestedPlayMode)) {
+    message = "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.";
+    pendingCelebration = true;
+    return;
+  }
+  progress = completeCourse(progress, requestedCourse.id);
+  saveProgress(localStorage, progress);
+  const next = nextCourse(requestedCourse);
+  message = next ? `Beautifully solved — ${requestedCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!";
+  pendingCelebration = true;
 }
 
 async function requestHint(): Promise<void> {
@@ -446,49 +424,27 @@ async function requestHint(): Promise<void> {
   const isActiveRequest = () => requestGeneration === hintGeneration
     && puzzle?.id === requestedPuzzleId
     && puzzle.puzzleToken === requestedPuzzleToken;
-  const progress = boardSolveProgress(requestedBoard, requestedPuzzle.spec);
-  const kind = progress.matches === 0 ? "clue" : progress.matches < Math.ceil(progress.total / 2) ? "elimination" : "placement";
-  const base = requestedPuzzle.spec.categories.find(category => category.id === requestedPuzzle.spec.baseCategory);
-  const boardContext = base ? requestedPuzzle.spec.categories.filter(category => category.id !== base.id).flatMap(category => base.values.flatMap(subject => category.values.flatMap(value => {
-    const mark = requestedBoard[squareKey(category.id, subject, value)];
-    return mark === "yes" || mark === "no" ? [{ category: category.label, subject, value, mark }] : [];
-  }))) : [];
+  const body = createHintRequestBody({
+    puzzle: requestedPuzzle,
+    board: requestedBoard,
+    usedClueIds: requestedUsedClueIds,
+    clueStrategies,
+    hintsUsed: requestedHintsUsed,
+    mistakes,
+    difficultyLevel: requestedDifficultyLevel,
+    puzzleStartedAt: requestedPuzzleStartedAt,
+    now: Date.now(),
+    smartMarking,
+  });
   loading = true;
   message = "Tako is finding the next helpful nudge…";
   render();
   try {
-    const result = await fetch("/api/hint", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        puzzleToken: requestedPuzzleToken,
-        kind,
-        clues: requestedPuzzle.clues.map(clue => ({ id: clue.id, text: clue.text, strategy: clue.strategy ?? clueStrategies[clue.id] })),
-        usedClueIds: [...requestedUsedClueIds],
-        board: boardContext,
-        totalMatches: progress.total,
-        hintsUsed: requestedHintsUsed,
-        mistakes,
-        elapsedMs: requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : 0,
-        smartMarking,
-      }),
-      signal: requestController.signal,
-    });
-    if (!isActiveRequest()) return;
-    const hint: unknown = await result.json();
-    if (!isActiveRequest()) return;
-    if (!result.ok || !hint || typeof hint !== "object") throw new Error("Hint unavailable");
-    const value = hint as { kind?: unknown; clue?: { id?: unknown; text?: unknown }; placement?: { subject?: unknown; category?: unknown; value?: unknown } };
-    if (value.kind === "placement" && value.placement && typeof value.placement.subject === "string" && typeof value.placement.category === "string" && typeof value.placement.value === "string") {
-      board = { ...requestedBoard, [squareKey(value.placement.category, value.placement.subject, value.placement.value)]: "yes" };
-      saveBoard(requestedPuzzleId, board);
-      message = `Hint: ${value.placement.subject} matches ${value.placement.value}.`;
-    } else if (value.clue && typeof value.clue.text === "string") {
-      if (typeof value.clue.id === "string") { usedClueIds = new Set(requestedUsedClueIds).add(value.clue.id); saveUsedClues(requestedPuzzleId, usedClueIds); }
-      message = `Hint: ${value.clue.text}`;
-    } else throw new Error("Invalid hint");
+    const hint = await requestHintResponse(body, requestController.signal, isActiveRequest);
+    if (!hint) return;
+    applyHintResponse(hint, requestedPuzzleId, requestedBoard, requestedUsedClueIds);
     hintsUsed = requestedHintsUsed + 1;
-    void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: "hint_used", templateId: requestedPuzzle.templateId, requestedDifficultyLevel, assessedDifficultyLevel: requestedPuzzle.difficulty.level, clueCount: requestedPuzzle.clues.length, elapsedMs: requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : undefined, hintsUsed }) }).catch(() => undefined);
+    recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, hintsUsed);
   } catch {
     if (!isActiveRequest()) return;
     message = "Tako can’t offer a hint just now. Please try again in a moment.";
@@ -499,6 +455,51 @@ async function requestHint(): Promise<void> {
       render();
     }
   }
+}
+
+async function requestHintResponse(body: HintRequestBody, signal: AbortSignal, isActive: () => boolean): Promise<ParsedHintResponse | undefined> {
+  const response = await fetch("/api/hint", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!isActive()) return undefined;
+  const hint = parseHintResponse(await response.json());
+  if (!isActive()) return undefined;
+  if (!response.ok || !hint) throw new Error("Hint unavailable");
+  return hint;
+}
+
+function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousBoard: Board, previousUsedClueIds: ReadonlySet<string>): void {
+  if (hint.kind === "placement") {
+    board = { ...previousBoard, [squareKey(hint.placement.category, hint.placement.subject, hint.placement.value)]: "yes" };
+    saveBoard(puzzleId, board);
+    message = `Hint: ${hint.placement.subject} matches ${hint.placement.value}.`;
+    return;
+  }
+  if (hint.clue.id !== undefined) {
+    usedClueIds = new Set(previousUsedClueIds).add(hint.clue.id);
+    saveUsedClues(puzzleId, usedClueIds);
+  }
+  message = `Hint: ${hint.clue.text}`;
+}
+
+function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number): void {
+  const elapsedMs = requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : undefined;
+  void fetch("/api/events", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      event: "hint_used",
+      templateId: requestedPuzzle.templateId,
+      requestedDifficultyLevel,
+      assessedDifficultyLevel: requestedPuzzle.difficulty.level,
+      clueCount: requestedPuzzle.clues.length,
+      elapsedMs,
+      hintsUsed: usedHints,
+    }),
+  }).catch(() => undefined);
 }
 
 async function sharePuzzle(): Promise<void> {
@@ -613,41 +614,68 @@ function focusGridCell(key: string): void {
   next.focus();
 }
 
+function changedBoardCell(key: string, current: Puzzle, base: Puzzle["spec"]["categories"][number]): { cell: HTMLButtonElement; row: string; column: string } | undefined {
+  const [categoryId, encodedRow, encodedColumn] = key.split("|");
+  if (!categoryId || !encodedRow || !encodedColumn) return undefined;
+  const category = current.spec.categories.find(candidate => candidate.id === categoryId);
+  if (!category || category.id === base.id) return undefined;
+  const cell = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
+  if (!cell) return undefined;
+  return { cell, row: decodeURIComponent(encodedRow), column: decodeURIComponent(encodedColumn) };
+}
+
 /** Updates only the cells and board controls changed by a mark, preserving the live grid DOM. */
-function updateBoardView(previous: Board, current: Puzzle): void {
-  const base = current.spec.categories.find(category => category.id === current.spec.baseCategory);
-  if (!base) return;
-  const changedKeys = new Set([...Object.keys(previous), ...Object.keys(board)].filter(key => previous[key] !== board[key]));
-  for (const key of changedKeys) {
-    const [, encodedRow, encodedColumn] = key.split("|");
-    const category = current.spec.categories.find(candidate => candidate.id === key.split("|")[0]);
-    if (!category || !encodedRow || !encodedColumn || category.id === base.id) continue;
-    const row = decodeURIComponent(encodedRow);
-    const column = decodeURIComponent(encodedColumn);
-    const mark = board[key] ?? "unknown";
-    const cell = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
-    if (!cell) continue;
-    cell.className = `mark mark-${mark}`;
-    cell.setAttribute("aria-label", gridCellLabel(row, column, mark));
-    const symbol = cell.querySelector("span");
-    if (symbol) symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
-  }
-  const progress = boardSolveProgress(board, current.spec);
+function updateBoardCell(key: string, current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
+  const target = changedBoardCell(key, current, base);
+  if (!target) return;
+  const mark = board[key] ?? "unknown";
+  target.cell.className = `mark mark-${mark}`;
+  target.cell.setAttribute("aria-label", gridCellLabel(target.row, target.column, mark));
+  const symbol = target.cell.querySelector("span");
+  if (symbol) symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
+}
+
+function updateChangedBoardCells(previous: Board, current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
+  const changedKeys = [...new Set([...Object.keys(previous), ...Object.keys(board)])]
+    .filter(key => previous[key] !== board[key]);
+  for (const key of changedKeys) updateBoardCell(key, current, base);
+}
+
+function updateProgressDisplay(progress: ReturnType<typeof boardSolveProgress>): void {
   const progressElement = root.querySelector<HTMLElement>(".progress");
   if (progressElement) progressElement.textContent = `${progress.matches} of ${progress.total} matches found`;
   const readinessMeter = root.querySelector<HTMLElement>(".readiness-meter");
   if (readinessMeter) readinessMeter.setAttribute("aria-label", `${progress.matches} of ${progress.total} matches found`);
   const readinessFill = root.querySelector<HTMLElement>(".readiness-meter__bar > span");
   if (readinessFill) readinessFill.style.width = `${progress.total === 0 ? 0 : Math.round((progress.matches / progress.total) * 100)}%`;
+}
+
+function updateBoardActionControls(current: Puzzle): void {
   const check = root.querySelector<HTMLButtonElement>("#check-solution");
   if (check) check.disabled = loading || !current.puzzleToken || !answerFromBoard(board, current.spec);
   const undo = root.querySelector<HTMLButtonElement>("#undo");
   if (undo) undo.disabled = loading || undoStack.length === 0;
+}
+
+function updateBoardProgressControls(current: Puzzle): void {
+  updateProgressDisplay(boardSolveProgress(board, current.spec));
+  updateBoardActionControls(current);
+}
+
+function updateGridResetControls(current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
   for (const category of current.spec.categories) {
     if (category.id === base.id) continue;
     const reset = root.querySelector<HTMLButtonElement>(`#grid-reset-${CSS.escape(category.id)}`);
     if (reset) reset.disabled = !Object.keys(board).some(key => key.split("|")[0] === category.id);
   }
+}
+
+function updateBoardView(previous: Board, current: Puzzle): void {
+  const base = current.spec.categories.find(category => category.id === current.spec.baseCategory);
+  if (!base) return;
+  updateChangedBoardCells(previous, current, base);
+  updateBoardProgressControls(current);
+  updateGridResetControls(current, base);
 }
 
 function selectGrid(gridId: string, focus = false): void {

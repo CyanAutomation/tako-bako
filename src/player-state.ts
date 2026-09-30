@@ -1,4 +1,5 @@
-import { CLUE_STRATEGIES, isClueStrategy, type ClueStrategy } from "./clue-strategy.js";
+import { CLUE_STRATEGIES, isClueStrategy } from "./clue-strategy-catalog.js";
+import type { ClueStrategy } from "./clue-strategy-catalog.js";
 
 export const PLAYER_PUZZLE_STATES = [
   "progressing",
