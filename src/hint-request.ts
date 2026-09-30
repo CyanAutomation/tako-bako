@@ -5,7 +5,7 @@ import type { ClueStrategy } from "./clue-strategy-catalog";
 const MAX_ELAPSED_MS = 86_400_000;
 
 export interface HintRequestOptions {
-  puzzle: Puzzle;
+  puzzle: Puzzle & { puzzleToken: string };
   board: Board;
   usedClueIds: ReadonlySet<string>;
   clueStrategies: Readonly<Record<string, ClueStrategy>>;
@@ -58,7 +58,7 @@ function boardContext(puzzle: Puzzle, board: Board): HintRequestBody["board"] {
 export function createHintRequestBody(options: HintRequestOptions): HintRequestBody {
   const progress = boardSolveProgress(options.board, options.puzzle.spec);
   return {
-    puzzleToken: options.puzzle.puzzleToken!,
+    puzzleToken: options.puzzle.puzzleToken,
     kind: hintKind(progress.matches, progress.total),
     clues: options.puzzle.clues.map(clue => ({
       id: clue.id,
