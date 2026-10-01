@@ -36,6 +36,24 @@ describe("hint proxy", () => {
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "hint-123");
   });
 
+  it("chooses an unused clue deterministically when Jev is unavailable", async () => {
+    delete process.env.OPENROUTER_API_KEY;
+    const fetchMock = resolvedMock(new Response(JSON.stringify({ kind: "clue", clue: { id: "used", text: "The used clue." } }), { status: 200, headers: { "content-type": "application/json" } }));
+    stubGlobal("fetch", fetchMock);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: {
+      puzzleToken: "signed-token",
+      kind: "elimination",
+      clues: [{ id: "used", text: "The used clue." }, { id: "fresh", text: "The next unused clue." }],
+      usedClueIds: ["used"],
+      board: [{ category: "Club", subject: "Aki", value: "Lions", mark: "yes" }],
+    } } as never, response as never);
+
+    assert.strictEqual(fetchMock.mock.callCount(), 1);
+    assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "fresh", text: "The next unused clue." } });
+  });
+
   it("rejects malformed or unsupported hint requests before contacting Yokaiba", async () => {
     const upstream = mock.fn(); stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();

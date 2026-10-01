@@ -11,10 +11,17 @@ describe("puzzle UI sections", () => {
     assert.ok((header).includes("Level 3: Moderate"));
   });
 
+  it("uses the explicit status tone for puzzle failures", () => {
+    const header = renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Tako can’t check your solution just now.", tone: "error" });
+
+    assert.ok(header.includes('class="status status--error"'));
+  });
+
   it("labels the board actions and exposes their interaction roles", () => {
-    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
+    const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
     assert.ok((toolbar).includes('2 of 4 matches found'));
     assert.ok((toolbar).includes('id="undo"'));
+    assert.ok((toolbar).includes('id="reset-board"'));
     assert.ok((toolbar).includes('id="check-solution"'));
     assert.ok((toolbar).includes('Choose one match in each row and column, then check your solution.'));
     assert.ok((toolbar).includes('>Check my solution</span>'));
