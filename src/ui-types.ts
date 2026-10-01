@@ -9,6 +9,12 @@ export interface ButtonOptions {
   id?: string;
   label: string;
   ariaLabel?: string;
+  role?: string;
+  ariaControls?: string;
+  selected?: boolean;
+  tabIndex?: number;
+  /** Optional specialized styling when a control is part of a larger primitive. */
+  className?: string;
   icon?: IconName;
   /** Icon-only controls are reserved for compact, familiar navigation actions. */
   iconOnly?: boolean;
@@ -64,9 +70,11 @@ export interface GridCardOptions {
   content: string;
 }
 
+export type StatusTone = "neutral" | "success" | "warning" | "error";
+
 export interface StatusOptions {
   message: string;
-  tone?: "neutral" | "success" | "warning" | "error";
+  tone?: StatusTone;
 }
 
 export interface PanelOptions {

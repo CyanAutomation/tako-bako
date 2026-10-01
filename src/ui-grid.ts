@@ -1,11 +1,18 @@
-import { escapeHtml, renderSelect } from "./ui-controls";
+import { escapeHtml, renderButton, renderSelect } from "./ui-controls";
 import type { GridCardOptions, GridCellOptions, TabItem } from "./ui-types";
 
 /** A standard three-state puzzle-grid control with a descriptive accessible name. */
 export function renderGridCell({ key, row, column, mark, disabled = false, tabIndex }: GridCellOptions): string {
   const symbols = { unknown: "", yes: "✓", no: "×" };
-  const tabIndexAttribute = disabled ? "" : ` tabindex="${tabIndex ?? -1}"`;
-  return `<td><button class="mark mark-${mark}" data-square="${escapeHtml(key)}" aria-label="${escapeHtml(gridCellLabel(row, column, mark, disabled))}"${tabIndexAttribute}${disabled ? " disabled" : ""}><span aria-hidden="true">${symbols[mark]}</span></button></td>`;
+  const button = renderButton({
+    label: symbols[mark],
+    ariaLabel: gridCellLabel(row, column, mark, disabled),
+    className: `mark mark-${mark}`,
+    data: { square: key },
+    disabled,
+    ...(disabled ? {} : { tabIndex: tabIndex ?? -1 }),
+  });
+  return `<td>${button}</td>`;
 }
 
 /** Returns the accessible description shared by rendered and incrementally updated grid cells. */
@@ -38,7 +45,15 @@ export function renderGridCard({ id, label, active, locked, controls, content }:
 
 /** Renders a complete ARIA tablist with roving tab focus. */
 export function renderTabs(tabs: TabItem[], activeId: string): string {
-  const buttons = tabs.map(tab => `<button role="tab" id="grid-tab-${escapeHtml(tab.id)}" aria-selected="${tab.id === activeId}" aria-controls="grid-${escapeHtml(tab.id)}" tabindex="${tab.id === activeId ? "0" : "-1"}" data-grid-tab="${escapeHtml(tab.id)}">${escapeHtml(tab.label)}</button>`).join("");
+  const buttons = tabs.map(tab => renderButton({
+    label: tab.label,
+    id: `grid-tab-${tab.id}`,
+    role: "tab",
+    ariaControls: `grid-${tab.id}`,
+    selected: tab.id === activeId,
+    tabIndex: tab.id === activeId ? 0 : -1,
+    data: { gridTab: tab.id },
+  })).join("");
   return `${renderSelect({ id: "grid-select", label: "Working grid", ariaLabel: "Choose working grid", options: tabs, selectedId: activeId, className: "grid-picker" })}<div class="grid-navigation"><div class="grid-tabs" role="tablist" aria-label="Choose working grid">${buttons}</div></div>`;
 }
 

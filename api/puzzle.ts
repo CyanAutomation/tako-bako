@@ -73,6 +73,11 @@ function isJson(response: Response): boolean {
   return response.headers.get("content-type")?.toLowerCase().includes("application/json") ?? false;
 }
 
+async function upstreamErrorCode(response: Response): Promise<string | undefined> {
+  const body = await response.clone().text().catch(() => "");
+  return /^error code:\s*(\d{3,4})$/i.exec(body.trim())?.[1];
+}
+
 function isTimeoutError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "TimeoutError";
 }
@@ -180,7 +185,7 @@ async function handleVerification(body: unknown, response: VercelResponse): Prom
     return;
   }
   try {
-    const { response: upstream } = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
+    const { response: upstream, retryCount } = await fetchYokaiba(YOKAIBA_VERIFY_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(completion),
@@ -190,7 +195,12 @@ async function handleVerification(body: unknown, response: VercelResponse): Prom
     if (await forwardRateLimit(upstream, response, "verify", startedAt)) return;
     if (!upstream.ok || !isJson(upstream)) {
       response.status(502).json({ error: "Yokaiba could not verify this puzzle. Please try again." });
-      logMetric("verify", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
+      const errorCode = await upstreamErrorCode(upstream);
+      logMetric("verify", "invalid_upstream_response", 502, startedAt, {
+        upstreamStatus: upstream.status,
+        retryCount,
+        ...(errorCode ? { upstreamErrorCode: errorCode } : {}),
+      });
       return;
     }
     response.status(200).json(await upstream.json());
@@ -242,7 +252,12 @@ async function forwardGeneratedPuzzle(parameters: GenerationParameters, response
     if (!upstream.ok) {
       preventCaching(response);
       response.status(502).json({ error: "Yokaiba is unavailable. Please try again." });
-      logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
+      const errorCode = await upstreamErrorCode(upstream);
+      logMetric("generate", "invalid_upstream_response", 502, startedAt, {
+        upstreamStatus: upstream.status,
+        retryCount,
+        ...(errorCode ? { upstreamErrorCode: errorCode } : {}),
+      });
       return;
     }
     if (!isJson(upstream)) {
