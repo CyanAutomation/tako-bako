@@ -78,6 +78,33 @@ describe("shared UI primitives", () => {
     assert.ok(tab.includes('data-grid-tab="club"'));
   });
 
+  it("escapes every dynamic button attribute while retaining false and zero states", () => {
+    const button = renderButton({
+      id: 'button "one"',
+      label: "Continue",
+      role: 'tab" aria-hidden="true',
+      ariaControls: "grid<&",
+      selected: false,
+      tabIndex: 0,
+      ariaLabel: 'Continue "safely"',
+      pressed: false,
+      expanded: true,
+      disabled: true,
+      data: { gridTab: "club & weight" },
+    });
+
+    assert.ok(button.includes('id="button &quot;one&quot;"'));
+    assert.ok(button.includes('role="tab&quot; aria-hidden=&quot;true"'));
+    assert.ok(button.includes('aria-controls="grid&lt;&amp;"'));
+    assert.ok(button.includes('aria-selected="false"'));
+    assert.ok(button.includes('tabindex="0"'));
+    assert.ok(button.includes('aria-label="Continue &quot;safely&quot;"'));
+    assert.ok(button.includes('aria-pressed="false"'));
+    assert.ok(button.includes('aria-expanded="true"'));
+    assert.ok(button.includes(' disabled'));
+    assert.ok(button.includes('data-grid-tab="club &amp; weight"'));
+  });
+
   it("renders filter choices through one labelled segmented-control primitive", () => {
     const markup = renderSegmentedControl({ label: "Filter clues", items: [
       { id: "all", label: "All", selected: true, data: { clueFilter: "all" } },

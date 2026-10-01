@@ -12,11 +12,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isBoundedText(value: unknown, maximumLength: number): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= maximumLength;
+}
+
 function parseClue(value: unknown): InputClue | undefined {
   if (!isRecord(value)) return undefined;
-  const { id, text, constraintKind } = value;
-  if (typeof id !== "string" || id.length === 0 || id.length > MAX_CLUE_ID_LENGTH) return undefined;
-  if (typeof text !== "string" || text.length === 0 || text.length > MAX_CLUE_TEXT_LENGTH) return undefined;
+  const { id, text } = value;
+  if (!isBoundedText(id, MAX_CLUE_ID_LENGTH) || !isBoundedText(text, MAX_CLUE_TEXT_LENGTH)) return undefined;
+  const constraintKind = value.constraintKind;
   const boundedConstraint = typeof constraintKind === "string" && constraintKind.length <= MAX_CLUE_ID_LENGTH ? constraintKind : undefined;
   return { id, text, ...(boundedConstraint ? { constraintKind: boundedConstraint } : {}) };
 }

@@ -54,24 +54,33 @@ function ownedCacheKeys(storage: SessionStorageLike): string[] {
   }
 }
 
+function createdAtForEntry(createdAt: unknown, expiresAt: number): number {
+  // Entries written before createdAt was introduced remain eligible for bounded cleanup.
+  return typeof createdAt === "number" ? createdAt : expiresAt - CACHE_TTL_MS;
+}
+
+function inspectOwnedEntry(storage: SessionStorageLike, key: string, now: number): CacheEntryMetadata | undefined {
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("Malformed cache entry");
+    const entry = parsed as Partial<CachedPuzzle<unknown>>;
+    if (typeof entry.expiresAt !== "number" || entry.expiresAt < now || !("value" in entry)) {
+      removeCacheEntry(storage, key);
+      return undefined;
+    }
+    return { key, createdAt: createdAtForEntry(entry.createdAt, entry.expiresAt) };
+  } catch {
+    removeCacheEntry(storage, key);
+    return undefined;
+  }
+}
+
 function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedKey?: string): CacheEntryMetadata[] {
   const entries: CacheEntryMetadata[] = [];
   for (const key of ownedCacheKeys(storage)) {
     if (key === excludedKey) continue;
-    try {
-      const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("Malformed cache entry");
-      const entry = parsed as Partial<CachedPuzzle<unknown>>;
-      if (typeof entry.expiresAt !== "number" || entry.expiresAt < now || !("value" in entry)) {
-        removeCacheEntry(storage, key);
-        continue;
-      }
-      // Entries written before createdAt was introduced remain eligible for bounded cleanup.
-      const createdAt = typeof entry.createdAt === "number" ? entry.createdAt : entry.expiresAt - CACHE_TTL_MS;
-      entries.push({ key, createdAt });
-    } catch {
-      removeCacheEntry(storage, key);
-    }
+    const entry = inspectOwnedEntry(storage, key, now);
+    if (entry) entries.push(entry);
   }
   return entries.sort((left, right) => left.createdAt - right.createdAt || left.key.localeCompare(right.key));
 }

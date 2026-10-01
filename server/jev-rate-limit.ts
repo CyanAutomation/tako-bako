@@ -27,14 +27,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isAllowedRedisRestUrl(url: URL): boolean {
+  return url.protocol === "https:"
+    && url.hostname.endsWith(".upstash.io")
+    && url.pathname === "/"
+    && !url.username
+    && !url.password
+    && !url.search
+    && !url.hash
+    && url.port === "";
+}
+
 function redisRestUrl(): string | undefined {
   const value = process.env.UPSTASH_REDIS_REST_URL;
   if (!value) return undefined;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || !url.hostname.endsWith(".upstash.io") || url.pathname !== "/"
-      || url.username || url.password || url.search || url.hash || url.port !== "") return undefined;
-    return url.origin;
+    return isAllowedRedisRestUrl(url) ? url.origin : undefined;
   } catch {
     return undefined;
   }

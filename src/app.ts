@@ -1,4 +1,6 @@
 import { answerFromBoard, boardSolveProgress, markBoard, squareKey } from "./puzzle-board";
+import { activeGridForPuzzle, renderApp } from "./app-view";
+import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
 import { parseAnswerVerification } from "./answer-verification";
 import { createHintRequestBody, parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
@@ -6,16 +8,15 @@ import type { Board, Puzzle } from "./puzzle";
 import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
-import { courseFor, courseProgressLabel, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
+import { courseFor, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
 import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
-import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
 import { parseClueStrategyResults } from "./clue-strategy-results";
 import type { ClueStrategy } from "./clue-strategy-catalog";
-import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { escapeHtml, renderBadge, renderButton, renderStatus } from "./ui-controls";
-import { renderDialog, renderDisclosure, trapDialogTab } from "./ui-dialog";
-import { gridCellLabel, nextGridCellKey, nextTabId, renderGridCard, renderGridCell } from "./ui-grid";
+import { type ClueFilter } from "./sections";
+import { trapDialogTab } from "./ui-dialog";
+import { gridCellLabel, nextGridCellKey } from "./ui-grid";
+import { nextTabId } from "./ui-tabs";
 import type { StatusTone } from "./ui-types";
 
 export interface AppAssets {
@@ -38,13 +39,12 @@ let undoStack: Board[] = [];
 const SMART_MARKING_STORAGE_KEY = "tako-bako.smart-marking";
 // Preserve the previous preference during this terminology migration.
 let smartMarking = (localStorage.getItem(SMART_MARKING_STORAGE_KEY) ?? localStorage.getItem("tako-bako.assist")) === "on";
-type PlayMode = "challenge" | "shared";
-
 let progress = loadProgress(localStorage);
-let playMode: PlayMode = modeFromUrl();
-let activeCourse: Course = courseFromUrl() ?? firstAvailableCourse(progress.completed);
-let difficultyLevel = playMode === "challenge" ? activeCourse.difficultyLevel : difficultyFromUrl();
-let templateId: ScenarioId = playMode === "challenge" ? activeCourse.templateId : templateFromUrl();
+const initialRoute = routeFromUrl(new URL(window.location.href), progress.completed);
+let playMode: PlayMode = initialRoute.playMode;
+let activeCourse: Course = initialRoute.activeCourse;
+let difficultyLevel = initialRoute.difficultyLevel;
+let templateId: ScenarioId = initialRoute.templateId;
 let activeGridId: string | undefined;
 let usedClueIds = new Set<string>();
 let clueStrategies: Record<string, ClueStrategy> = {};
@@ -98,48 +98,12 @@ function openSharedPuzzle(input: SharedPuzzleInput): void {
 }
 
 function seedFromUrl(): string | undefined {
-  const seed = new URL(window.location.href).searchParams.get("seed");
-  return seed !== null && isValidSeed(seed) ? seed : undefined;
-}
-
-function difficultyFromUrl(): number | undefined {
-  const level = new URL(window.location.href).searchParams.get("difficulty");
-  return parseDifficultyLevel(level);
-}
-
-function templateFromUrl(): ScenarioId {
-  const template = new URL(window.location.href).searchParams.get("template");
-  return scenarioIdFromUrl(template) ?? DEFAULT_SCENARIO_ID;
-}
-
-function modeFromUrl(): PlayMode {
-  const parameters = new URL(window.location.href).searchParams;
-  if (parameters.get("mode") === "challenge") return "challenge";
-  return parameters.has("seed") ? "shared" : "challenge";
-}
-
-function courseFromUrl(): Course | undefined {
-  const parameters = new URL(window.location.href).searchParams;
-  return courseFor(parameters.get("tier") ?? undefined, Number(parameters.get("level")) || undefined);
+  return routeFromUrl(new URL(window.location.href), progress.completed).seed;
 }
 
 function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course): void {
-  if (mode === "none") return;
-  const url = new URL(window.location.href);
-  url.searchParams.set("seed", seed);
-  url.searchParams.set("mode", requestedPlayMode);
-  if (requestedPlayMode === "challenge") {
-    url.searchParams.set("tier", requestedCourse.tier);
-    url.searchParams.set("level", String(requestedCourse.level));
-    url.searchParams.delete("template");
-    url.searchParams.delete("difficulty");
-  } else {
-    url.searchParams.delete("tier");
-    url.searchParams.delete("level");
-    if (requestedTemplateId === DEFAULT_SCENARIO_ID) url.searchParams.delete("template"); else url.searchParams.set("template", requestedTemplateId);
-    if (requestedDifficultyLevel) url.searchParams.set("difficulty", String(requestedDifficultyLevel)); else url.searchParams.delete("difficulty");
-  }
-  window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
+  const url = updatedPuzzleUrl(window.location.href, mode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, seed);
+  if (url) window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
 
 let currentFetchId = 0;
@@ -545,97 +509,37 @@ async function sharePuzzle(): Promise<void> {
   render();
 }
 
-function boardGrid(category: Puzzle["spec"]["categories"][number], base: Puzzle["spec"]["categories"][number]): string {
-  const header = category.values.map(value => `<th scope="col">${escapeHtml(value)}</th>`).join("");
-  const rows = base.values.map(row => {
-    const cells = category.values.map(column => {
-      const key = squareKey(category.id, row, column);
-      const mark = board[key] ?? "unknown";
-      return renderGridCell({ key, row, column, mark, tabIndex: key === activeCellKey ? 0 : -1 });
-    }).join("");
-    return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
-  }).join("");
-  return renderGridCard({
-    id: category.id,
-    label: `${base.label} × ${category.label}`,
-    active: category.id === activeGridId,
-    locked: false,
-    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "reset", disabled: !Object.keys(board).some(key => key.split("|")[0] === category.id), data: { gridReset: category.id, actionRole: "utility" } }),
-    content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
-  });
-}
-
-function renderResetModal(current: Puzzle): string {
-  if (pendingBoardReset) return `<div class="modal-backdrop">${renderDialog({ id: "reset-board-dialog", eyebrow: "Reset board", title: "Clear all board marks?", description: "This clears every tick and cross in every grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-board-reset", label: "Cancel" })}${renderButton({ id: "confirm-board-reset", label: "Reset board", variant: "danger" })}` })}</div>`;
-  if (!pendingResetGridId) return "";
-  const category = current.spec.categories.find(candidate => candidate.id === pendingResetGridId);
-  if (!category) return "";
-  return `<div class="modal-backdrop">${renderDialog({ id: "reset-grid", eyebrow: "Reset grid", title: `Clear ${category.label}?`, description: "This clears every tick and cross in this grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Reset grid", variant: "danger" })}` })}</div>`;
-}
-
-function renderNewChallengeModal(): string {
-  if (!pendingNewChallenge) return "";
-  return `<div class="modal-backdrop">${renderDialog({ id: "new-challenge", eyebrow: "New challenge", title: "Leave this puzzle?", description: "Your marks are saved, but you will start a different puzzle.", actions: `${renderButton({ id: "cancel-new-challenge", label: "Keep solving" })}${renderButton({ id: "confirm-new-challenge", label: "Start new challenge", variant: "primary" })}` })}</div>`;
-}
-
-function renderProgressResetModal(): string {
-  if (!pendingProgressReset) return "";
-  return `<div class="modal-backdrop">${renderDialog({ id: "reset-progress", eyebrow: "Puzzle Challenge progress", title: "Reset your Puzzle Challenge?", description: "This relocks levels and returns you to Beginner Level 1. Saved boards and shared puzzle links stay untouched.", actions: `${renderButton({ id: "cancel-progress-reset", label: "Keep my progress" })}${renderButton({ id: "confirm-progress-reset", label: "Reset progress", variant: "danger" })}` })}</div>`;
-}
-
-function renderMascotNote({ title, copy, mood = "ready" }: { title: string; copy: string; mood?: "ready" | "celebrate" }): string {
-  return `<aside class="mascot-note mascot-note--${mood}" aria-label="A note from Tako"><img src="${mascotUrl}" alt="Tako, the Tako Bako mascot"><div><p class="eyebrow">A note from Tako</p><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div></aside>`;
-}
-
-function renderCelebrationModal(): string {
-  if (!pendingCelebration) return "";
-  const next = playMode === "challenge" ? nextCourse(activeCourse) : undefined;
-  const title = playMode === "challenge" ? "Level complete!" : "Puzzle solved!";
-  const copy = next ? `${next.label} is ready when you are.` : playMode === "challenge" ? "You’ve completed every level in the Puzzle Challenge. Congratulations!" : "Every match is in place. Share this puzzle or start another.";
-  const actions = next ? `${renderButton({ id: "celebration-close", label: "Return to the dojo" })}${renderButton({ id: "celebration-continue", label: `Start ${next.label}`, variant: "primary" })}` : renderButton({ id: "celebration-close", label: "Return to the dojo", variant: "primary" });
-  return `<div class="modal-backdrop celebration-backdrop">${renderDialog({ id: "celebration", className: "celebration-dialog", eyebrow: "Solved!", title, description: copy, content: renderMascotNote({ title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" }), actions })}</div>`;
-}
-
-function renderProgressManagement(): string {
-  const completed = progress.completed.length;
-  return `<section class="progress-management" aria-label="Puzzle Challenge progress"><div><p class="eyebrow">Your progress</p><strong>${completed} of 12 levels complete</strong><p>Your saved boards stay separate from your Puzzle Challenge progress.</p></div>${renderDisclosure({ className: "progress-settings", summary: "Progress settings", content: renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" }) })}</section>`;
-}
-
-function renderChallengeOptions(): string {
-  if (!challengeOptionsOpen) return "";
-  const content = `${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id, showHeading: false })}<div class="challenge-extras"><p>Today’s puzzle matches your current level. Solve it to move forward.</p>${renderButton({ id: "daily-puzzle", label: "Play today’s puzzle", disabled: loading })}</div>`;
-  return `<div class="modal-backdrop course-menu-backdrop">${renderDialog({ id: "challenge-menu-dialog", className: "course-dialog", eyebrow: "Your Puzzle Challenge", title: "Choose your next level", description: "Complete each level to unlock the next.", content, actions: `${renderButton({ id: "close-challenge-menu", label: "Close" })}` })}</div>`;
-}
-
-function renderSharedPuzzleModal(): string {
-  if (!sharedPuzzleOpen) return "";
-  const content = `<label class="seed-entry">Shared puzzle link or code <input id="landing-seed-input" placeholder="Paste a link or code" autocomplete="off"></label>`;
-  const actions = `${renderButton({ id: "close-shared-puzzle", label: "Cancel" })}${renderButton({ id: "open-landing-seed", label: "Open puzzle", variant: "primary" })}`;
-  return `<div class="modal-backdrop">${renderDialog({ id: "shared-puzzle", eyebrow: "Shared puzzle", title: "Open a shared puzzle", description: "Paste a friend’s link or puzzle code to pick up the exact puzzle.", content, actions })}</div>`;
-}
-
-function renderPuzzle(current: Puzzle): string {
-  const base = current.spec.categories.find(category => category.id === current.spec.baseCategory);
-  if (!base) throw new Error("Puzzle has no base category");
-  const categories = current.spec.categories.filter(category => category.id !== base.id);
-  const activeCategory = categories.find(category => category.id === activeGridId) ?? categories[0];
-  activeGridId = activeCategory.id;
-  const grids = categories.map(category => boardGrid(category, base)).join("");
-  const canCheck = Boolean(current.puzzleToken && answerFromBoard(board, current.spec));
-  const progress = boardSolveProgress(board, current.spec);
-  const title = playMode === "challenge" ? activeCourse.label : current.spec.title;
-  const courseLabel = playMode === "challenge" ? `${activeCourse.tier[0]!.toUpperCase()}${activeCourse.tier.slice(1)} · Level ${activeCourse.level}` : `Shared · Level ${current.difficulty.level}`;
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message, tone: messageTone })}<section class="workspace">${renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar: renderBoardToolbar({ matches: progress.matches, total: progress.total, undoDisabled: undoStack.length === 0 || loading, resetDisabled: loading || Object.keys(board).length === 0, checkDisabled: loading || !canCheck, hintDisabled: loading || !current.puzzleToken, smartMarking }), grids })}${renderCluePanel({ clues: current.clues.map(clue => ({ ...clue, strategy: clue.strategy ?? clueStrategies[clue.id] })), activeCategory, cluesOpen, usedClueIds, clueFilter })}</section></main>${renderResetModal(current)}${renderNewChallengeModal()}${renderCelebrationModal()}`;
-}
-
-function renderLandingAction(): string {
-  if (difficultyUnavailable) return renderButton({ id: "try-another-puzzle", label: "Try another puzzle", variant: "primary", disabled: loading });
-  return renderButton({ id: "start-puzzle", label: loading ? "Preparing challenge…" : puzzleLoadFailed ? `Retry ${activeCourse.label}` : `Start ${activeCourse.label}`, variant: "primary", disabled: loading });
-}
-
 function render(): void {
-  const actionMenu = renderDisclosure({ className: "action-menu", summary: "More", content: `${renderButton({ id: "open-shared-puzzle", label: "Open a shared puzzle" })}${renderButton({ id: "new-puzzle", label: loading ? "Setting up…" : playMode === "challenge" ? "Restart this level" : "New shared puzzle", disabled: loading })}<div class="action-menu__danger">${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</div>` });
-  root.innerHTML = `<div class="page-shell"><header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${puzzle ? `<div class="header-actions">${playMode === "challenge" ? renderBadge(courseProgressLabel(activeCourse, new Set(progress.completed)), "course-status") : ""}${renderButton({ id: "challenge-menu", label: "Challenge", expanded: challengeOptionsOpen })}${renderButton({ id: "share-puzzle", label: "Share", ariaLabel: "Share puzzle", icon: "share" })}${actionMenu}</div>` : ""}</header>${puzzle ? renderPuzzle(puzzle) : `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message, tone: difficultyUnavailable ? "error" : messageTone })}${renderLandingAction()}${renderMascotNote({ title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." })}</section><div class="landing-route">${renderCurriculum({ completed: new Set(progress.completed), currentCourseId: activeCourse.id })}${renderProgressManagement()}</div></main>`}<footer><span class="footer-brand"><img src="${markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer></div>${renderChallengeOptions()}${renderSharedPuzzleModal()}${renderProgressResetModal()}`;
+  if (puzzle) activeGridId = activeGridForPuzzle(puzzle, activeGridId);
+  root.innerHTML = renderApp({
+    mascotUrl,
+    markUrl,
+    puzzle,
+    board,
+    loading,
+    message,
+    messageTone,
+    difficultyUnavailable,
+    puzzleLoadFailed,
+    undoCount: undoStack.length,
+    smartMarking,
+    playMode,
+    progress,
+    activeCourse,
+    activeGridId,
+    activeCellKey,
+    usedClueIds,
+    clueStrategies,
+    pendingResetGridId,
+    pendingBoardReset,
+    pendingNewChallenge,
+    pendingProgressReset,
+    pendingCelebration,
+    cluesOpen,
+    clueFilter,
+    challengeOptionsOpen,
+    sharedPuzzleOpen,
+  });
 }
 
 function focusGridCell(key: string): void {
@@ -1027,15 +931,16 @@ root.addEventListener("change", event => {
 });
 
 window.addEventListener("popstate", () => {
-  playMode = modeFromUrl();
-  activeCourse = courseFromUrl() ?? firstAvailableCourse(progress.completed);
-  difficultyLevel = playMode === "challenge" ? activeCourse.difficultyLevel : difficultyFromUrl();
-  templateId = playMode === "challenge" ? activeCourse.templateId : templateFromUrl();
-  const seed = seedFromUrl();
-  if (seed) void fetchPuzzle(seed, "none");
+  const route = routeFromUrl(new URL(window.location.href), progress.completed);
+  playMode = route.playMode;
+  activeCourse = route.activeCourse;
+  difficultyLevel = route.difficultyLevel;
+  templateId = route.templateId;
+  if (route.seed) void fetchPuzzle(route.seed, "none");
   else showLandingPage();
 });
 
 render();
-if (seedFromUrl()) void fetchPuzzle(seedFromUrl()!, "none");
+const initialSeed = seedFromUrl();
+if (initialSeed) void fetchPuzzle(initialSeed, "none");
 }
