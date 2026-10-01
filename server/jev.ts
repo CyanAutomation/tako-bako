@@ -1,3 +1,5 @@
+import { allowJevDecision } from "./jev-rate-limit.js";
+
 const OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 const JEV_TIMEOUT_MS = 5_000;
 
@@ -11,9 +13,9 @@ export function hasJevApiKey(): boolean {
 }
 
 /** Returns undefined on all provider/configuration failures so callers can fall back safely. */
-export async function requestJevDecision(request: JevDecisionRequest): Promise<Record<string, unknown> | undefined> {
+export async function requestJevDecision(request: JevDecisionRequest, clientAddress?: string): Promise<Record<string, unknown> | undefined> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return undefined;
+  if (!apiKey || !await allowJevDecision(clientAddress)) return undefined;
   try {
     const response = await fetch(OPENROUTER_DECISIONS_URL, {
       method: "POST",
