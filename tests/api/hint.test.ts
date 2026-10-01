@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { assertPartialMatch, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
+import { assertPartialMatch, configureJevForTests, isJevRateLimitRequest, jevRateLimitResponse, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
 import handler from "../../api/hint.js";
 
@@ -22,7 +22,12 @@ describe("hint proxy", () => {
     jevMetrics.length = 0;
     mock.method(console, "info", (...args: Parameters<typeof console.info>) => { jevMetrics.push(args); });
   });
-  afterEach(() => { delete process.env.OPENROUTER_API_KEY; delete process.env.JEV_MODEL; });
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.JEV_MODEL;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  });
 
   it("forwards a bounded hint request and preserves the Yokaiba request ID", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ kind: "clue", clue: { id: "c1", text: "Start here." } }), { status: 200, headers: { "content-type": "application/json", "x-request-id": "hint-123" } }));
@@ -34,6 +39,38 @@ describe("hint proxy", () => {
     assertPartialMatch(upstream.mock.calls[0].arguments[1], { method: "POST", body: JSON.stringify({ puzzleToken: "signed-token", kind: "clue" }) });
     assertPartialMatch(result, { statusCode: 200, body: { kind: "clue" } });
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "hint-123");
+  });
+
+  it("does not call Jev when Yokaiba rejects the puzzle token", async () => {
+    configureJevForTests();
+    const calls: string[] = [];
+    const fetchMock = mock.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
+      if (url.includes("openrouter.ai")) {
+        return new Response(JSON.stringify({ answers: { player_state: { type: "choice", choice: "stalled", confidence: 0.9 } } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: "invalid token" }), { status: 401, headers: { "content-type": "application/json" } });
+    });
+    stubGlobal("fetch", fetchMock);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: {
+      puzzleToken: "not-a-token",
+      kind: "clue",
+      clues: [{ id: "fresh", text: "Hana lives next to the fish keeper." }],
+      board: [],
+      totalMatches: 16,
+      hintsUsed: 0,
+      mistakes: 0,
+      elapsedMs: 1_000,
+      smartMarking: false,
+    } } as never, response as never);
+
+    assert.deepStrictEqual(calls, ["https://yokaiba.scheimann.workers.dev/v1/puzzles/hint"]);
+    assert.strictEqual(fetchMock.mock.callCount(), 1);
+    assert.strictEqual(result.statusCode, 401);
   });
 
   it("chooses an unused clue deterministically when Jev is unavailable", async () => {
@@ -74,12 +111,13 @@ describe("hint proxy", () => {
   });
 
   it("lets Jev choose only from the supplied clues and Yokaiba's solver-verified hint", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    configureJevForTests();
     const calls: { url: string; body: Record<string, unknown> }[] = [];
     const fetchMock = mock.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       calls.push({ url, body });
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_1", confidence: 0.9 } } }), { status: 200 });
       }
@@ -104,13 +142,14 @@ describe("hint proxy", () => {
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "hint-123");
   });
 
-  it("classifies compact player state before the solver request and enforces the deterministic strength policy", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+  it("validates the token before classifying player state and enforces the strength policy", async () => {
+    configureJevForTests();
     const calls: { url: string; body: Record<string, unknown> }[] = [];
     const fetchMock = mock.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
       calls.push({ url, body });
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { player_state: { type: "choice", choice: "stalled", confidence: 0.91 } } }), { status: 200 });
       }
@@ -133,9 +172,16 @@ describe("hint proxy", () => {
     } } as never, response as never);
 
     const modelCall = calls.find(call => call.url.includes("openrouter.ai"));
-    const solverCall = calls.find(call => call.url.includes("yokaiba"));
+    const solverCalls = calls.filter(call => call.url.includes("yokaiba"));
+    const firstSolverIndex = calls.findIndex(call => call.url.includes("yokaiba"));
+    const firstModelIndex = calls.findIndex(call => call.url.includes("openrouter.ai"));
     assert.ok(modelCall);
-    assert.ok(solverCall);
+    assert.ok(firstSolverIndex >= 0 && firstSolverIndex < firstModelIndex);
+    assert.strictEqual(solverCalls.length, 2);
+    assert.deepStrictEqual(solverCalls.map(call => call.body), [
+      { puzzleToken: "secret-signed-token", kind: "clue" },
+      { puzzleToken: "secret-signed-token", kind: "elimination" },
+    ]);
     assert.deepStrictEqual(modelCall.body.state, {
       affirmative_count: 0,
       negative_count: 1,
@@ -151,9 +197,8 @@ describe("hint proxy", () => {
     });
     assert.strictEqual(JSON.stringify(modelCall.body).includes("secret-signed-token"), false);
     assert.strictEqual("current_board" in (modelCall.body.state as Record<string, unknown>), false);
-    assert.deepStrictEqual(solverCall.body, { puzzleToken: "secret-signed-token", kind: "elimination" });
     assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "fresh", text: "Hana lives next to the fish keeper." } });
-    assert.strictEqual(fetchMock.mock.callCount(), 2);
+    assert.strictEqual(fetchMock.mock.callCount(), 4);
     const metric = jevMetrics.find(([, value]) => (value as { operation?: unknown }).operation === "player_state")?.[1] as Record<string, unknown> | undefined;
     assert.ok(metric);
     assert.strictEqual(metric.questionCount, 1);
@@ -163,12 +208,13 @@ describe("hint proxy", () => {
   });
 
   it("falls back to progress-based strength when the player-state answer has low confidence", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    configureJevForTests();
     const calls: { url: string; body: Record<string, unknown> }[] = [];
     const fetchMock = mock.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
       calls.push({ url, body });
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         const response = calls.filter(call => call.url.includes("openrouter.ai")).length === 1
           ? { answers: { player_state: { type: "choice", choice: "ready_for_stronger_hint", confidence: 0.4 } } }
@@ -221,10 +267,12 @@ describe("hint proxy", () => {
   });
 
   it("falls back to the primary Yokaiba hint when Jev returns an out-of-bounds candidate index", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
-    const fetchMock = mock.fn(async (input: string | URL | Request) => String(input).includes("openrouter.ai")
-      ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_2", confidence: 1 } } }), { status: 200 })
-      : new Response(JSON.stringify({ kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } }), { status: 200, headers: { "content-type": "application/json" } }));
+    configureJevForTests();
+    const fetchMock = mock.fn(async (input: string | URL | Request) => isJevRateLimitRequest(input)
+      ? jevRateLimitResponse()
+      : String(input).includes("openrouter.ai")
+        ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_2", confidence: 1 } } }), { status: 200 })
+        : new Response(JSON.stringify({ kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } }), { status: 200, headers: { "content-type": "application/json" } }));
     stubGlobal("fetch", fetchMock);
     const { response, result } = responseRecorder();
 
@@ -293,7 +341,7 @@ describe("hint proxy", () => {
   }
 
   it("uses the sole unused clue when Yokaiba's clue has already been marked used", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    configureJevForTests();
     const upstream = resolvedMock(new Response(JSON.stringify({ kind: "clue", clue: { id: "used", text: "Already used." } }), { status: 200, headers: { "content-type": "application/json" } }));
     stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();

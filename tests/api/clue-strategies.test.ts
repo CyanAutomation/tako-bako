@@ -1,12 +1,14 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { rejectedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
+import { configureJevForTests, isJevRateLimitRequest, jevRateLimitResponse, rejectedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
 import handler from "../../api/clue-strategies.js";
 
 afterEach(() => {
   restoreStubbedGlobals();
   delete process.env.OPENROUTER_API_KEY;
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
 });
 
 function responseRecorder() {
@@ -17,8 +19,9 @@ function responseRecorder() {
 
 describe("clue strategy endpoint", () => {
   it("uses known constraint metadata and batches semantic classifications through Jev", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    configureJevForTests();
     const upstream = mock.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      if (isJevRateLimitRequest(_url)) return jevRateLimitResponse();
       if (String(_url).includes("yokaiba")) return new Response(JSON.stringify({ kind: "clue" }), { status: 200 });
       const request = JSON.parse(String(init?.body));
       assert.strictEqual(JSON.stringify(request).includes("signed-token"), false);
@@ -35,7 +38,7 @@ describe("clue strategy endpoint", () => {
       { id: "mystery", text: "Hana lives next to the fish keeper." },
     ] } } as never, response as never);
 
-    assert.strictEqual(upstream.mock.callCount(), 2);
+    assert.strictEqual(upstream.mock.callCount(), 3);
     assert.strictEqual(upstream.mock.calls[0].arguments[0], "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint");
     assert.deepStrictEqual(result.body, { strategies: [
       { clueId: "match", strategy: "direct_match", confidence: 1 },
@@ -67,7 +70,7 @@ describe("clue strategy endpoint", () => {
   });
 
   it("requires a signed token before requesting model labels", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    configureJevForTests();
     const upstream = mock.fn();
     stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
@@ -80,10 +83,12 @@ describe("clue strategy endpoint", () => {
   });
 
   it("keeps deterministic labels when Jev returns no usable answers", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
-    const upstream = mock.fn(async (url: string | URL | Request) => String(url).includes("yokaiba")
-      ? new Response(JSON.stringify({ kind: "clue" }), { status: 200 })
-      : new Response(JSON.stringify({ answers: null }), { status: 200 }));
+    configureJevForTests();
+    const upstream = mock.fn(async (url: string | URL | Request) => isJevRateLimitRequest(url)
+      ? jevRateLimitResponse()
+      : String(url).includes("yokaiba")
+        ? new Response(JSON.stringify({ kind: "clue" }), { status: 200 })
+        : new Response(JSON.stringify({ answers: null }), { status: 200 }));
     stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
 
