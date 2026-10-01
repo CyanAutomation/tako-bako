@@ -16,8 +16,8 @@ describe("shared UI primitives", () => {
     assert.ok((markup).includes('role="tablist"'));
     assert.ok((markup).includes('id="grid-select" aria-label="Choose working grid"'));
     assert.ok((markup).includes('<option value="weight" selected>Weight</option>'));
-    assert.ok((markup).includes('id="grid-tab-weight" aria-selected="true" aria-controls="grid-weight" tabindex="0"'));
-    assert.ok((markup).includes('id="grid-tab-club" aria-selected="false" aria-controls="grid-club" tabindex="-1"'));
+    assert.ok((markup).includes('id="grid-tab-weight" class="button button--secondary" role="tab" aria-controls="grid-weight" aria-selected="true" tabindex="0"'));
+    assert.ok((markup).includes('id="grid-tab-club" class="button button--secondary" role="tab" aria-controls="grid-club" aria-selected="false" tabindex="-1"'));
   });
 
   it("uses tabs on wider layouts and one labelled selector on compact layouts", () => {
@@ -65,6 +65,17 @@ describe("shared UI primitives", () => {
     const labelledIconButton = renderButton({ id: "smart-marking", label: "Smart marking: on", icon: "fast-forward", variant: "efficiency", pressed: true });
     assert.ok((labelledIconButton).includes('class="button button--with-icon button--efficiency"'));
     assert.ok((labelledIconButton).includes('<span>Smart marking: on</span>'));
+  });
+
+  it("supports semantic tab attributes and specialized button styles through the shared primitive", () => {
+    const tab = renderButton({ label: "Club", id: "grid-tab-club", role: "tab", ariaControls: "grid-club", selected: true, tabIndex: 0, className: "grid-tab", data: { gridTab: "club" } });
+
+    assert.ok(tab.includes('class="grid-tab"'));
+    assert.ok(tab.includes('role="tab"'));
+    assert.ok(tab.includes('aria-controls="grid-club"'));
+    assert.ok(tab.includes('aria-selected="true"'));
+    assert.ok(tab.includes('tabindex="0"'));
+    assert.ok(tab.includes('data-grid-tab="club"'));
   });
 
   it("renders filter choices through one labelled segmented-control primitive", () => {

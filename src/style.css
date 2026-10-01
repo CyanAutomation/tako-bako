@@ -228,6 +228,7 @@ select,
   font-weight: 500;
 }
 .status--error,
+.status--warning,
 .status--success {
   width: max-content;
   max-width: 100%;
@@ -238,6 +239,11 @@ select,
   color: #742720;
   background: #f4c9bd;
   border-color: var(--rust);
+}
+.status--warning {
+  color: #5b430d;
+  background: #faedc8;
+  border-color: #b98720;
 }
 .status--success {
   color: #145751;

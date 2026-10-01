@@ -213,7 +213,11 @@ function selectCandidateWithJev(context: SelectionContext, candidates: HintCandi
 function hintCandidates(payload: unknown, context: SelectionContext): HintCandidate[] {
   const candidates: HintCandidate[] = [];
   const primaryCandidate = solverCandidate("solver_primary", payload);
-  if (primaryCandidate && !(primaryCandidate.type === "clue" && primaryCandidate.clueId && context.usedClueIds.has(primaryCandidate.clueId))) candidates.push(primaryCandidate);
+  const primaryIsUsed = primaryCandidate?.type === "clue" && (
+    (primaryCandidate.clueId !== undefined && context.usedClueIds.has(primaryCandidate.clueId))
+    || context.clues?.some(clue => context.usedClueIds.has(clue.id) && clue.text === primaryCandidate.text)
+  );
+  if (primaryCandidate && !primaryIsUsed) candidates.push(primaryCandidate);
   for (const clue of context.clues ?? []) {
     if (!context.usedClueIds.has(clue.id) && primaryCandidate?.clueId !== clue.id) candidates.push({
       id: `clue:${clue.id}`,
@@ -273,8 +277,13 @@ async function deliverHint(request: ParsedHintRequest, context: SelectionContext
   try {
     const result = await fetchPrimaryHint(request.puzzleToken, hintKind, response);
     if (!result) return;
-    if (!context || !hasJevApiKey() || !context.clues?.length) {
+    if (!context || !context.clues?.length) {
       response.status(result.upstream.status).json(result.payload);
+      return;
+    }
+    if (!hasJevApiKey()) {
+      const candidates = hintCandidates(result.payload, context);
+      response.status(result.upstream.status).json(candidates[0]?.payload ?? result.payload);
       return;
     }
     const selected = await chooseHintPayload(context, result.payload, features, policy, assessment);
