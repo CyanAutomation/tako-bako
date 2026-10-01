@@ -3,3 +3,4 @@ export * from "./ui-types";
 export * from "./ui-controls";
 export * from "./ui-dialog";
 export * from "./ui-grid";
+export * from "./ui-tabs";
