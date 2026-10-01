@@ -13,7 +13,7 @@ interface FakeButton {
   dataset: Record<string, string>;
 }
 
-const puzzleResponse = (id: string, token: string, clues: { id: string; text: string; constraint?: { kind: string } }[] = []) => ({
+const puzzleResponse = (id: string, token: string, clues: { id: string; text: string; constraint?: { kind: string } }[] = [], additionalCategories: { id: string; label: string; values: string[] }[] = []) => ({
   id,
   seed: id,
   puzzleToken: token,
@@ -26,6 +26,7 @@ const puzzleResponse = (id: string, token: string, clues: { id: string; text: st
     categories: [
       { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
       { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+      ...additionalCategories,
     ],
   },
 });
@@ -297,6 +298,50 @@ describe("answer verification navigation", () => {
 
     assert.ok(app.root.innerHTML.includes("Not quite yet. Your notes are saved"));
     assert.strictEqual(app.storage.get(PROGRESS_STORAGE_KEY), undefined);
+  });
+
+  it("shows verification failures as errors", async () => {
+    const app = mountTestPuzzle("verification-error", async (input, init) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/puzzle" && init?.method === "POST") return new Response("{}", { status: 502 });
+      return new Response(JSON.stringify(puzzleResponse("verification-error", "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ dataset: { square: "club|Aki|Lions" } });
+    app.click({ dataset: { square: "club|Ben|Wolves" } });
+    app.click({ id: "check-solution" });
+    await flush();
+
+    assert.ok(app.root.innerHTML.includes('class="status status--error"'));
+    assert.ok(app.root.innerHTML.includes("Tako can’t check your solution just now"));
+  });
+
+  it("resets one grid or the full board with Undo restoring the previous marks", async () => {
+    const app = mountTestPuzzle("board-reset", async (input) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse("board-reset", "signed-token", [], [{ id: "weight", label: "Weight", values: ["light", "heavy"] }])), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+    const key = "tako-bako.board.board-reset";
+    const savedBoard = () => JSON.parse(app.storage.get(key) ?? "{}");
+
+    app.click({ dataset: { square: "club|Aki|Lions" } });
+    app.click({ dataset: { square: "weight|Aki|light" } });
+    app.click({ dataset: { gridReset: "club" } });
+    app.click({ id: "confirm-grid-reset" });
+
+    assert.deepStrictEqual(savedBoard(), { "weight|Aki|light": "yes" });
+    app.click({ id: "undo" });
+    assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
+
+    app.click({ id: "reset-board" });
+    app.click({ id: "confirm-board-reset" });
+    assert.deepStrictEqual(savedBoard(), {});
+    app.click({ id: "undo" });
+    assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
   });
 
   it("applies a successful clue hint and persists the used clue ID", async () => {

@@ -201,6 +201,20 @@ describe("puzzle proxy", () => {
     assertPartialMatch(metricCalls[0]?.[1], { operation: "generate", outcome: "success", retryCount: 1 });
   });
 
+  it("logs the upstream failure code and retry count for targeted generation errors", async () => {
+    stubGlobal("fetch", resolvedSequenceMock(
+      new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),
+      new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),
+    ));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "targeted-failure", templateId: "open-division-v2", difficultyLevel: "5" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 502);
+    const metric = metricCalls.find(([, value]) => (value as { outcome?: unknown }).outcome === "invalid_upstream_response")?.[1];
+    assertPartialMatch(metric, { operation: "generate", upstreamStatus: 503, retryCount: 1, upstreamErrorCode: "1102" });
+  });
+
   it("forwards an allowlisted expanded template to Yokaiba", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ id: "champion" }), {
       status: 200, headers: { "content-type": "application/json" },

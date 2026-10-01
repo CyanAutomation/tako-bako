@@ -34,13 +34,18 @@ function buttonDataAttributes(data: ButtonOptions["data"]): string {
 
 function buttonAttributes(options: ButtonOptions): string {
   const id = options.id ? ` id="${escapeHtml(options.id)}"` : "";
+  const role = options.role ? ` role="${escapeHtml(options.role)}"` : "";
+  const ariaControls = options.ariaControls ? ` aria-controls="${escapeHtml(options.ariaControls)}"` : "";
+  const selected = options.selected === undefined ? "" : ` aria-selected="${options.selected}"`;
+  const tabIndex = options.tabIndex === undefined ? "" : ` tabindex="${options.tabIndex}"`;
   const accessibleName = options.icon
     ? ` aria-label="${escapeHtml(options.ariaLabel ?? options.label)}" title="${escapeHtml(options.label)}"`
     : options.ariaLabel ? ` aria-label="${escapeHtml(options.ariaLabel)}"` : "";
   const pressed = options.pressed === undefined ? "" : ` aria-pressed="${options.pressed}"`;
   const expanded = options.expanded === undefined ? "" : ` aria-expanded="${options.expanded}"`;
   const disabled = options.disabled ? " disabled" : "";
-  return `${id} class="${buttonClasses(options.icon, Boolean(options.iconOnly), options.variant ?? "secondary")}"${accessibleName}${pressed}${expanded}${disabled}${buttonDataAttributes(options.data)}`;
+  const className = escapeHtml(options.className ?? buttonClasses(options.icon, Boolean(options.iconOnly), options.variant ?? "secondary"));
+  return `${id} class="${className}"${role}${ariaControls}${selected}${tabIndex}${accessibleName}${pressed}${expanded}${disabled}${buttonDataAttributes(options.data)}`;
 }
 
 function buttonContent(options: ButtonOptions): string {
