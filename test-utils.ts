@@ -3,7 +3,7 @@ import { mock } from "node:test";
 
 const originalGlobalDescriptors = new Map<string, PropertyDescriptor | undefined>();
 
-export const JEV_TEST_REDIS_URL = "https://test-db.upstash.io";
+const JEV_TEST_REDIS_URL = "https://test-db.upstash.io";
 
 export function configureJevForTests(): void {
   process.env.OPENROUTER_API_KEY = "test-key";

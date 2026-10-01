@@ -131,6 +131,19 @@ describe("puzzle session cache", () => {
     assert.notStrictEqual(storage.getItem(puzzleCacheKey("seed-20", undefined)), null);
   });
 
+  it("uses expiry order to evict legacy entries without creation metadata", () => {
+    const storage = new MemoryStorage();
+    for (let index = 0; index < 20; index += 1) {
+      storage.setItem(puzzleCacheKey(`legacy-${index}`, undefined), JSON.stringify({ expiresAt: 20_000 + index, value: { index } }));
+    }
+
+    savePuzzleToCache(storage, "new", undefined, { id: "new" }, expiresAt, generatedAt);
+
+    assert.strictEqual(storage.getItem(puzzleCacheKey("legacy-0", undefined)), null);
+    assert.notStrictEqual(storage.getItem(puzzleCacheKey("legacy-1", undefined)), null);
+    assert.deepStrictEqual(loadPuzzleFromCache(storage, "new", undefined, generatedAt), { id: "new" });
+  });
+
   it("preserves unrelated session storage while maintaining the cache", () => {
     const storage = new MemoryStorage();
     storage.setItem("another-feature", "keep me");

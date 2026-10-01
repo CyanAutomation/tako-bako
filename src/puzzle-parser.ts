@@ -37,11 +37,20 @@ function parseDifficulty(value: unknown): Puzzle["difficulty"] {
   return { level, label, modelVersion };
 }
 
+function clueConstraintCandidate(value: Record<string, unknown>): unknown {
+  if (typeof value.constraintKind === "string") return value.constraintKind;
+  if (!isRecord(value.constraint)) return undefined;
+  return value.constraint.kind;
+}
+
+function boundedConstraintKind(value: unknown): string | undefined {
+  return typeof value === "string" && value.length <= MAX_TEXT_LENGTH ? value : undefined;
+}
+
 function parseClue(value: unknown): Clue {
-  if (!isRecord(value) || typeof value.id !== "string" || typeof value.text !== "string") return invalidPuzzle();
-  const constraint = isRecord(value.constraint) ? value.constraint : undefined;
-  const candidateKind = typeof value.constraintKind === "string" ? value.constraintKind : constraint?.kind;
-  const constraintKind = typeof candidateKind === "string" && candidateKind.length <= MAX_TEXT_LENGTH ? candidateKind : undefined;
+  if (!isRecord(value)) return invalidPuzzle();
+  if (typeof value.id !== "string" || typeof value.text !== "string") return invalidPuzzle();
+  const constraintKind = boundedConstraintKind(clueConstraintCandidate(value));
   const strategy = strategyForConstraintKind(constraintKind) ?? (isClueStrategy(value.strategy) ? value.strategy : undefined);
   return { id: value.id, text: value.text, ...(constraintKind ? { constraintKind } : {}), ...(strategy ? { strategy } : {}) };
 }
@@ -52,13 +61,25 @@ function parseCategory(value: unknown): Category {
   return { id: value.id, label: value.label, values: value.values };
 }
 
+function isSpecRecord(value: unknown): value is Record<string, unknown> & { id: string; title: string; baseCategory: string; categories: unknown[] } {
+  if (!isRecord(value)) return false;
+  if (!isBoundedText(value.id) || !isBoundedText(value.title) || !isBoundedText(value.baseCategory)) return false;
+  return Array.isArray(value.categories) && value.categories.length >= 2 && value.categories.length <= MAX_CATEGORIES;
+}
+
+function hasUniqueCategoryIds(categories: Category[]): boolean {
+  return new Set(categories.map(category => category.id)).size === categories.length;
+}
+
+function categoryValuesMatchBase(categories: Category[], base: Category): boolean {
+  return categories.every(category => category.values.length === base.values.length);
+}
+
 function parseSpec(value: unknown): Puzzle["spec"] {
-  if (!isRecord(value) || !isBoundedText(value.id) || !isBoundedText(value.title) || !isBoundedText(value.baseCategory)
-    || !Array.isArray(value.categories) || value.categories.length < 2 || value.categories.length > MAX_CATEGORIES) return invalidPuzzle();
+  if (!isSpecRecord(value)) return invalidPuzzle();
   const categories = value.categories.map(parseCategory);
   const base = categories.find(category => category.id === value.baseCategory);
-  const ids = new Set(categories.map(category => category.id));
-  if (!base || ids.size !== categories.length || categories.some(category => category.values.length !== base.values.length)) return invalidPuzzle();
+  if (!base || !hasUniqueCategoryIds(categories) || !categoryValuesMatchBase(categories, base)) return invalidPuzzle();
   return { id: value.id, title: value.title, baseCategory: value.baseCategory, categories };
 }
 
