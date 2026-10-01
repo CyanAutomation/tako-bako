@@ -4,7 +4,7 @@ import type { ClueStrategy } from "./clue-strategy-catalog";
 import { courses, TIERS, type CourseId } from "./curriculum";
 import { escapeHtml, renderBadge, renderButton, renderControlGroup, renderLevelCard, renderPanel, renderSegmentedControl, renderStatus } from "./ui-controls";
 import { renderInfoDisclosure } from "./ui-dialog";
-import { renderTabs } from "./ui-grid";
+import { renderTabs } from "./ui-tabs";
 import type { StatusTone } from "./ui-types";
 
 export type ClueFilter = "all" | "remaining" | "used";

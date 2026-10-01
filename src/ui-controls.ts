@@ -32,20 +32,29 @@ function buttonDataAttributes(data: ButtonOptions["data"]): string {
   }).join("");
 }
 
+function stringAttribute(name: string, value: string | undefined): string {
+  return value ? ` ${name}="${escapeHtml(value)}"` : "";
+}
+
+function booleanAttribute(name: string, value: boolean | undefined): string {
+  return value === undefined ? "" : ` ${name}="${value}"`;
+}
+
+function buttonAccessibleName(options: ButtonOptions): string {
+  const label = options.icon ? options.ariaLabel ?? options.label : options.ariaLabel;
+  if (!label) return "";
+  const title = options.icon ? ` title="${escapeHtml(options.label)}"` : "";
+  return ` aria-label="${escapeHtml(label)}"${title}`;
+}
+
 function buttonAttributes(options: ButtonOptions): string {
-  const id = options.id ? ` id="${escapeHtml(options.id)}"` : "";
-  const role = options.role ? ` role="${escapeHtml(options.role)}"` : "";
-  const ariaControls = options.ariaControls ? ` aria-controls="${escapeHtml(options.ariaControls)}"` : "";
-  const selected = options.selected === undefined ? "" : ` aria-selected="${options.selected}"`;
-  const tabIndex = options.tabIndex === undefined ? "" : ` tabindex="${options.tabIndex}"`;
-  const accessibleName = options.icon
-    ? ` aria-label="${escapeHtml(options.ariaLabel ?? options.label)}" title="${escapeHtml(options.label)}"`
-    : options.ariaLabel ? ` aria-label="${escapeHtml(options.ariaLabel)}"` : "";
-  const pressed = options.pressed === undefined ? "" : ` aria-pressed="${options.pressed}"`;
-  const expanded = options.expanded === undefined ? "" : ` aria-expanded="${options.expanded}"`;
   const disabled = options.disabled ? " disabled" : "";
   const className = escapeHtml(options.className ?? buttonClasses(options.icon, Boolean(options.iconOnly), options.variant ?? "secondary"));
-  return `${id} class="${className}"${role}${ariaControls}${selected}${tabIndex}${accessibleName}${pressed}${expanded}${disabled}${buttonDataAttributes(options.data)}`;
+  const tabIndex = options.tabIndex === undefined ? "" : ` tabindex="${options.tabIndex}"`;
+  return `${stringAttribute("id", options.id)} class="${className}"${stringAttribute("role", options.role)}`
+    + `${stringAttribute("aria-controls", options.ariaControls)}${booleanAttribute("aria-selected", options.selected)}`
+    + `${tabIndex}${buttonAccessibleName(options)}${booleanAttribute("aria-pressed", options.pressed)}`
+    + `${booleanAttribute("aria-expanded", options.expanded)}${disabled}${buttonDataAttributes(options.data)}`;
 }
 
 function buttonContent(options: ButtonOptions): string {
