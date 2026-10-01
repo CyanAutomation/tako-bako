@@ -33,7 +33,7 @@ function redisRestUrl(): string | undefined {
   try {
     const url = new URL(value);
     if (url.protocol !== "https:" || !url.hostname.endsWith(".upstash.io") || url.pathname !== "/"
-      || url.username || url.password || url.search || url.hash || url.port) return undefined;
+      || url.username || url.password || url.search || url.hash || url.port !== "") return undefined;
     return url.origin;
   } catch {
     return undefined;

@@ -72,6 +72,16 @@ describe("Jev shared rate limit", () => {
     assert.strictEqual(await allowJevDecision("203.0.113.4"), false);
   });
 
+  it("rejects an Upstash REST URL with a non-default port", async () => {
+    configureRedis();
+    process.env.UPSTASH_REDIS_REST_URL = "https://test-db.upstash.io:8443";
+    const fetchMock = mock.fn();
+    stubGlobal("fetch", fetchMock);
+
+    assert.strictEqual(await allowJevDecision("203.0.113.4"), false);
+    assert.strictEqual(fetchMock.mock.callCount(), 0);
+  });
+
   it("uses the rightmost Vercel forwarded address and rejects malformed values", () => {
     assert.strictEqual(clientAddressFromForwardedFor("198.51.100.9, 203.0.113.7"), "203.0.113.7");
     assert.strictEqual(clientAddressFromForwardedFor(["198.51.100.9", "203.0.113.7"]), "203.0.113.7");
