@@ -3,6 +3,22 @@ import { mock } from "node:test";
 
 const originalGlobalDescriptors = new Map<string, PropertyDescriptor | undefined>();
 
+export const JEV_TEST_REDIS_URL = "https://test-db.upstash.io";
+
+export function configureJevForTests(): void {
+  process.env.OPENROUTER_API_KEY = "test-key";
+  process.env.UPSTASH_REDIS_REST_URL = JEV_TEST_REDIS_URL;
+  process.env.UPSTASH_REDIS_REST_TOKEN = "test-redis-token";
+}
+
+export function isJevRateLimitRequest(input: string | URL | Request): boolean {
+  return String(input) === JEV_TEST_REDIS_URL;
+}
+
+export function jevRateLimitResponse(clientCount = 1, globalCount = 1, allowed = 1): Response {
+  return new Response(JSON.stringify({ result: [clientCount, globalCount, allowed] }), { status: 200 });
+}
+
 export function stubGlobal(name: string, value: unknown): void {
   if (!originalGlobalDescriptors.has(name)) {
     originalGlobalDescriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));

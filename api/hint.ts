@@ -3,6 +3,7 @@ import { clueStrategyLabel, isClueStrategy } from "../src/clue-strategy-catalog.
 import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { derivePlayerStateFeatures, hintStrengthForProgress, hintStrengthRank, MIN_PLAYER_STATE_CONFIDENCE, parsePlayerStateAssessment, policyForPlayerState, serializePlayerStateFeatures, type HintStrength, type PlayerStateFeatures, type PlayerStatePolicy } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
+import { clientAddressFromForwardedFor } from "../server/jev-rate-limit.js";
 
 const URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
 const MAX_TOKEN_LENGTH = 16_384;
@@ -137,7 +138,7 @@ function playerStateFeatures(value: Record<string, unknown>, context: SelectionC
   });
 }
 
-async function classifyPlayerState(features: PlayerStateFeatures) {
+async function classifyPlayerState(features: PlayerStateFeatures, clientAddress?: string) {
   const startedAt = Date.now();
   const result = await requestJevDecision({
     state: serializePlayerStateFeatures(features),
@@ -154,7 +155,7 @@ async function classifyPlayerState(features: PlayerStateFeatures) {
         },
       },
     },
-  });
+  }, clientAddress);
   const assessment = parsePlayerStateAssessment(result);
   recordJevMetric({ operation: "player_state", questionCount: 1, candidateCount: 0, durationMs: Date.now() - startedAt, outcome: assessment ? "success" : "fallback" });
   return assessment;
@@ -184,7 +185,7 @@ function candidateFromJevResult(result: unknown, candidates: HintCandidate[]): H
   return Number.isInteger(selectedIndex) && selectedIndex >= 0 && selectedIndex < candidates.length ? candidates[selectedIndex] : undefined;
 }
 
-function selectCandidateWithJev(context: SelectionContext, candidates: HintCandidate[], features?: PlayerStateFeatures, policy?: PlayerStatePolicy, assessment?: { state: string; confidence: number }): Promise<HintCandidate | undefined> {
+function selectCandidateWithJev(context: SelectionContext, candidates: HintCandidate[], features?: PlayerStateFeatures, policy?: PlayerStatePolicy, assessment?: { state: string; confidence: number }, clientAddress?: string): Promise<HintCandidate | undefined> {
   const startedAt = Date.now();
   const questionOptions = Object.fromEntries(candidates.map((_candidate, index) => [`candidate_${index}`, `Candidate: ${candidates[index]!.type}. ${candidates[index]!.text}`]));
   return requestJevDecision({
@@ -203,7 +204,7 @@ function selectCandidateWithJev(context: SelectionContext, candidates: HintCandi
         criteria: questionOptions,
       },
     },
-  }).then(result => {
+  }, clientAddress).then(result => {
     const selected = candidateFromJevResult(result, candidates);
     recordJevMetric({ operation: "hint_selection", questionCount: 1, candidateCount: candidates.length, durationMs: Date.now() - startedAt, outcome: selected ? "success" : "fallback" });
     return selected;
@@ -235,6 +236,7 @@ async function chooseHintPayload(
   features: PlayerStateFeatures | undefined,
   policy: PlayerStatePolicy | undefined,
   assessment: Awaited<ReturnType<typeof classifyPlayerState>>,
+  clientAddress?: string,
 ): Promise<unknown> {
   const candidates = hintCandidates(payload, context);
   const boundedCandidates = policy
@@ -242,7 +244,7 @@ async function chooseHintPayload(
     : candidates;
   if (boundedCandidates.length === 0) return policy ? { error: "A suitable hint is unavailable." } : payload;
   if (boundedCandidates.length === 1) return boundedCandidates[0]!.payload;
-  const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment);
+  const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment, clientAddress);
   const safeFallback = policy
     ? boundedCandidates.find(candidate => candidate.id === "solver_primary") ?? boundedCandidates[0]
     : undefined;
@@ -268,14 +270,10 @@ async function fetchPrimaryHint(puzzleToken: string, hintKind: HintStrength | un
   return { upstream, payload };
 }
 
-async function deliverHint(request: ParsedHintRequest, context: SelectionContext | undefined, features: PlayerStateFeatures | undefined, response: VercelResponse): Promise<void> {
-  let assessment: Awaited<ReturnType<typeof classifyPlayerState>>;
-  if (features && context?.clues?.length && hasJevApiKey()) assessment = await classifyPlayerState(features);
-  const policy = assessment && features ? policyForPlayerState(assessment.state, features) : undefined;
+async function deliverHint(request: ParsedHintRequest, context: SelectionContext | undefined, features: PlayerStateFeatures | undefined, clientAddress: string | undefined, response: VercelResponse): Promise<void> {
   const defaultKind = features ? hintStrengthForProgress(features.affirmativeCount, features.totalMatches) : request.kind;
-  const hintKind = policy?.hintKind ?? defaultKind;
   try {
-    const result = await fetchPrimaryHint(request.puzzleToken, hintKind, response);
+    let result = await fetchPrimaryHint(request.puzzleToken, defaultKind, response);
     if (!result) return;
     if (!context || !context.clues?.length) {
       response.status(result.upstream.status).json(result.payload);
@@ -286,7 +284,18 @@ async function deliverHint(request: ParsedHintRequest, context: SelectionContext
       response.status(result.upstream.status).json(candidates[0]?.payload ?? result.payload);
       return;
     }
-    const selected = await chooseHintPayload(context, result.payload, features, policy, assessment);
+
+    // Yokaiba must accept the token before any caller-controlled state reaches Jev.
+    const assessment = features ? await classifyPlayerState(features, clientAddress) : undefined;
+    const policy = assessment && features ? policyForPlayerState(assessment.state, features) : undefined;
+    const hintKind = policy?.hintKind ?? defaultKind;
+    if (hintKind !== defaultKind) {
+      const policyResult = await fetchPrimaryHint(request.puzzleToken, hintKind, response);
+      if (!policyResult) return;
+      result = policyResult;
+    }
+
+    const selected = await chooseHintPayload(context, result.payload, features, policy, assessment, clientAddress);
     response.status(result.upstream.status).json(selected);
   } catch {
     response.status(502).json({ error: "Yokaiba assistance is unavailable. Please try again." });
@@ -300,5 +309,6 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (!parsedRequest) { response.status(400).json({ error: "A valid signed hint request is required" }); return; }
   const context = parseSelectionContext(parsedRequest.body);
   const features = context ? playerStateFeatures(parsedRequest.body, context) : undefined;
-  await deliverHint(parsedRequest, context, features, response);
+  const clientAddress = clientAddressFromForwardedFor(request.headers?.["x-forwarded-for"]);
+  await deliverHint(parsedRequest, context, features, clientAddress, response);
 }
