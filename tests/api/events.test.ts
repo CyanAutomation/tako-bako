@@ -59,7 +59,7 @@ describe("outcome proxy", () => {
     await handler({ method: "POST", body: { event: "puzzle_completed", templateId: "tournament-order-v2", assessedDifficultyLevel: 2, elapsedMs: 1000, smartMarkingEnabled: true, seed: "must-not-forward" } } as never, response as never);
     assert.strictEqual(upstream.mock.callCount(), 1);
     assert.strictEqual(upstream.mock.calls[0].arguments[0], "https://yokaiba.scheimann.workers.dev/v1/events");
-    assertPartialMatch(upstream.mock.calls[0].arguments[1], { body: JSON.stringify({ event: "puzzle_completed", templateId: "tournament-order-v2", assessedDifficultyLevel: 2, elapsedMs: 1000, smartMarkingEnabled: true }) });
+    assertPartialMatch(upstream.mock.calls[0].arguments[1], { body: JSON.stringify({ schemaVersion: 0, event: "puzzle_completed", templateId: "tournament-order-v2", assessedDifficultyLevel: 2, elapsedMs: 1000, smartMarkingEnabled: true }) });
     assertPartialMatch(result, { statusCode: 202, body: { accepted: true } });
   });
 });

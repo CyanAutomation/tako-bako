@@ -41,6 +41,17 @@ describe("hint proxy", () => {
     assert.strictEqual(result.headers.get("x-yokaiba-request-id"), "hint-123");
   });
 
+  it("uses the completed hint count to request the next deterministic Yokaiba hint", async () => {
+    const upstream = resolvedMock(new Response(JSON.stringify({ kind: "placement", placement: { subject: "Hana", category: "club", value: "Wolves" } }), { status: 200, headers: { "content-type": "application/json" } }));
+    stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "signed-token", kind: "placement", hintsUsed: 3 } } as never, response as never);
+
+    assert.deepStrictEqual(JSON.parse(String(upstream.mock.calls[0]?.arguments[1]?.body)), { puzzleToken: "signed-token", kind: "placement", hintIndex: 3 });
+    assert.deepStrictEqual(result.body, { kind: "placement", placement: { subject: "Hana", category: "club", value: "Wolves" } });
+  });
+
   it("does not call Jev when Yokaiba rejects the puzzle token", async () => {
     configureJevForTests();
     const calls: string[] = [];
@@ -179,8 +190,8 @@ describe("hint proxy", () => {
     assert.ok(firstSolverIndex >= 0 && firstSolverIndex < firstModelIndex);
     assert.strictEqual(solverCalls.length, 2);
     assert.deepStrictEqual(solverCalls.map(call => call.body), [
-      { puzzleToken: "secret-signed-token", kind: "clue" },
-      { puzzleToken: "secret-signed-token", kind: "elimination" },
+      { puzzleToken: "secret-signed-token", kind: "clue", hintIndex: 1 },
+      { puzzleToken: "secret-signed-token", kind: "elimination", hintIndex: 1 },
     ]);
     assert.deepStrictEqual(modelCall.body.state, {
       affirmative_count: 0,
