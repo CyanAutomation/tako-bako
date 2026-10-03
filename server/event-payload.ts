@@ -41,8 +41,16 @@ function isAllowedBoolean(_field: typeof BOOLEAN_FIELDS[number], value: unknown)
 export function parseEventPayload(value: unknown): Record<string, unknown> | undefined {
   if (!isRecord(value) || typeof value.event !== "string" || !EVENTS.has(value.event)
     || typeof value.templateId !== "string" || !TEMPLATE_IDS.has(value.templateId)) return undefined;
-  const event: Record<string, unknown> = { event: value.event, templateId: value.templateId };
+  const schemaVersion = value.schemaVersion === undefined ? 0 : value.schemaVersion;
+  if (schemaVersion !== 0 && schemaVersion !== 1) return undefined;
+  const event: Record<string, unknown> = { schemaVersion, event: value.event, templateId: value.templateId };
   const numbersAreValid = copyAllowedFields(value, event, NUMBER_FIELDS, isAllowedNumber);
   const booleansAreValid = copyAllowedFields(value, event, BOOLEAN_FIELDS, isAllowedBoolean);
+  if (schemaVersion === 1) {
+    const requiredFields = value.event === "puzzle_completed" || value.event === "puzzle_abandoned"
+      ? ["elapsedMs", "hintsUsed", "mistakes"]
+      : ["hintsUsed", "mistakes"];
+    if (requiredFields.some(field => !Object.hasOwn(event, field))) return undefined;
+  }
   return numbersAreValid && booleansAreValid ? event : undefined;
 }

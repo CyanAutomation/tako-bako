@@ -74,7 +74,7 @@ function newSeed(): string {
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
   if (!puzzle) return;
-  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed, smartMarkingEnabled: smartMarking }) }).catch(() => undefined);
+  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ schemaVersion: 1, event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed, mistakes, smartMarkingEnabled: smartMarking }) }).catch(() => undefined);
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -441,7 +441,7 @@ async function requestHint(): Promise<void> {
     if (!hint) return;
     applyHintResponse(hint, requestedPuzzleId, requestedBoard, requestedUsedClueIds);
     hintsUsed = requestedHintsUsed + 1;
-    recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, hintsUsed);
+    recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, hintsUsed, mistakes);
   } catch {
     if (!isActiveRequest()) return;
     setMessage("Tako can’t offer a hint just now. Please try again in a moment.", "error");
@@ -482,12 +482,13 @@ function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousB
   setMessage(`Hint: ${hint.clue.text}`);
 }
 
-function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number): void {
+function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number, currentMistakes: number): void {
   const elapsedMs = requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : undefined;
   void fetch("/api/events", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
+      schemaVersion: 1,
       event: "hint_used",
       templateId: requestedPuzzle.templateId,
       requestedDifficultyLevel,
@@ -495,6 +496,7 @@ function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: numb
       clueCount: requestedPuzzle.clues.length,
       elapsedMs,
       hintsUsed: usedHints,
+      mistakes: currentMistakes,
     }),
   }).catch(() => undefined);
 }

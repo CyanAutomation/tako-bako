@@ -46,6 +46,7 @@ interface ParsedHintRequest {
   body: Record<string, unknown>;
   puzzleToken: string;
   kind?: HintStrength;
+  hintIndex?: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -121,7 +122,13 @@ function parseSelectionContext(value: Record<string, unknown>): SelectionContext
 function parseHintRequest(value: Record<string, unknown>): ParsedHintRequest | undefined {
   if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
   if (value.kind !== undefined && value.kind !== "clue" && value.kind !== "elimination" && value.kind !== "placement") return undefined;
-  return { body: value, puzzleToken: value.puzzleToken, kind: value.kind as HintStrength | undefined };
+  if (value.hintsUsed !== undefined && !isBoundedInteger(value.hintsUsed, 0, MAX_HINT_COUNT)) return undefined;
+  return {
+    body: value,
+    puzzleToken: value.puzzleToken,
+    kind: value.kind as HintStrength | undefined,
+    ...(typeof value.hintsUsed === "number" && value.hintsUsed > 0 ? { hintIndex: value.hintsUsed } : {}),
+  };
 }
 
 function isBoundedInteger(value: unknown, minimum: number, maximum: number): value is number {
@@ -302,11 +309,11 @@ async function chooseHintPayload(
   return selected?.payload ?? fallbackHintPayload(boundedCandidates, policy, payload);
 }
 
-async function fetchPrimaryHint(puzzleToken: string, hintKind: HintStrength | undefined, response: VercelResponse): Promise<{ upstream: Response; payload: unknown } | undefined> {
+async function fetchPrimaryHint(puzzleToken: string, hintKind: HintStrength | undefined, response: VercelResponse, hintIndex?: number): Promise<{ upstream: Response; payload: unknown } | undefined> {
   const upstream = await fetch(URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ puzzleToken, ...(hintKind === undefined ? {} : { kind: hintKind }) }),
+    body: JSON.stringify({ puzzleToken, ...(hintKind === undefined ? {} : { kind: hintKind }), ...(hintIndex === undefined ? {} : { hintIndex }) }),
     signal: AbortSignal.timeout(8_000),
   });
   const requestId = upstream.headers.get("x-request-id");
@@ -349,7 +356,7 @@ async function deliverWithJev(
   const hintKind = policy?.hintKind ?? defaultKind;
   const result = hintKind === defaultKind
     ? initialResult
-    : await fetchPrimaryHint(request.puzzleToken, hintKind, response);
+    : await fetchPrimaryHint(request.puzzleToken, hintKind, response, request.hintIndex);
   if (!result) return;
   const selected = await chooseHintPayload(context, result.payload, features, policy, assessment, clientAddress);
   respondWithPayload(response, result, selected);
@@ -358,7 +365,7 @@ async function deliverWithJev(
 async function deliverHint(request: ParsedHintRequest, context: SelectionContext | undefined, features: PlayerStateFeatures | undefined, clientAddress: string | undefined, response: VercelResponse): Promise<void> {
   const defaultKind = features ? hintStrengthForProgress(features.affirmativeCount, features.totalMatches) : request.kind;
   try {
-    const result = await fetchPrimaryHint(request.puzzleToken, defaultKind, response);
+    const result = await fetchPrimaryHint(request.puzzleToken, defaultKind, response, request.hintIndex);
     if (!result) return;
     if (!context || !context.clues?.length) {
       respondWithHint(response, result);
