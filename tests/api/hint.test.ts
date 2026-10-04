@@ -292,6 +292,32 @@ describe("hint proxy", () => {
     assert.deepStrictEqual(result.body, { kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } });
   });
 
+  it("falls back to an unused clue when Jev cannot rank candidates and the solver clue was already used", async () => {
+    configureJevForTests();
+    const fetchMock = mock.fn(async (input: string | URL | Request) => {
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
+      if (String(input).includes("openrouter.ai")) {
+        return new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_99", confidence: 1 } } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ kind: "clue", clue: { id: "used", text: "Already used." } }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    stubGlobal("fetch", fetchMock);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: {
+      puzzleToken: "signed-token",
+      kind: "clue",
+      clues: [
+        { id: "used", text: "Already used." },
+        { id: "fresh-1", text: "Try this unused clue first." },
+        { id: "fresh-2", text: "Another unused clue." },
+      ],
+      usedClueIds: ["used"],
+    } } as never, response as never);
+
+    assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "fresh-1", text: "Try this unused clue first." } });
+  });
+
   it("keeps the existing Yokaiba hint available when optional selection context is malformed", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ kind: "clue", clue: { id: "c1", text: "Start here." } }), { status: 200, headers: { "content-type": "application/json" } }));
     stubGlobal("fetch", upstream);
