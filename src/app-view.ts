@@ -4,7 +4,7 @@ import type { ChallengeProgress } from "./progress";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
 import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader, type ClueFilter } from "./sections";
-import { escapeHtml, renderBadge, renderButton, renderStatus } from "./ui-controls";
+import { escapeHtml, renderBadge, renderButton, renderPanel, renderStatus } from "./ui-controls";
 import { renderDialog, renderDisclosure } from "./ui-dialog";
 import { renderGridCard, renderGridCell } from "./ui-grid";
 import type { StatusTone } from "./ui-types";
@@ -109,7 +109,11 @@ function renderCelebrationModal(view: AppViewState): string {
 
 function renderProgressManagement(progress: ChallengeProgress): string {
   const completed = progress.completed.length;
-  return `<section class="progress-management" aria-label="Puzzle Challenge progress"><div><p class="eyebrow">Your progress</p><strong>${completed} of 12 levels complete</strong><p>Your saved boards stay separate from your Puzzle Challenge progress.</p></div>${renderDisclosure({ className: "progress-settings", summary: "Progress settings", content: renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" }) })}</section>`;
+  return renderPanel({
+    className: "progress-management",
+    labelledBy: "progress-summary",
+    content: `<div class="progress-management__summary"><p class="eyebrow">Your progress</p><strong id="progress-summary">${completed} of 12 levels complete</strong><p>Your saved boards stay separate from your Puzzle Challenge progress.</p></div>${renderDisclosure({ className: "progress-settings", summary: "Progress settings", content: renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" }) })}`,
+  });
 }
 
 function renderChallengeOptions(view: AppViewState): string {

@@ -287,8 +287,7 @@ function candidatesForPolicy(candidates: HintCandidate[], policy: PlayerStatePol
   return candidates.filter(candidate => hintStrengthRank(candidate.type) <= maximumStrength);
 }
 
-function fallbackHintPayload(candidates: HintCandidate[], policy: PlayerStatePolicy | undefined, payload: unknown): unknown {
-  if (!policy) return payload;
+function fallbackHintPayload(candidates: HintCandidate[], payload: unknown): unknown {
   const primary = candidates.find(candidate => candidate.id === "solver_primary");
   return primary?.payload ?? candidates[0]?.payload ?? payload;
 }
@@ -306,7 +305,7 @@ async function chooseHintPayload(
   if (boundedCandidates.length === 0) return policy ? { error: "A suitable hint is unavailable." } : payload;
   if (boundedCandidates.length === 1) return boundedCandidates[0]!.payload;
   const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment, clientAddress);
-  return selected?.payload ?? fallbackHintPayload(boundedCandidates, policy, payload);
+  return selected?.payload ?? fallbackHintPayload(boundedCandidates, payload);
 }
 
 async function fetchPrimaryHint(puzzleToken: string, hintKind: HintStrength | undefined, response: VercelResponse, hintIndex?: number): Promise<{ upstream: Response; payload: unknown } | undefined> {
