@@ -312,7 +312,9 @@ jobs:
 
               queued|running)
                 echo "Kaseki status: $status"
-                sleep 60
+                if (( $(date +%s) < deadline )); then
+                  sleep 60
+                fi
                 ;;
 
               *)

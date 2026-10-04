@@ -152,6 +152,7 @@ test("DOCS waits for the remote run and reports its terminal result", () => {
   assert.match(docsSweepJob, /steps\.wait\.outputs\.status/);
   assert.match(waitStep, /\/api\/runs\/\$RUN_ID\/status/);
   assert.match(waitStep, /\.exitCode \/\/ 0 \| numbers/);
+  assert.match(waitStep, /if \(\( \$\(date \+%s\) < deadline \)\); then\s+sleep 60\s+fi/);
   assert.match(waitStep, /status=failed/);
   assert.match(summary, /FINAL_STATUS: \$\{\{ steps\.wait\.outputs\.status/);
 });
