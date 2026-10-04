@@ -78,6 +78,27 @@ describe("OpenRouter Jev client", () => {
     assert.strictEqual(await requestJevDecision({ state: "text", questions: {} }), undefined);
   });
 
+  it("treats an expired OpenRouter API key as unavailable", async () => {
+    configureJevForTests();
+    const fetchMock = mock.fn(async (input: string | URL | Request) => isJevRateLimitRequest(input)
+      ? jevRateLimitResponse()
+      : new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401 }));
+    stubGlobal("fetch", fetchMock);
+
+    assert.strictEqual(await requestJevDecision({ state: "text", questions: {} }), undefined);
+    assert.strictEqual(fetchMock.mock.callCount(), 2);
+    assert.strictEqual(String(fetchMock.mock.calls[1]?.arguments[0]), "https://openrouter.ai/api/alpha/decisions");
+  });
+
+  it("skips Jev when the shared rate-limit API key has expired", async () => {
+    configureJevForTests();
+    const fetchMock = mock.fn(async () => new Response("Unauthorized", { status: 401 }));
+    stubGlobal("fetch", fetchMock);
+
+    assert.strictEqual(await requestJevDecision({ state: "text", questions: {} }), undefined);
+    assert.strictEqual(fetchMock.mock.callCount(), 1);
+  });
+
   it("returns undefined when the provider request times out or rejects", async () => {
     configureJevForTests();
     stubGlobal("fetch", mock.fn(async (input: string | URL | Request) => {

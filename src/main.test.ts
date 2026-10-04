@@ -365,6 +365,36 @@ describe("answer verification navigation", () => {
   });
 });
 
+describe("puzzle loading error feedback", () => {
+  beforeEach(() => {
+    mock.restoreAll();
+  });
+
+  it("shows a connection-specific message when the puzzle API is unreachable", async () => {
+    const app = mountTestPuzzle("offline-puzzle", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      throw new TypeError("Failed to fetch");
+    });
+
+    await flush();
+
+    assert.ok(app.root.innerHTML.includes('class="status status--error"'));
+    assert.ok(app.root.innerHTML.includes("The puzzle service couldn’t be reached. Please check your connection and try again."));
+  });
+
+  it("shows the API's timeout message when Yokaiba is slow", async () => {
+    const app = mountTestPuzzle("slow-puzzle", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify({ error: "Yokaiba took too long to respond. Please try again." }), { status: 504 });
+    });
+
+    await flush();
+
+    assert.ok(app.root.innerHTML.includes('class="status status--error"'));
+    assert.ok(app.root.innerHTML.includes("Yokaiba took too long to respond. Please try again."));
+  });
+});
+
 describe("dialog keyboard navigation", () => {
   it("routes Tab and Shift+Tab through the active dialog focus trap", () => {
     const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
