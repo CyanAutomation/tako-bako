@@ -266,6 +266,9 @@ describe("answer verification navigation", () => {
     assert.strictEqual(href, "https://example.test/");
     assert.ok((root.innerHTML).includes('class="landing-state"'));
     assert.ok((root.innerHTML).includes('id="start-puzzle"'));
+    assert.ok((root.innerHTML).includes('class="progress-management" aria-labelledby="progress-summary"'));
+    assert.ok((root.innerHTML).includes('class="progress-management__summary"'));
+    assert.ok((root.innerHTML).includes('class="disclosure progress-settings"'));
     assert.ok(!(root.innerHTML).includes('id="share-puzzle"'));
     assert.strictEqual(fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 1);
 

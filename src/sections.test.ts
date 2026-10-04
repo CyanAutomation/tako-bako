@@ -35,7 +35,8 @@ describe("puzzle UI sections", () => {
     assert.ok((toolbar).includes('data-action-role="efficiency"'));
     assert.ok((toolbar).includes('data-action-role="primary"'));
     assert.ok((toolbar).includes('class="readiness-meter"'));
-    assert.ok((toolbar).includes('aria-label="2 of 4 matches found"'));
+    assert.ok((toolbar).includes('<progress class="readiness-meter__bar" aria-label="2 of 4 matches found" max="4" value="2"></progress>'));
+    assert.doesNotMatch(toolbar, /style=/);
   });
 
   it("labels the grid workspace for assistive technology", () => {

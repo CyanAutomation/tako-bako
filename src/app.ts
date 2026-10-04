@@ -591,10 +591,12 @@ function updateChangedBoardCells(previous: Board, current: Puzzle, base: Puzzle[
 function updateProgressDisplay(progress: ReturnType<typeof boardSolveProgress>): void {
   const progressElement = root.querySelector<HTMLElement>(".progress");
   if (progressElement) progressElement.textContent = `${progress.matches} of ${progress.total} matches found`;
-  const readinessMeter = root.querySelector<HTMLElement>(".readiness-meter");
-  if (readinessMeter) readinessMeter.setAttribute("aria-label", `${progress.matches} of ${progress.total} matches found`);
-  const readinessFill = root.querySelector<HTMLElement>(".readiness-meter__bar > span");
-  if (readinessFill) readinessFill.style.width = `${progress.total === 0 ? 0 : Math.round((progress.matches / progress.total) * 100)}%`;
+  const readinessMeter = root.querySelector<HTMLProgressElement>(".readiness-meter__bar");
+  if (readinessMeter) {
+    readinessMeter.max = Math.max(progress.total, 1);
+    readinessMeter.value = Math.min(progress.matches, readinessMeter.max);
+    readinessMeter.setAttribute("aria-label", `${progress.matches} of ${progress.total} matches found`);
+  }
 }
 
 function updateBoardActionControls(current: Puzzle): void {
