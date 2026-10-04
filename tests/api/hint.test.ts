@@ -102,6 +102,35 @@ describe("hint proxy", () => {
     assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "fresh", text: "The next unused clue." } });
   });
 
+  it("keeps the solver hint available when the configured Jev key has expired", async () => {
+    configureJevForTests();
+    const calls: string[] = [];
+    const solverHint = { kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } };
+    const fetchMock = mock.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      calls.push(url);
+      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
+      if (url.includes("yokaiba")) return new Response(JSON.stringify(solverHint), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401 });
+    });
+    stubGlobal("fetch", fetchMock);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: {
+      puzzleToken: "signed-token",
+      kind: "placement",
+      clues: [{ id: "next", text: "Aki trains at Lions." }],
+    } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, solverHint);
+    assert.deepStrictEqual(calls, [
+      "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint",
+      "https://test-db.upstash.io",
+      "https://openrouter.ai/api/alpha/decisions",
+    ]);
+  });
+
   it("rejects malformed or unsupported hint requests before contacting Yokaiba", async () => {
     const upstream = mock.fn(); stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
