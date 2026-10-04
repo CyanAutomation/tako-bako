@@ -3,6 +3,8 @@ import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
 import { parseAnswerVerification } from "./answer-verification";
 import { createHintRequestBody, parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
+import { buildGameEventPayload, clampElapsedMs } from "./events";
+import { postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
 import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
@@ -74,7 +76,18 @@ function newSeed(): string {
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
   if (!puzzle) return;
-  void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ schemaVersion: 1, event, templateId: puzzle.templateId, requestedDifficultyLevel: difficultyLevel, assessedDifficultyLevel: puzzle.difficulty.level, clueCount: puzzle.clues.length, elapsedMs: puzzleStartedAt ? Math.min(86_400_000, Date.now() - puzzleStartedAt) : undefined, hintsUsed, mistakes, smartMarkingEnabled: smartMarking }) }).catch(() => undefined);
+  postGameEvent(buildGameEventPayload({
+    schemaVersion: 1,
+    event,
+    templateId: puzzle.templateId,
+    requestedDifficultyLevel: difficultyLevel,
+    assessedDifficultyLevel: puzzle.difficulty.level,
+    clueCount: puzzle.clues.length,
+    elapsedMs: clampElapsedMs(puzzleStartedAt),
+    hintsUsed,
+    mistakes,
+    smartMarkingEnabled: smartMarking,
+  }));
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -483,22 +496,17 @@ function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousB
 }
 
 function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number, currentMistakes: number): void {
-  const elapsedMs = requestedPuzzleStartedAt ? Math.min(86_400_000, Date.now() - requestedPuzzleStartedAt) : undefined;
-  void fetch("/api/events", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      schemaVersion: 1,
-      event: "hint_used",
-      templateId: requestedPuzzle.templateId,
-      requestedDifficultyLevel,
-      assessedDifficultyLevel: requestedPuzzle.difficulty.level,
-      clueCount: requestedPuzzle.clues.length,
-      elapsedMs,
-      hintsUsed: usedHints,
-      mistakes: currentMistakes,
-    }),
-  }).catch(() => undefined);
+  postGameEvent(buildGameEventPayload({
+    schemaVersion: 1,
+    event: "hint_used",
+    templateId: requestedPuzzle.templateId,
+    requestedDifficultyLevel,
+    assessedDifficultyLevel: requestedPuzzle.difficulty.level,
+    clueCount: requestedPuzzle.clues.length,
+    elapsedMs: clampElapsedMs(requestedPuzzleStartedAt),
+    hintsUsed: usedHints,
+    mistakes: currentMistakes,
+  }));
 }
 
 async function sharePuzzle(): Promise<void> {
