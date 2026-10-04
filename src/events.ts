@@ -18,11 +18,6 @@ export interface GameEventPayload {
   smartMarkingEnabled?: boolean;
 }
 
-/** Builds a v1 game-event payload matching the contract parsed by server/event-payload.ts. */
-export function buildGameEventPayload(fields: GameEventPayload): GameEventPayload {
-  return fields;
-}
-
 /** Posts a game event to the API; failures are ignored so telemetry never blocks play. */
 export function postGameEvent(payload: GameEventPayload): void {
   void fetch("/api/events", {
