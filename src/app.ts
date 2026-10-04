@@ -3,8 +3,7 @@ import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
 import { parseAnswerVerification } from "./answer-verification";
 import { createHintRequestBody, parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
-import { buildGameEventPayload, clampElapsedMs } from "./events";
-import { postGameEvent } from "./events";
+import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
 import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
@@ -76,7 +75,7 @@ function newSeed(): string {
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
   if (!puzzle) return;
-  postGameEvent(buildGameEventPayload({
+  postGameEvent({
     schemaVersion: 1,
     event,
     templateId: puzzle.templateId,
@@ -87,7 +86,7 @@ function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used
     hintsUsed,
     mistakes,
     smartMarkingEnabled: smartMarking,
-  }));
+  });
 }
 
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
@@ -496,7 +495,7 @@ function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousB
 }
 
 function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number, currentMistakes: number): void {
-  postGameEvent(buildGameEventPayload({
+  postGameEvent({
     schemaVersion: 1,
     event: "hint_used",
     templateId: requestedPuzzle.templateId,
@@ -506,7 +505,7 @@ function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: numb
     elapsedMs: clampElapsedMs(requestedPuzzleStartedAt),
     hintsUsed: usedHints,
     mistakes: currentMistakes,
-  }));
+  });
 }
 
 async function sharePuzzle(): Promise<void> {
