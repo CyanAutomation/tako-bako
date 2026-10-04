@@ -12,6 +12,10 @@ export interface PuzzleLoaderDependencies {
   now?: () => number;
 }
 
+const PUZZLE_SERVICE_UNAVAILABLE_MESSAGE = "The puzzle service couldn’t be reached. Please check your connection and try again.";
+const GENERIC_PUZZLE_LOAD_ERROR = "The puzzle could not be collected. Please try again.";
+const MAX_API_ERROR_MESSAGE_LENGTH = 240;
+
 export class DifficultyUnavailableError extends Error {
   constructor(availableLevels: number[] = []) {
     super(availableLevels.length
@@ -54,7 +58,16 @@ async function failureForResponse(response: Response): Promise<Error> {
     return new DifficultyUnavailableError(availableDifficultyLevels(body?.availableDifficultyLevels));
   }
   if (response.status === 429) return new Error(retryAfterMessage(response.headers.get("retry-after")));
-  return new Error("The puzzle could not be collected. Please try again.");
+  if (response.status >= 500) {
+    const body: unknown = await response.json().catch(() => undefined);
+    if (body && typeof body === "object" && !Array.isArray(body)) {
+      const message = (body as { error?: unknown }).error;
+      if (typeof message === "string" && message.trim().length > 0 && message.length <= MAX_API_ERROR_MESSAGE_LENGTH) {
+        return new Error(message.trim());
+      }
+    }
+  }
+  return new Error(GENERIC_PUZZLE_LOAD_ERROR);
 }
 
 async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Puzzle> {
@@ -63,7 +76,13 @@ async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoa
     templateId: request.templateId,
     ...(request.difficultyLevel ? { difficultyLevel: String(request.difficultyLevel) } : {}),
   });
-  const response = await (dependencies.fetcher ?? fetch)(`/api/puzzle?${query}`, { signal: dependencies.signal });
+  let response: Response;
+  try {
+    response = await (dependencies.fetcher ?? fetch)(`/api/puzzle?${query}`, { signal: dependencies.signal });
+  } catch (error) {
+    if (dependencies.signal.aborted) throw error;
+    throw new Error(PUZZLE_SERVICE_UNAVAILABLE_MESSAGE);
+  }
   if (!response.ok) throw await failureForResponse(response);
 
   try {

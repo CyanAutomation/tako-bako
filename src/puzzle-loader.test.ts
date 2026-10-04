@@ -65,6 +65,20 @@ describe("loadPuzzle", () => {
     }), /Try again in 7 seconds/);
   });
 
+  it("shows the API's bounded service message when puzzle generation fails", async () => {
+    await assert.rejects(loadPuzzle(request, {
+      storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
+      fetcher: async () => new Response(JSON.stringify({ error: "Yokaiba took too long to respond. Please try again." }), { status: 504 }),
+    }), /Yokaiba took too long to respond/);
+  });
+
+  it("turns a disconnected puzzle API into a useful connection message", async () => {
+    await assert.rejects(loadPuzzle(request, {
+      storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
+      fetcher: async () => { throw new TypeError("Failed to fetch"); },
+    }), /The puzzle service couldn’t be reached\. Please check your connection and try again\./);
+  });
+
   it("does not cache an older response after its request has been superseded", async () => {
     const storage = new MemoryStorage();
     await loadPuzzle(request, {
