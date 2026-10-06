@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { assertPartialMatch, rejectedMock, resolvedMock, resolvedSequenceMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../../src/cache-policy.js";
+import { parseSharedPuzzleInput } from "../../src/shared-puzzle.js";
 
 import handler from "../../api/puzzle.js";
 
@@ -185,6 +186,53 @@ describe("puzzle proxy", () => {
     assert.strictEqual(result.headers.get("etag"), '"yokaiba-v1-cached"');
   });
 
+  it("[TB-INPUT-01] accepts documented seed and difficulty boundaries in shared links and API requests", async () => {
+    const upstream = mock.fn(async () => new Response(JSON.stringify({ id: "boundary-puzzle" }), {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    stubGlobal("fetch", upstream);
+
+    for (const { seed, difficultyLevel } of [
+      { seed: "a", difficultyLevel: "1" },
+      { seed: "z".repeat(128), difficultyLevel: "12" },
+    ]) {
+      const sharedInput = parseSharedPuzzleInput(`https://example.test/?seed=${seed}&mode=shared&difficulty=${difficultyLevel}`);
+      assert.deepStrictEqual(sharedInput, { seed, difficultyLevel: Number(difficultyLevel) });
+
+      const { response, result } = responseRecorder();
+      await handler({ method: "GET", query: { seed, difficultyLevel } } as never, response as never);
+
+      assert.strictEqual(result.statusCode, 200);
+      const forwardedUrl = new URL(String(upstream.mock.calls.at(-1)?.arguments[0]));
+      assert.strictEqual(forwardedUrl.pathname, "/v1/puzzles/generate");
+      assert.strictEqual(forwardedUrl.searchParams.get("seed"), sharedInput.seed);
+      assert.strictEqual(forwardedUrl.searchParams.get("difficultyLevel"), String(sharedInput.difficultyLevel));
+      assert.strictEqual(forwardedUrl.searchParams.get("allowSeedFallback"), "true");
+    }
+  });
+
+  it("[TB-INPUT-02] rejects invalid API seed and difficulty boundaries before contacting Yokaiba", async () => {
+    const upstream = mock.fn();
+    stubGlobal("fetch", upstream);
+    const invalidRequests = [
+      { seed: "bad_seed" },
+      { seed: "x".repeat(129) },
+      { seed: "valid-seed", difficultyLevel: "0" },
+      { seed: "valid-seed", difficultyLevel: "13" },
+    ];
+
+    for (const query of invalidRequests) {
+      const { response, result } = responseRecorder();
+      await handler({ method: "GET", query } as never, response as never);
+      assert.strictEqual(result.statusCode, 400, JSON.stringify(query));
+      assert.strictEqual(result.headers.get("cache-control"), "no-store");
+    }
+
+    assert.strictEqual(upstream.mock.callCount(), 0);
+    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=0"), { seed: "valid-seed" });
+    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=13"), { seed: "valid-seed" });
+  });
+
   it("retries one transient upstream generation failure before surfacing an error", async () => {
     const upstream = resolvedSequenceMock(
       new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),
@@ -215,7 +263,7 @@ describe("puzzle proxy", () => {
     assertPartialMatch(metric, { operation: "generate", upstreamStatus: 503, retryCount: 1, upstreamErrorCode: "1102" });
   });
 
-  it("forwards an allowlisted expanded template to Yokaiba", async () => {
+  it("[TB-URL-01] forwards an allowlisted expanded template to Yokaiba", async () => {
     const upstream = resolvedMock(new Response(JSON.stringify({ id: "champion" }), {
       status: 200, headers: { "content-type": "application/json" },
     }));
@@ -226,7 +274,15 @@ describe("puzzle proxy", () => {
 
     assert.strictEqual(result.statusCode, 200);
     assert.strictEqual(upstream.mock.callCount(), 1);
-    assert.strictEqual(upstream.mock.calls[0].arguments[0], "https://yokaiba.scheimann.workers.dev/v1/puzzles/generate?templateId=championship-bridge-v1&seed=champion-day&difficultyLevel=8&allowSeedFallback=true");
+    const forwardedUrl = new URL(String(upstream.mock.calls[0].arguments[0]));
+    assert.strictEqual(forwardedUrl.origin, "https://yokaiba.scheimann.workers.dev");
+    assert.strictEqual(forwardedUrl.pathname, "/v1/puzzles/generate");
+    assert.deepStrictEqual(Object.fromEntries(forwardedUrl.searchParams), {
+      templateId: "championship-bridge-v1",
+      seed: "champion-day",
+      difficultyLevel: "8",
+      allowSeedFallback: "true",
+    });
     assert.ok(upstream.mock.calls[0].arguments[1] !== undefined && upstream.mock.calls[0].arguments[1] !== null);
   });
 
