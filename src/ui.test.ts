@@ -10,28 +10,18 @@ describe("shared UI primitives", () => {
     { id: "tatami", label: "Tatami" },
   ];
 
-  it("renders a semantic tablist with one keyboard-focusable active tab", () => {
+  it("[TB-ACCESS-01] renders a labelled grid selector and one keyboard-focusable active tab", () => {
     const markup = renderTabs(tabs, "weight");
 
-    assert.ok((markup).includes('role="tablist"'));
-    assert.ok((markup).includes('id="grid-select" aria-label="Choose working grid"'));
-    assert.ok((markup).includes('<option value="weight" selected>Weight</option>'));
-    assert.ok((markup).includes('id="grid-tab-weight" class="button button--secondary" role="tab" aria-controls="grid-weight" aria-selected="true" tabindex="0"'));
-    assert.ok((markup).includes('id="grid-tab-club" class="button button--secondary" role="tab" aria-controls="grid-club" aria-selected="false" tabindex="-1"'));
+    assert.match(markup, /<label[^>]*>Working grid <select id="grid-select" aria-label="Choose working grid">/);
+    assert.match(markup, /<option value="weight" selected>Weight<\/option>/);
+    assert.match(markup, /role="tablist" aria-label="Choose working grid"/);
+    assert.match(markup, /id="grid-tab-weight"[^>]*role="tab"[^>]*aria-controls="grid-weight"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+    assert.match(markup, /id="grid-tab-club"[^>]*role="tab"[^>]*aria-selected="false"[^>]*tabindex="-1"/);
+    assert.strictEqual((markup.match(/role="tab"[^>]*tabindex="0"/g) ?? []).length, 1);
   });
 
-  it("uses tabs on wider layouts and one labelled selector on compact layouts", () => {
-    const markup = renderTabs(tabs, "weight");
-
-    assert.ok((markup).includes('class="grid-picker"'));
-    assert.ok((markup).includes('class="grid-navigation"'));
-    assert.ok((markup).includes('class="grid-tabs"'));
-    assert.ok(!(markup).includes('id="previous-grid"'));
-    assert.ok(!(markup).includes('id="next-grid"'));
-    assert.ok(!(markup).includes(" hidden"));
-  });
-
-  it("moves through tabs with the standard arrow, Home, and End keys", () => {
+  it("[TB-ACCESS-01] moves through tabs with the standard arrow, Home, and End keys", () => {
     assert.strictEqual(nextTabId(tabs, "weight", "ArrowRight"), "tatami");
     assert.strictEqual(nextTabId(tabs, "weight", "ArrowLeft"), "club");
     assert.strictEqual(nextTabId(tabs, "club", "ArrowLeft"), "tatami");
@@ -39,7 +29,7 @@ describe("shared UI primitives", () => {
     assert.strictEqual(nextTabId(tabs, "weight", "End"), "tatami");
   });
 
-  it("moves a grid cell with arrow keys while staying within its grid", () => {
+  it("[TB-ACCESS-01] moves a grid cell with arrow keys while staying within its grid", () => {
     const options = { categoryId: "club", rows: ["Aki", "Ben"], columns: ["Lions", "Wolves"] };
 
     assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "ArrowRight" }), "club|Aki|Wolves");
@@ -49,33 +39,34 @@ describe("shared UI primitives", () => {
     assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" }), undefined);
   });
 
-  it("does not navigate grids without rows or columns", () => {
+  it("[TB-ACCESS-01] does not navigate grids without rows or columns", () => {
     assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: [], columns: ["Lions"], key: "club|Aki|Lions", keyName: "ArrowDown" }), undefined);
     assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" }), undefined);
   });
 
-  it("uses a shared button primitive for regular and custom SVG icon actions", () => {
-    assert.ok((renderButton({ id: "new", label: "New puzzle" })).includes('class="button button--secondary"'));
-    const iconButton = renderButton({ id: "undo", label: "Undo", icon: "undo" });
-    assert.ok((iconButton).includes('class="button button--with-icon button--secondary"'));
-    assert.ok((iconButton).includes('<svg'));
-    assert.ok((iconButton).includes('<span>Undo</span>'));
-    assert.ok((iconButton).includes('aria-hidden="true"'));
-    assert.ok(!(iconButton).includes("↶"));
-    const labelledIconButton = renderButton({ id: "smart-marking", label: "Smart marking: on", icon: "fast-forward", variant: "efficiency", pressed: true });
-    assert.ok((labelledIconButton).includes('class="button button--with-icon button--efficiency"'));
-    assert.ok((labelledIconButton).includes('<span>Smart marking: on</span>'));
+  it("[TB-ACCESS-02] gives icon actions an accessible name and hides decorative SVGs", () => {
+    const iconButton = renderButton({ id: "undo", label: "Undo", ariaLabel: "Undo last mark", icon: "undo" });
+
+    assert.match(iconButton, /^<button\b/);
+    assert.match(iconButton, /aria-label="Undo last mark"/);
+    assert.match(iconButton, /<svg[^>]*aria-hidden="true"/);
+    assert.match(iconButton, /<span>Undo<\/span>/);
+    assert.doesNotMatch(iconButton, /aria-hidden="true"[^>]*>Undo/);
+
+    const toggle = renderButton({ label: "Smart marking: on", ariaLabel: "Smart marking: on", icon: "fast-forward", pressed: true });
+    assert.match(toggle, /aria-label="Smart marking: on"/);
+    assert.match(toggle, /aria-pressed="true"/);
+    assert.match(toggle, /<span>Smart marking: on<\/span>/);
   });
 
-  it("supports semantic tab attributes and specialized button styles through the shared primitive", () => {
+  it("[TB-ACCESS-01] preserves the tab relationship and roving focus state", () => {
     const tab = renderButton({ label: "Club", id: "grid-tab-club", role: "tab", ariaControls: "grid-club", selected: true, tabIndex: 0, className: "grid-tab", data: { gridTab: "club" } });
 
-    assert.ok(tab.includes('class="grid-tab"'));
-    assert.ok(tab.includes('role="tab"'));
-    assert.ok(tab.includes('aria-controls="grid-club"'));
-    assert.ok(tab.includes('aria-selected="true"'));
-    assert.ok(tab.includes('tabindex="0"'));
-    assert.ok(tab.includes('data-grid-tab="club"'));
+    assert.match(tab, /role="tab"/);
+    assert.match(tab, /aria-controls="grid-club"/);
+    assert.match(tab, /aria-selected="true"/);
+    assert.match(tab, /tabindex="0"/);
+    assert.match(tab, /data-grid-tab="club"/);
   });
 
   it("escapes every dynamic button attribute while retaining false and zero states", () => {
@@ -105,14 +96,16 @@ describe("shared UI primitives", () => {
     assert.ok(button.includes('data-grid-tab="club &amp; weight"'));
   });
 
-  it("renders filter choices through one labelled segmented-control primitive", () => {
+  it("[TB-ACCESS-03] exposes clue filters as a labelled single-choice control", () => {
     const markup = renderSegmentedControl({ label: "Filter clues", items: [
       { id: "all", label: "All", selected: true, data: { clueFilter: "all" } },
       { id: "used", label: "Used", selected: false, data: { clueFilter: "used" } },
     ] });
-    assert.ok((markup).includes('class="segmented-control" role="group" aria-label="Filter clues"'));
-    assert.ok((markup).includes('data-clue-filter="all"'));
-    assert.ok((markup).includes('aria-pressed="true"'));
+
+    assert.match(markup, /role="group" aria-label="Filter clues"/);
+    assert.match(markup, /<button(?=[^>]*data-clue-filter="all")(?=[^>]*aria-pressed="true")[^>]*>All<\/button>/);
+    assert.match(markup, /<button(?=[^>]*data-clue-filter="used")(?=[^>]*aria-pressed="false")[^>]*>Used<\/button>/);
+    assert.strictEqual((markup.match(/aria-pressed="true"/g) ?? []).length, 1);
   });
 
   it("renders each Puzzle Challenge level through one stateful card primitive", () => {
@@ -187,14 +180,17 @@ describe("shared UI primitives", () => {
     assert.ok((markup).includes('<option value="3" selected>Level 3</option>'));
   });
 
-  it("uses a shared grid-card primitive with an explicit active state", () => {
+  it("[TB-ACCESS-01] renders a labelled tab panel with its active grid identity", () => {
     const markup = renderGridCard({ id: "weight", label: "Judoka × Weight", active: true, locked: false, controls: "<button>Lock</button>", content: "<table></table>" });
+    const lockedMarkup = renderGridCard({ id: "weight", label: "Judoka × Weight", active: false, locked: true, controls: "<button>Unlock</button>", content: "<table></table>" });
 
-    assert.ok((markup).includes('id="grid-weight"'));
-    assert.ok((markup).includes('class="grid-card is-active is-unlocked"'));
-    assert.ok((markup).includes('class="grid-card-controls"'));
-    assert.ok((markup).includes('is-unlocked'));
-    assert.ok(!(markup).includes("hidden"));
+    assert.match(markup, /<section id="grid-weight" role="tabpanel" aria-label="Judoka × Weight"/);
+    assert.match(markup, /data-grid-card="weight"/);
+    assert.match(markup, /class="grid-card[^"]*\bis-active\b/);
+    assert.match(markup, /<div class="grid-card-controls"><button>Lock<\/button><\/div>/);
+    assert.match(lockedMarkup, /<section id="grid-weight" role="tabpanel" aria-label="Judoka × Weight"/);
+    assert.match(lockedMarkup, /class="grid-card[^"]*\bis-locked\b/);
+    assert.doesNotMatch(lockedMarkup, /class="grid-card[^"]*\bis-active\b/);
   });
 
   it("gives grid cells an accessible name, a roving tab stop, and disabled semantics", () => {

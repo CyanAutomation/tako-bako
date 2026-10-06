@@ -8,7 +8,8 @@ on:
 run-name: >-
   Docs sweep · ${{ github.repository }}@main
 
-permissions: {}
+permissions:
+  contents: read
 
 concurrency:
   group: kaseki-${{ github.repository }}
@@ -17,6 +18,8 @@ concurrency:
 env:
   REPO_URL: ${{ github.server_url }}/${{ github.repository }}
   REF: main
+  KASEKI_PUBLISH_MODE: pr
+  KASEKI_MAX_DIFF_BYTES: "102400"
   TASK_DESCRIPTION: Keep README.md and docs/ accurate against the current implementation.
   ALLOWLIST: README.md,docs/**/*.md
   VALIDATION_COMMAND: npm run lint && npm test && npm run build
@@ -33,6 +36,14 @@ jobs:
       KASEKI_BASE_URL: ${{ vars.KASEKI_BASE_URL }}
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.12.0
+
       - name: Validate Kaseki configuration
         shell: bash
         run: |
@@ -133,29 +144,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          key="$(node --input-type=module <<'NODE'
-          import { createHash } from "node:crypto";
-
-          const namespace = Buffer.from("6ba7b8119dad11d180b400c04fd430c8", "hex");
-          const name = JSON.stringify([
-            process.env.GITHUB_REPOSITORY,
-            process.env.GITHUB_WORKFLOW,
-            process.env.GITHUB_RUN_ID,
-          ]);
-          const digest = createHash("sha1").update(namespace).update(name).digest();
-          digest[6] = (digest[6] & 0x0f) | 0x50;
-          digest[8] = (digest[8] & 0x3f) | 0x80;
-
-          const hex = digest.subarray(0, 16).toString("hex");
-          console.log([
-            hex.slice(0, 8),
-            hex.slice(8, 12),
-            hex.slice(12, 16),
-            hex.slice(16, 20),
-            hex.slice(20),
-          ].join("-"));
-          NODE
-          )"
+          key="$(node scripts/kaseki/idempotency-key.mjs)"
 
           [[ "$key" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
           printf 'key=%s\n' "$key" >> "$GITHUB_OUTPUT"
@@ -180,15 +169,17 @@ jobs:
               --arg taskDescription "$TASK_DESCRIPTION" \
               --arg validationCommand "$VALIDATION_COMMAND" \
               --arg allowlist "$ALLOWLIST" \
+              --arg publishMode "$KASEKI_PUBLISH_MODE" \
+              --argjson maxDiffBytes "$KASEKI_MAX_DIFF_BYTES" \
               --arg idempotencyKey "$IDEMPOTENCY_KEY" \
               '{
                 repoUrl: $repoUrl,
                 ref: $ref,
                 idempotencyKey: $idempotencyKey,
                 taskMode: "patch",
-                publishMode: "pr",
+                publishMode: $publishMode,
                 timeoutSeconds: 10800,
-                maxDiffBytes: 102400,
+                maxDiffBytes: $maxDiffBytes,
 
                 scouting: {
                   enabled: false
@@ -272,60 +263,7 @@ jobs:
           RUN_ID: ${{ steps.submit.outputs.run_id }}
         run: |
           set -euo pipefail
-
-          response_file="$(mktemp)"
-          trap 'rm -f "$response_file"' EXIT
-
-          # Kaseki allows three hours; stop polling after 185 minutes.
-          deadline=$(( $(date +%s) + 185 * 60 ))
-          while (( $(date +%s) < deadline )); do
-            timeout --foreground --kill-after=5s 50s \
-              curl --fail-with-body --silent --show-error \
-                --retry 2 --retry-all-errors \
-                --connect-timeout 10 --max-time 40 \
-                --max-filesize 1048576 \
-                --proto '=https' --tlsv1.2 \
-                --output "$response_file" \
-                --header "Authorization: Bearer $KASEKI_API_TOKEN" \
-                "$KASEKI_BASE_URL/api/runs/$RUN_ID/status"
-
-            status="$(jq -er '.status | strings' "$response_file")"
-
-            case "$status" in
-              completed)
-                exit_code="$(jq -er '.exitCode // 0 | numbers' "$response_file")"
-                if (( exit_code != 0 )); then
-                  echo "status=failed" >> "$GITHUB_OUTPUT"
-                  echo "::error title=Kaseki run failed::Completed with exit code $exit_code"
-                  exit 1
-                fi
-                echo "status=completed" >> "$GITHUB_OUTPUT"
-                echo "Kaseki status: completed with exit code $exit_code"
-                exit 0
-                ;;
-
-              failed|cancelled)
-                echo "status=$status" >> "$GITHUB_OUTPUT"
-                echo "::error title=Kaseki run failed::Kaseki status: $status"
-                exit 1
-                ;;
-
-              queued|running)
-                echo "Kaseki status: $status"
-                if (( $(date +%s) < deadline )); then
-                  sleep 60
-                fi
-                ;;
-
-              *)
-                echo "::error title=Unexpected Kaseki status::Controller returned an unsupported status"
-                exit 1
-                ;;
-            esac
-          done
-
-          echo "::error title=Kaseki run timed out::No terminal status within 185 minutes"
-          exit 1
+          node scripts/kaseki/wait-for-run.mjs
 
       - name: Publish run details
         if: always()

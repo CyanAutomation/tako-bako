@@ -2,7 +2,7 @@
 export const DAILY_TIME_ZONE = "UTC";
 
 /** Build a daily seed from the date parts produced by Intl.DateTimeFormat. */
-export function dailySeedFromParts(parts: readonly Intl.DateTimeFormatPart[]): string {
+function dailySeedFromParts(parts: readonly Intl.DateTimeFormatPart[]): string {
   const value = (type: Intl.DateTimeFormatPartTypes) => {
     const part = parts.find(part => part.type === type)?.value;
     if (!part) throw new Error(`Missing date part: ${type}`);

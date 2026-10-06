@@ -2,164 +2,218 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { parseDocument } from "yaml";
 
-const docsWorkflow = readFileSync(
-  new URL("../.github/workflows/kaseki-docs.yaml", import.meta.url),
-  "utf8",
-);
-const dryWorkflow = readFileSync(
-  new URL("../.github/workflows/kaseki-dry.yaml", import.meta.url),
-  "utf8",
-);
+import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.mjs";
+import { createKasekiStatusFetcher, pollKasekiRun } from "../scripts/kaseki/wait-for-run.mjs";
 
-const workflows = [docsWorkflow, dryWorkflow];
+type WorkflowStep = { name?: string; uses?: string; run?: string; with?: Record<string, unknown>; env?: Record<string, string> };
+type WorkflowJob = { if?: string; steps: WorkflowStep[] };
+type Workflow = {
+  permissions: Record<string, unknown>;
+  concurrency: { group: string; "cancel-in-progress": boolean };
+  env: Record<string, string>;
+  jobs: Record<string, WorkflowJob>;
+};
 
-function workflowStep(source: string, name: string): string {
-  const marker = `      - name: ${name}\n`;
-  const start = source.indexOf(marker);
-  assert.notEqual(start, -1, `workflow step "${name}" should exist`);
-  const nextStep = source.indexOf("\n      - name:", start + marker.length);
-  return source.slice(start, nextStep === -1 ? source.length : nextStep);
+function readWorkflow(name: string): Workflow {
+  const source = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+  const document = parseDocument(source);
+  assert.deepStrictEqual(document.errors, [], `${name} must be valid YAML`);
+  return document.toJSON() as Workflow;
 }
 
-function shellScripts(workflow: string): string[] {
-  const lines = workflow.split("\n");
-  const scripts: string[] = [];
+const workflows = [
+  { name: "kaseki-docs.yaml", workflow: readWorkflow("kaseki-docs.yaml") },
+  { name: "kaseki-dry.yaml", workflow: readWorkflow("kaseki-dry.yaml") },
+];
 
-  for (let index = 0; index < lines.length; index += 1) {
-    if (lines[index] !== "        run: |") continue;
+function allWorkflowSteps(workflow: Workflow): WorkflowStep[] {
+  return Object.values(workflow.jobs).flatMap(job => job.steps);
+}
 
-    const body: string[] = [];
-    for (let lineIndex = index + 1; lineIndex < lines.length; lineIndex += 1) {
-      const line = lines[lineIndex];
-      if (line.trim() === "") {
-        body.push("");
-      } else if (line.startsWith("          ")) {
-        body.push(line.slice(10));
-      } else {
-        break;
-      }
+function submitStep(workflow: Workflow): WorkflowStep {
+  const step = allWorkflowSteps(workflow).find(candidate => candidate.name?.startsWith("Submit "));
+  assert.ok(step?.run, "workflow should have a runnable submit step");
+  return step;
+}
+
+function namedStep(workflow: Workflow, name: string): WorkflowStep {
+  const step = allWorkflowSteps(workflow).find(candidate => candidate.name === name);
+  assert.ok(step, `workflow should contain ${name}`);
+  return step;
+}
+
+test("all Kaseki workflow bash steps pass bash syntax validation", () => {
+  for (const { name, workflow } of workflows) {
+    const scripts = allWorkflowSteps(workflow).filter(step => step.run).map(step => step.run!);
+    assert.ok(scripts.length > 0, `${name} should contain bash steps`);
+
+    for (const [index, script] of scripts.entries()) {
+      const result = spawnSync("bash", ["-n"], { encoding: "utf8", input: script });
+      assert.equal(result.status, 0, `${name} bash step ${index}: ${result.stderr}`);
     }
-    scripts.push(body.join("\n"));
   }
+});
 
-  return scripts;
-}
+test("[CI-KASEKI-01] workflows run on main with least permissions and shared serialization", () => {
+  for (const { name, workflow } of workflows) {
+    assert.deepStrictEqual(workflow.permissions, { contents: "read" }, `${name} should request read-only checkout access`);
+    assert.deepStrictEqual(workflow.concurrency, {
+      group: "kaseki-${{ github.repository }}",
+      "cancel-in-progress": false,
+    });
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      assert.equal(job.if, "github.ref == 'refs/heads/main'", `${name} job ${jobName} should run only on main`);
+    }
+  }
+});
 
-function idempotencyProgram(workflow: string): string {
-  const step = workflowStep(workflow, "Create idempotency key");
-  const match = step.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n[ \t]*NODE/);
-  assert.ok(match, "idempotency step should derive a UUIDv5 from GitHub run context");
-  return match[1].split("\n").map(line => line.replace(/^ {12}/, "")).join("\n");
-}
+test("[CI-KASEKI-01] workflows check out helpers without persisting credentials and pin Node", () => {
+  for (const { name, workflow } of workflows) {
+    const steps = allWorkflowSteps(workflow);
+    const checkout = steps.find(step => step.uses?.startsWith("actions/checkout@"));
+    const setupNode = steps.find(step => step.uses?.startsWith("actions/setup-node@"));
 
-function generateIdempotencyKey(program: string, workflowName: string, runId: string): string {
-  const result = spawnSync(process.execPath, ["--input-type=module"], {
+    assert.ok(checkout, `${name} should check out the helper scripts`);
+    assert.equal(checkout.with?.["persist-credentials"], false);
+    assert.ok(setupNode, `${name} should select a supported Node runtime`);
+    assert.equal(setupNode.with?.["node-version"], "22.12.0");
+  }
+});
+
+test("[CI-KASEKI-02] submit steps use the configured pull request mode and diff limit", () => {
+  for (const { name, workflow } of workflows) {
+    assert.equal(workflow.env.KASEKI_PUBLISH_MODE, "pr", `${name} publish mode`);
+    assert.equal(workflow.env.KASEKI_MAX_DIFF_BYTES, "102400", `${name} diff limit`);
+    const run = submitStep(workflow).run!;
+    assert.match(run, /--arg publishMode "\$KASEKI_PUBLISH_MODE"/);
+    assert.match(run, /--argjson maxDiffBytes "\$KASEKI_MAX_DIFF_BYTES"/);
+    assert.match(run, /publishMode: \$publishMode/);
+    assert.match(run, /maxDiffBytes: \$maxDiffBytes/);
+  }
+});
+
+test("[CI-KASEKI-03] idempotency keys are stable UUIDv5 values for each workflow run", () => {
+  const input = {
+    repository: "CyanAutomation/tako-bako",
+    workflow: "Kaseki Docs Sweep",
+    runId: "123456789",
+  };
+  const first = createKasekiIdempotencyKey(input);
+
+  assert.match(first, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(first, "3bc77288-0b27-51ed-9866-c12d81d76d63");
+  assert.equal(first, createKasekiIdempotencyKey(input));
+  assert.notEqual(first, createKasekiIdempotencyKey({ ...input, workflow: "Kaseki DRY Sweep" }));
+  assert.notEqual(first, createKasekiIdempotencyKey({ ...input, runId: "123456790" }));
+});
+
+test("[CI-KASEKI-03] idempotency CLI reads GitHub run context", () => {
+  const result = spawnSync(process.execPath, ["scripts/kaseki/idempotency-key.mjs"], {
     encoding: "utf8",
-    input: program,
     env: {
-      ...process.env,
+      PATH: process.env.PATH,
       GITHUB_REPOSITORY: "CyanAutomation/tako-bako",
-      GITHUB_WORKFLOW: workflowName,
-      GITHUB_RUN_ID: runId,
+      GITHUB_WORKFLOW: "Kaseki Docs Sweep",
+      GITHUB_RUN_ID: "123456789",
     },
   });
 
   assert.equal(result.status, 0, result.stderr);
-  return result.stdout.trim();
-}
+  assert.equal(result.stdout.trim(), "3bc77288-0b27-51ed-9866-c12d81d76d63");
+});
 
-test("all Kaseki workflow bash steps pass bash syntax validation", () => {
-  for (const [index, workflow] of workflows.entries()) {
-    const scripts = shellScripts(workflow);
-    assert.ok(scripts.length > 0, "each workflow should contain bash steps");
-
-    for (const [scriptIndex, script] of scripts.entries()) {
-      const result = spawnSync("bash", ["-n"], {
-        encoding: "utf8",
-        input: script,
-      });
-      const context = "workflow " + index + ", bash step " + scriptIndex;
-      assert.equal(result.status, 0, context + ": " + result.stderr);
+test("[CI-KASEKI-03] workflows invoke the tested idempotency and status helpers", () => {
+  for (const { name, workflow } of workflows) {
+    assert.match(namedStep(workflow, "Create idempotency key").run ?? "", /node scripts\/kaseki\/idempotency-key\.mjs/);
+    assert.match(namedStep(workflow, "Wait for Kaseki completion").run ?? "", /node scripts\/kaseki\/wait-for-run\.mjs/);
+    assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.KASEKI_API_TOKEN, "${{ secrets.KASEKI_API_TOKEN }}");
+    assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.RUN_ID, "${{ steps.submit.outputs.run_id }}");
+    if (name === "kaseki-dry.yaml") {
+      assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.SUBMITTED_AT, "${{ steps.submit.outputs.submitted_at }}");
     }
   }
 });
 
-test("Kaseki workflows only target main and use repository-wide serialization", () => {
-  assert.match(docsWorkflow, /^ {2}REF: main$/m);
-  assert.match(dryWorkflow, /^ {6}REF: main$/m);
-  assert.match(docsWorkflow, /github\.repository }}@main/);
-  assert.match(dryWorkflow, /github\.repository }}@main/);
+test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retries transient failures", async () => {
+  const calls: { input: URL | RequestInfo; init?: RequestInit }[] = [];
+  const responses = [
+    new Response("unavailable", { status: 503 }),
+    new Response(JSON.stringify({ status: "running" }), { status: 200 }),
+  ];
+  const fetchStatus = createKasekiStatusFetcher({
+    baseUrl: "https://kaseki.example",
+    apiToken: "test-token",
+    runId: "run_123",
+    fetchImpl: async (input, init) => {
+      calls.push({ input, init });
+      return responses.shift()!;
+    },
+  });
 
-  const docsJobs = ["docs_sweep"];
-  for (const job of docsJobs) {
-    const jobStart = docsWorkflow.indexOf(`  ${job}:\n`);
-    assert.notEqual(jobStart, -1, `${job} job should exist`);
-    const nextJob = docsWorkflow.slice(jobStart + 1).search(/^ {2}[a-z_]+:\n/m);
-    const block = docsWorkflow.slice(
-      jobStart,
-      nextJob === -1 ? docsWorkflow.length : jobStart + 1 + nextJob,
-    );
-    assert.match(block, /^ {4}if: github\.ref == 'refs\/heads\/main'$/m, "job must be main-only");
-  }
-  assert.match(dryWorkflow, /^ {4}if: github\.ref == 'refs\/heads\/main'$/m);
+  assert.deepStrictEqual(await fetchStatus(), { status: "running" });
+  assert.equal(calls.length, 2);
+  assert.equal(String(calls[0]?.input), "https://kaseki.example/api/runs/run_123/status");
+  assert.equal(new Headers(calls[1]?.init?.headers).get("authorization"), "Bearer test-token");
+  assert.throws(() => createKasekiStatusFetcher({ baseUrl: "http://kaseki.example", apiToken: "test-token", runId: "run_123" }), /HTTPS/);
+});
 
-  const sharedConcurrencyGroup = "group: kaseki-${{ github.repository }}";
-  for (const workflow of workflows) {
-    assert.ok(workflow.includes(sharedConcurrencyGroup));
-    assert.match(workflow, /^permissions: \{\}$/m);
+test("[CI-KASEKI-03] polling returns success only for a completed run with exit code zero", async () => {
+  const responses: unknown[] = [
+    { status: "queued" },
+    { status: "running" },
+    { status: "completed", exitCode: 0 },
+  ];
+  let now = 0;
+  const delays: number[] = [];
+
+  const result = await pollKasekiRun({
+    fetchStatus: async () => responses.shift(),
+    deadlineAt: 180_000,
+    now: () => now,
+    wait: async milliseconds => {
+      delays.push(milliseconds);
+      now += milliseconds;
+    },
+  });
+
+  assert.deepStrictEqual(result, { status: "completed", exitCode: 0 });
+  assert.deepStrictEqual(delays, [60_000, 60_000]);
+});
+
+test("[CI-KASEKI-03] polling marks nonzero completion, failure, and cancellation as unsuccessful", async () => {
+  const cases = [
+    { response: { status: "completed", exitCode: 7 }, expected: { status: "failed", exitCode: 7 } },
+    { response: { status: "failed" }, expected: { status: "failed" } },
+    { response: { status: "cancelled" }, expected: { status: "cancelled" } },
+  ] as const;
+
+  for (const { response, expected } of cases) {
+    const result = await pollKasekiRun({
+      fetchStatus: async () => response,
+      deadlineAt: 60_000,
+      now: () => 0,
+      wait: async () => undefined,
+    });
+    assert.deepStrictEqual(result, expected);
   }
 });
 
-test("both Kaseki requests require normal PR publication and a bounded diff", () => {
-  for (const workflow of workflows) {
-    assert.match(workflow, /^\s+publishMode: "pr",?$/m);
-    assert.doesNotMatch(workflow, /draft_pr/i);
-    assert.match(workflow, /^\s+maxDiffBytes: 102400,?$/m);
-    assert.match(workflow, /full pull request/);
-  }
-});
+test("[CI-KASEKI-03] polling rejects unsupported states and expired deadlines", async () => {
+  await assert.rejects(pollKasekiRun({
+    fetchStatus: async () => ({ status: "starting" }),
+    deadlineAt: 60_000,
+    now: () => 0,
+    wait: async () => undefined,
+  }), /unsupported status/);
 
-test("Kaseki idempotency keys are stable UUIDv5 values for each GitHub workflow run", () => {
-  const docsProgram = idempotencyProgram(docsWorkflow);
-  const dryProgram = idempotencyProgram(dryWorkflow);
-  assert.equal(docsProgram, dryProgram, "both workflows should share the same key derivation");
-
-  const first = generateIdempotencyKey(docsProgram, "Kaseki Docs Sweep", "123456789");
-  const replay = generateIdempotencyKey(docsProgram, "Kaseki Docs Sweep", "123456789");
-  const otherWorkflow = generateIdempotencyKey(docsProgram, "Kaseki DRY Sweep", "123456789");
-  const otherRun = generateIdempotencyKey(docsProgram, "Kaseki Docs Sweep", "123456790");
-
-  assert.match(first, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-  assert.equal(first, replay);
-  assert.notEqual(first, otherWorkflow);
-  assert.notEqual(first, otherRun);
-
-  for (const workflow of workflows) {
-    assert.match(workflow, /IDEMPOTENCY_KEY: \$\{\{ steps\.idempotency\.outputs\.key \}\}/);
-    assert.match(workflow, /--arg idempotencyKey "\$IDEMPOTENCY_KEY"/);
-  }
-});
-
-test("DOCS waits for the remote run and reports its terminal result", () => {
-  const docsSweepJobStart = docsWorkflow.indexOf("  docs_sweep:\n");
-  assert.notEqual(docsSweepJobStart, -1);
-  const docsSweepJob = docsWorkflow.slice(docsSweepJobStart);
-  const waitStep = workflowStep(docsWorkflow, "Wait for Kaseki completion");
-  const summary = workflowStep(docsWorkflow, "Publish run details");
-
-  assert.match(docsSweepJob, /^ {4}timeout-minutes: 200$/m);
-  assert.match(docsSweepJob, /steps\.wait\.outputs\.status/);
-  assert.match(waitStep, /\/api\/runs\/\$RUN_ID\/status/);
-  assert.match(waitStep, /\.exitCode \/\/ 0 \| numbers/);
-  assert.match(waitStep, /if \(\( \$\(date \+%s\) < deadline \)\); then\s+sleep 60\s+fi/);
-  assert.match(waitStep, /status=failed/);
-  assert.match(summary, /FINAL_STATUS: \$\{\{ steps\.wait\.outputs\.status/);
-});
-
-test("DRY fails completed runs with nonzero exit codes", () => {
-  const waitStep = workflowStep(dryWorkflow, "Wait for Kaseki completion");
-  assert.match(waitStep, /\.exitCode \/\/ 0 \| numbers/);
-  assert.match(waitStep, /completed with exit code/);
-  assert.match(waitStep, /status=failed/);
+  let requests = 0;
+  await assert.rejects(pollKasekiRun({
+    fetchStatus: async () => { requests += 1; return { status: "queued" }; },
+    deadlineAt: 0,
+    now: () => 0,
+    wait: async () => undefined,
+  }), /timed out/);
+  assert.equal(requests, 0);
 });
