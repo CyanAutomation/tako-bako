@@ -40,19 +40,21 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 4. **Check** -- Once your board meets the readiness requirement, submit it via the Check button. Tako Bako sends a puzzle token and your completed board to the API layer, which verifies the answer against Yokaiba. Correct deductions advance your Puzzle Challenge course.
 
-5. **Share** -- Copy the current page URL to the clipboard. The link always encodes the seed and mode: challenge links add tier and level, while shared links add template and difficulty (mutually exclusive), so others can open the same puzzle or jump directly into a Puzzle Challenge course.
+5. **Share** -- Copy the current page URL to the clipboard. The link always encodes the seed and mode: challenge links add tier and level, while shared links add template and difficulty (mutually exclusive), so others can open the same puzzle or jump directly into a Puzzle Challenge course. Pasted seed codes contain 1–128 ASCII letters, digits, or hyphens; shared puzzle difficulty ranges from 1 to 12.
 
 Four current scenarios are available: Tournament Order (a compact 4×4 warm-up designed for step-by-step deduction), Open Division (a broader 5×5 challenge), Championship Bridge (a five-row bridge into the expert three-grid board), and Championship Circuit (an expert 5×5 puzzle with three grids). Tournament Order v1 remains available for legacy shared links.
 
-You can filter clues as All, To review, or Used, and mark individual clues as used or unused to track your reasoning.
+You can filter clues as All, To review, or Used, and mark individual clues as used or unused to track your reasoning. Keyboard users can move through grid cells with arrow keys; the grid selector exposes one active tab, and clue filters announce their selected state.
 
 ### Puzzle Challenge
 
-Tako Bako includes a guided progression called Puzzle Challenge. The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses Tournament Order levels 1-4; Intermediate uses Open Division 5-7 then Championship Bridge 8; Advanced uses Championship Bridge 9 then Championship Circuit 10-12. Complete each level sequentially to unlock the next. A Hint button starts with a clue, then offers an elimination or one revealed placement as progress increases. Your daily puzzle locks to your current level and advances automatically upon a correct deduction. You can also play shared puzzles from links, replay the current tier, or start the daily puzzle fresh. Reset your Challenge progress at any time without affecting saved boards or shared puzzle links.
+Tako Bako includes a guided progression called Puzzle Challenge. The course has four levels in each tier and maps directly to Yokaiba's 12-level scale: Beginner uses Tournament Order levels 1-4; Intermediate uses Open Division 5-7 then Championship Bridge 8; Advanced uses Championship Bridge 9 then Championship Circuit 10-12. Complete each level sequentially to unlock the next. A Hint button starts with a clue, then offers an elimination or one revealed placement as progress increases. Daily puzzles change at midnight UTC for every player. Your daily puzzle locks to your current level and advances automatically upon a correct deduction. You can also play shared puzzles from links, replay the current tier, or start the daily puzzle fresh. Reset your Challenge progress at any time without affecting saved boards or shared puzzle links.
 
 ## Development
 
 Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layer.
+
+Selected test contracts and their links to product behavior are listed in [docs/test-traceability.md](docs/test-traceability.md). The follow-up scores and verification evidence are in [docs/test-quality-review.md](docs/test-quality-review.md).
 
 Use individual commands during active development:
 

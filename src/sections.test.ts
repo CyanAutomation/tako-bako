@@ -58,7 +58,7 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
   });
 
-  it("offers focused clue views without changing the original clue numbering", () => {
+  it("[TB-ACCESS-03] offers focused clue views without changing the original clue numbering", () => {
     const clues = [{ id: "one", text: "Aki was associated with Lions." }, { id: "two", text: "Hana was associated with Wolves." }];
     const markup = renderCluePanel({ clues, activeCategory: { id: "club", label: "Club", values: ["Lions", "Wolves"] }, cluesOpen: true, usedClueIds: new Set(["two"]), clueFilter: "remaining" });
 
