@@ -42,84 +42,13 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22.12.0
+          node-version: 24.x
 
-      - name: Validate Kaseki configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          : "${KASEKI_BASE_URL:?KASEKI_BASE_URL is not configured}"
-
-          [[ "$KASEKI_BASE_URL" == "https://kaseki-tunnel.scheimann.xyz" ]] || {
-            echo "::error title=Invalid Kaseki controller URL::Use the approved HTTPS controller URL."
-            exit 1
-          }
-
-          for tool in curl jq node timeout; do
-            command -v "$tool" >/dev/null || {
-              echo "::error title=Missing required tool::Required command '$tool' is unavailable."
-              exit 1
-            }
-          done
-
-      - name: Verify controller health
-        # Pin the merged health-probe action; it has no release tag yet.
-        uses: CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@0400e036f8bd03d3c6a8ad1dd68ee74d85ac0aa6 # zizmor: ignore[stale-action-refs]
+      - name: Verify Kaseki controller and gateway
+        uses: ./.github/actions/kaseki-preflight
         with:
           base-url: ${{ vars.KASEKI_BASE_URL }}
-
-      - name: Verify controller readiness
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          response_file="$(mktemp)"
-          trap 'rm -f "$response_file"' EXIT
-
-          curl --fail-with-body \
-            --silent \
-            --show-error \
-            --retry 3 \
-            --retry-all-errors \
-            --connect-timeout 10 \
-            --max-time 20 \
-            --max-filesize 1048576 \
-            --proto '=https' \
-            --tlsv1.2 \
-            --output "$response_file" \
-            "$KASEKI_BASE_URL/ready"
-
-          jq -e '.status == "ready"' "$response_file" >/dev/null
-
-      - name: Verify gateway connectivity and authentication
-        shell: bash
-        env:
-          # Store this as an environment secret, rather than a repository secret.
-          KASEKI_API_TOKEN: ${{ secrets.KASEKI_API_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          : "${KASEKI_API_TOKEN:?KASEKI_API_TOKEN is not configured}"
-
-          response_file="$(mktemp)"
-          trap 'rm -f "$response_file"' EXIT
-
-          curl --fail-with-body \
-            --silent \
-            --show-error \
-            --retry 3 \
-            --retry-all-errors \
-            --connect-timeout 10 \
-            --max-time 60 \
-            --max-filesize 1048576 \
-            --proto '=https' \
-            --tlsv1.2 \
-            --output "$response_file" \
-            --header "Authorization: Bearer $KASEKI_API_TOKEN" \
-            "$KASEKI_BASE_URL/api/gateway-test?stage=1"
-
-          jq -e '.status == "ok"' "$response_file" >/dev/null
+          api-token: ${{ secrets.KASEKI_API_TOKEN }}
 
       - name: Create idempotency key
         id: idempotency
