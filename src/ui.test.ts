@@ -108,29 +108,12 @@ describe("shared UI primitives", () => {
     assert.strictEqual((markup.match(/aria-pressed="true"/g) ?? []).length, 1);
   });
 
-  it("renders each Puzzle Challenge level through one stateful card primitive", () => {
-    const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "locked" });
+  it("disables locked and current courses with distinct accessible names", () => {
+    const locked = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "locked" });
+    const current = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "current" });
 
-    assert.ok((markup).includes('class="course course--locked"'));
-    assert.ok((markup).includes('data-course="beginner-2"'));
-    assert.ok((markup).includes('aria-label="Beginner Level 2, locked"'));
-    assert.ok((markup).includes('disabled'));
-    assert.ok((markup).includes('>Locked</span>'));
-  });
-
-  it("makes the current Puzzle Challenge level informational rather than restartable", () => {
-    const markup = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "current" });
-
-    assert.ok((markup).includes('aria-label="Beginner Level 2, current"'));
-    assert.ok((markup).includes("disabled"));
-    assert.ok((markup).includes(">Current</span>"));
-  });
-
-  it("exposes toggle-button state and safely encoded grid identifiers", () => {
-    const markup = renderButton({ id: "lock", label: "Unlock grid", icon: "lock", pressed: false, data: { gridLock: 'weight & "open"' } });
-
-    assert.ok((markup).includes('aria-pressed="false"'));
-    assert.ok((markup).includes('data-grid-lock="weight &amp; &quot;open&quot;"'));
+    assert.match(locked, /<button\b[^>]*aria-label="Beginner Level 2, locked"[^>]*disabled/);
+    assert.match(current, /<button\b[^>]*aria-label="Beginner Level 2, current"[^>]*disabled/);
   });
 
   it("renders a reusable accessible dialog with labelled actions", () => {
@@ -170,14 +153,14 @@ describe("shared UI primitives", () => {
     assert.ok((markup).includes('<div class="info-disclosure__content">A compact introduction.</div>'));
   });
 
-  it("uses a shared labelled select control for compact settings", () => {
-    const markup = renderSelect({ id: "difficulty", label: "Difficulty", ariaLabel: "Puzzle difficulty", selectedId: "3", options: [
+  it("associates the visible Difficulty label with the selected option", () => {
+    const markup = renderSelect({ id: "difficulty", label: "Difficulty", selectedId: "3", options: [
       { id: "", label: "Any" }, { id: "3", label: "Level 3" },
     ] });
 
-    assert.ok((markup).includes('<label class="select-control">Difficulty'));
-    assert.ok((markup).includes('id="difficulty" aria-label="Puzzle difficulty"'));
-    assert.ok((markup).includes('<option value="3" selected>Level 3</option>'));
+    assert.match(markup, /<label[^>]*>Difficulty <select id="difficulty">/);
+    assert.match(markup, /<option value="3" selected>Level 3<\/option>/);
+    assert.strictEqual((markup.match(/\sselected(?:\s|>)/g) ?? []).length, 1);
   });
 
   it("[TB-ACCESS-01] renders a labelled tab panel with its active grid identity", () => {

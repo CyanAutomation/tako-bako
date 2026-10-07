@@ -11,12 +11,6 @@ describe("puzzle UI sections", () => {
     assert.ok((header).includes("Level 3: Moderate"));
   });
 
-  it("uses the explicit status tone for puzzle failures", () => {
-    const header = renderPuzzleHeader({ title: "Tournament Order", difficulty: "Level 3: Moderate", message: "Tako can’t check your solution just now.", tone: "error" });
-
-    assert.ok(header.includes('class="status status--error"'));
-  });
-
   it("labels the board actions and exposes their interaction roles", () => {
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
     assert.ok((toolbar).includes('2 of 4 matches found'));
@@ -69,21 +63,15 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('class="clue-item clue-item--related"'));
   });
 
-  it("renders the Puzzle Challenge path with stateful tiles and compact tier information", () => {
+  it("shows completed, current, and locked course states in the Puzzle Challenge path", () => {
     const markup = renderCurriculum({ completed: new Set(["beginner-1"]), currentCourseId: "beginner-2" });
+
     assert.ok((markup).includes('Your Puzzle Challenge'));
-    assert.ok((markup).includes('data-course="beginner-1"'));
-    assert.ok((markup).includes('data-course="beginner-2"'));
-    assert.match(markup, /course--locked[\s\S]*disabled[\s\S]*data-course="beginner-3"/);
-    assert.ok((markup).includes('aria-label="Beginner Level 2, current"'));
-    assert.ok((markup).includes('class="course course--complete"'));
-    assert.ok((markup).includes('class="course course--current"'));
-    assert.ok((markup).includes('class="course-state"'));
-    assert.ok((markup).includes('Complete'));
-    assert.ok((markup).includes('class="info-disclosure"'));
-    assert.ok((markup).includes('More information about Beginner'));
+    assert.match(markup, /<button\b(?=[^>]*aria-label="Beginner Level 1, complete")(?=[^>]*data-course="beginner-1")(?![^>]*disabled)[^>]*>/);
+    assert.match(markup, /<button\b(?=[^>]*aria-label="Beginner Level 2, current")(?=[^>]*disabled)[^>]*>/);
+    assert.match(markup, /<button\b(?=[^>]*aria-label="Beginner Level 3, locked")(?=[^>]*disabled)[^>]*>/);
+    assert.match(markup, /<summary aria-label="More information about Beginner"/);
     assert.ok((markup).includes('A compact 4×4 introduction with no-guess beginner puzzles.'));
-    assert.match(markup, /course--current[\s\S]*disabled/);
   });
 
   it("makes the active clue context explicit with a reusable category chip", () => {

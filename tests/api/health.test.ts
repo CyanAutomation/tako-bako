@@ -18,7 +18,7 @@ function responseRecorder() {
 describe("health readiness", () => {
   afterEach(() => { restoreStubbedGlobals(); mock.restoreAll(); });
 
-  it("reports ready when Yokaiba is healthy", async () => {
+  it("[TB-OBS-01] reports readiness and logs a valid success metric", async () => {
     stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ status: "ok" }), { status: 200 })));
     const metric = mock.method(console, "info", () => undefined);
     const { response, result } = responseRecorder();
@@ -29,16 +29,24 @@ describe("health readiness", () => {
     assert.strictEqual(result.headers.get("cache-control"), "no-store");
     assert.strictEqual(metric.mock.callCount(), 1);
     assert.strictEqual(metric.mock.calls[0].arguments[0], "tako_bako_api_metric");
-    assertPartialMatch(metric.mock.calls[0].arguments[1], { operation: "health", outcome: "success" });
+    const fields = metric.mock.calls[0].arguments[1] as Record<string, unknown>;
+    assertPartialMatch(fields, { operation: "health", outcome: "success", status: 200 });
+    assert.ok(typeof fields.durationMs === "number" && Number.isFinite(fields.durationMs) && fields.durationMs >= 0);
   });
 
-  it("reports degraded when Yokaiba cannot be reached", async () => {
+  it("[TB-OBS-01] reports degraded readiness and logs a valid failure metric", async () => {
     stubGlobal("fetch", rejectedMock(new Error("offline")));
-    mock.method(console, "error", () => undefined);
+    const timestamps = [1_000, 900];
+    mock.method(Date, "now", () => timestamps.shift() ?? 900);
+    const metric = mock.method(console, "error", () => undefined);
     const { response, result } = responseRecorder();
 
     await handler({ method: "GET" } as never, response as never);
 
     assertPartialMatch(result, { statusCode: 503, body: { status: "degraded", dependencies: { yokaiba: "unavailable" } } });
+    assert.strictEqual(metric.mock.calls[0]?.arguments[0], "tako_bako_api_metric");
+    const fields = metric.mock.calls[0]?.arguments[1] as Record<string, unknown>;
+    assertPartialMatch(fields, { operation: "health", outcome: "dependency_error", status: 503 });
+    assert.strictEqual(fields.durationMs, 0);
   });
 });

@@ -37,15 +37,20 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+const flush = async (): Promise<void> => {
+  for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
+};
 
 function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL | Request, init?: RequestInit) => Promise<unknown>) {
   const listeners = new Map<string, (event: never) => void>();
   let href = `https://example.test/?seed=${seed}&mode=challenge&tier=beginner&level=1`;
+  let focusedSelector: string | undefined;
+  const historyWrites: string[] = [];
+  const challengeMenuButton = { focus: () => { focusedSelector = "#challenge-menu"; } };
   const root = {
     innerHTML: "",
     addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
-    querySelector: () => null,
+    querySelector: (selector: string) => selector === "#challenge-menu" ? challengeMenuButton : null,
   };
   const storage = new Map<string, string>();
   const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
@@ -54,7 +59,10 @@ function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL
     get location() { return new URL(href); },
     matchMedia: () => ({ matches: false }),
     addEventListener: () => undefined,
-    history: { pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); }, replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); } },
+    history: {
+      pushState: (_state: unknown, _unused: string, url: URL | string) => { historyWrites.push("push"); href = String(url); },
+      replaceState: (_state: unknown, _unused: string, url: URL | string) => { historyWrites.push("replace"); href = String(url); },
+    },
   });
   stubGlobal("localStorage", storageApi);
   stubGlobal("sessionStorage", storageApi);
@@ -67,7 +75,10 @@ function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL
   const click = (button: Partial<FakeButton>) => listeners.get("click")!({
     target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
   } as never);
-  return { root, listeners, storage, fetchMock, click };
+  return {
+    root, listeners, storage, fetchMock, click, historyWrites,
+    get focusedSelector() { return focusedSelector; },
+  };
 }
 
 describe("answer verification navigation", () => {
@@ -319,6 +330,7 @@ describe("answer verification navigation", () => {
 
     assert.ok(app.root.innerHTML.includes('class="status status--error"'));
     assert.ok(app.root.innerHTML.includes("Tako can’t check your solution just now"));
+    assert.match(app.root.innerHTML, /<p[^>]*role="status"[^>]*>Tako can’t check your solution just now/);
   });
 
   it("resets one grid or the full board with Undo restoring the previous marks", async () => {
@@ -439,17 +451,15 @@ describe("dialog keyboard navigation", () => {
     assert.strictEqual(prevented, true);
   });
 
-  it("moves focus through grid cells and tabs, then closes the challenge dialog with Escape", async () => {
+  it("routes grid-cell and tab arrow keys to the next focus target", async () => {
     const listeners = new Map<string, (event: never) => void>();
     let activeElement: unknown = null;
     let href = "https://example.test/?seed=keyboard&mode=challenge&tier=beginner&level=1";
-    const symbols = new Map<string, { textContent: string }>();
     const cells = new Map<string, { dataset: Record<string, string>; disabled: boolean; className: string; focus: () => void; setAttribute: (name: string, value: string) => void; querySelector: () => { textContent: string } }>();
     const tabs = new Map<string, { dataset: Record<string, string>; focus: () => void }>();
     const getCell = (key: string) => {
       if (!cells.has(key)) {
         const symbol = { textContent: "" };
-        symbols.set(key, symbol);
         const cell = { dataset: { square: key }, disabled: false, className: "mark mark-unknown", focus: () => { activeElement = cell; }, setAttribute: () => undefined, querySelector: () => symbol };
         cells.set(key, cell);
       }
@@ -462,7 +472,6 @@ describe("dialog keyboard navigation", () => {
       }
       return tabs.get(id)!;
     };
-    const returnFocusButton = { focus: () => { activeElement = returnFocusButton; } };
     const root = {
       innerHTML: "",
       addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
@@ -471,7 +480,6 @@ describe("dialog keyboard navigation", () => {
         if (cellMatch) return getCell(cellMatch[1]!);
         const tabMatch = /^\[data-grid-tab="(.*)"\]$/.exec(selector);
         if (tabMatch) return getTab(tabMatch[1]!);
-        if (selector === "#challenge-menu") return returnFocusButton;
         return null;
       },
     };
@@ -499,7 +507,6 @@ describe("dialog keyboard navigation", () => {
 
     mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
     await flush();
-    const click = (button: Partial<FakeButton>) => listeners.get("click")!({ target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) } } as never);
     let prevented = false;
     const keydown = (target: { closest: (selector: string) => unknown }, key: string) => listeners.get("keydown")!({ target, key, shiftKey: false, preventDefault: () => { prevented = true; } } as never);
 
@@ -512,10 +519,41 @@ describe("dialog keyboard navigation", () => {
     keydown({ closest: selector => selector === "button[data-grid-tab]" ? firstTab : null }, "ArrowRight");
     assert.strictEqual(activeElement, getTab("weight"));
 
-    click({ id: "challenge-menu" });
-    keydown({ closest: () => null }, "Escape");
-    assert.ok(!root.innerHTML.includes("challenge-menu-dialog"));
-    assert.strictEqual(activeElement, returnFocusButton);
-    assert.strictEqual(symbols.get("club|Aki|Lions")?.textContent, "");
+  });
+
+  it("closes the challenge dialog on Escape and restores focus to its trigger", async () => {
+    const app = mountTestPuzzle("keyboard-dialog", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse("keyboard-dialog", "signed-token")), { status: 200 });
+    });
+    await flush();
+    app.click({ id: "challenge-menu" });
+    assert.ok(app.root.innerHTML.includes("challenge-menu-dialog"));
+
+    let prevented = false;
+    app.listeners.get("keydown")!({
+      target: { closest: () => null },
+      key: "Escape",
+      shiftKey: false,
+      preventDefault: () => { prevented = true; },
+    } as never);
+
+    assert.ok(!app.root.innerHTML.includes("challenge-menu-dialog"));
+    assert.strictEqual(app.focusedSelector, "#challenge-menu");
+    assert.strictEqual(prevented, true);
+  });
+});
+
+describe("browser history", () => {
+  it("[TB-URL-03] loads an existing puzzle URL without adding a history entry", async () => {
+    const app = mountTestPuzzle("history-route", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse("history-route", "signed-token")), { status: 200 });
+    });
+
+    await flush();
+
+    assert.deepStrictEqual(app.historyWrites, []);
+    assert.strictEqual(app.fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 1);
   });
 });

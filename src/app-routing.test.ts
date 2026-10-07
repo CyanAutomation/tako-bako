@@ -54,8 +54,4 @@ describe("puzzle route updates", () => {
     assert.strictEqual(url?.searchParams.has("template"), false);
     assert.strictEqual(url?.searchParams.has("difficulty"), false);
   });
-
-  it("leaves browser history untouched for a no-history update", () => {
-    assert.strictEqual(updatedPuzzleUrl("https://example.test/?seed=old", "none", "shared", "open-division-v2", 5, firstAvailableCourse([]), "new-seed"), undefined);
-  });
 });

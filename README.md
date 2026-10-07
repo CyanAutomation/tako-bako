@@ -40,7 +40,7 @@ Tako Bako presents logic grid puzzles with several categories of clues. For exam
 
 4. **Check** -- Once your board meets the readiness requirement, submit it via the Check button. Tako Bako sends a puzzle token and your completed board to the API layer, which verifies the answer against Yokaiba. Correct deductions advance your Puzzle Challenge course.
 
-5. **Share** -- Copy the current page URL to the clipboard. The link always encodes the seed and mode: challenge links add tier and level, while shared links add template and difficulty (mutually exclusive), so others can open the same puzzle or jump directly into a Puzzle Challenge course. Pasted seed codes contain 1–128 ASCII letters, digits, or hyphens; shared puzzle difficulty ranges from 1 to 12.
+5. **Share** -- Copy the current page URL to the clipboard. The link always encodes the seed and mode: challenge links add tier and level, while shared links add template and difficulty (mutually exclusive), so others can open the same puzzle or jump directly into a Puzzle Challenge course. Opening a puzzle URL loads that route without adding a duplicate browser-history entry. Pasted seed codes contain 1–128 ASCII letters, digits, or hyphens; shared puzzle difficulty ranges from 1 to 12.
 
 Four current scenarios are available: Tournament Order (a compact 4×4 warm-up designed for step-by-step deduction), Open Division (a broader 5×5 challenge), Championship Bridge (a five-row bridge into the expert three-grid board), and Championship Circuit (an expert 5×5 puzzle with three grids). Tournament Order v1 remains available for legacy shared links.
 
@@ -71,6 +71,10 @@ Vite proxies `/api/puzzle` requests to Yokaiba during development, routing queri
 
 `vercel.json` declares this as a Vite project with `buildCommand: npm run build` and `outputDirectory: dist`. The five Vercel serverless function handlers live in `api/`: `/api/puzzle` handles GET requests for puzzle generation and POST requests for verification; `/api/hint` provides bounded assistance; `/api/clue-strategies` classifies clues; `/api/events` forwards anonymous calibration outcomes; and `/api/health` reports app and upstream puzzle-service readiness. Supporting server modules live in `server/`, and API tests live in `tests/api/`. Course requests opt into Yokaiba's deterministic seed fallback when a requested level is unavailable, so a player is not stranded at a 422 response. Browser-side CORS configuration is not required because the API layer shares the same origin.
 
+### API metrics
+
+Puzzle and health API metrics use the `tako_bako_api_metric` log label. Each record includes the operation, outcome, HTTP status, and a finite non-negative duration in milliseconds. Operation-specific records may include retry and upstream-status details.
+
 The app root serves strict Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options headers for all non-asset routes (`/(.*)`). Static assets at `/assets/(.*)` receive immutable caching for one year with `Cache-Control: public, max-age=31536000, immutable`.
 
 ## Configuration
@@ -82,6 +86,8 @@ Tako Bako forwards completed boards to Yokaiba via the `/api/puzzle` endpoint. B
 The intended maximum end-to-end puzzle age is five minutes from generation. The API stamps each newly generated response with `X-Tako-Bako-Generated-At`; that stamp survives edge caching, and the browser derives its session-cache expiry from it rather than starting a new five-minute window. Consequently an edge response served during the CDN's `stale-while-revalidate=3600` period is usable for the current request but is not saved in session storage once it is five minutes old. Missing, malformed, expired, or implausibly future generation stamps disable browser caching, and every accepted expiry is capped to five minutes from the browser's current time. A one-minute future tolerance accommodates modest server/client clock skew.
 
 The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and a 3,600-second stale-while-revalidate lifetime. The API uses those values for `s-maxage=300` and `stale-while-revalidate=3600`, while the browser derives its five-minute session-cache deadline from the same fresh lifetime. Upstream rate-limit headers are forwarded to the client. A single transient upstream 5xx is retried before the API returns a user-friendly 502/504 failure, while rate-limit and validation responses are never retried. Course requests opt into deterministic fallback before the API surfaces a remaining `difficulty_unavailable` response. Outcome events carry schema version 1 and the event-specific hint/mistake counters, and never include a player identifier, seed, or answer cells. Yokaiba continues to accept legacy version 0 events from older clients.
+
+Session cache entries expire when their freshness deadline is reached. During bounded cleanup, older puzzle records without a `createdAt` timestamp use their expiry time to determine eviction order; unrelated session-storage keys are preserved.
 
 ### Optional Jev clue labels and hint selection
 

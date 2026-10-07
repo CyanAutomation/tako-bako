@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { loadPuzzle, DifficultyUnavailableError, retryAfterMessage, type PuzzleLoadRequest } from "./puzzle-loader";
-import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache";
+import { loadPuzzleFromCache, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache";
 
 class MemoryStorage implements SessionStorageLike {
   private readonly entries = new Map<string, string>();
@@ -79,14 +79,41 @@ describe("loadPuzzle", () => {
     }), /The puzzle service couldn’t be reached\. Please check your connection and try again\./);
   });
 
-  it("does not cache an older response after its request has been superseded", async () => {
+  it("keeps the newest puzzle in cache when overlapping requests resolve out of order", async () => {
     const storage = new MemoryStorage();
-    await loadPuzzle(request, {
-      storage, signal: new AbortController().signal, isCurrent: () => false, now: () => 10_000,
-      fetcher: async () => new Response(JSON.stringify(puzzle), { status: 200, headers: { "x-tako-bako-generated-at": "10000" } }),
+    let currentRequestId = 0;
+    const deferred = () => {
+      let resolve!: (response: Response) => void;
+      const promise = new Promise<Response>(done => { resolve = done; });
+      return { promise, resolve };
+    };
+    const olderResponse = deferred();
+    const newerResponse = deferred();
+    const responseFor = (id: string) => new Response(JSON.stringify({ ...puzzle, id }), {
+      status: 200,
+      headers: { "x-tako-bako-generated-at": "10000" },
     });
 
-    assert.strictEqual(storage.getItem(puzzleCacheKey(request.seed, request.difficultyLevel, request.templateId)), null);
+    const olderRequestId = ++currentRequestId;
+    const olderLoad = loadPuzzle(request, {
+      storage, signal: new AbortController().signal, isCurrent: () => olderRequestId === currentRequestId, now: () => 10_000,
+      fetcher: () => olderResponse.promise,
+    });
+    const newerRequestId = ++currentRequestId;
+    const newerLoad = loadPuzzle(request, {
+      storage, signal: new AbortController().signal, isCurrent: () => newerRequestId === currentRequestId, now: () => 10_000,
+      fetcher: () => newerResponse.promise,
+    });
+
+    newerResponse.resolve(responseFor("newer-puzzle"));
+    assert.strictEqual((await newerLoad).id, "newer-puzzle");
+    olderResponse.resolve(responseFor("older-puzzle"));
+    assert.strictEqual((await olderLoad).id, "older-puzzle");
+
+    assert.strictEqual(
+      loadPuzzleFromCache<{ id: string }>(storage, request.seed, request.difficultyLevel, 10_001, request.templateId)?.id,
+      "newer-puzzle",
+    );
   });
 
   it("formats retry-after seconds, dates, and malformed values", () => {
