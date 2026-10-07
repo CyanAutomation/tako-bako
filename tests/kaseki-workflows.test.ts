@@ -8,7 +8,12 @@ import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.mj
 import { createKasekiStatusFetcher, pollKasekiRun } from "../scripts/kaseki/wait-for-run.mjs";
 
 type WorkflowStep = { name?: string; uses?: string; run?: string; with?: Record<string, unknown>; env?: Record<string, string> };
-type WorkflowJob = { if?: string; steps: WorkflowStep[] };
+type WorkflowJob = {
+  if?: string;
+  env?: Record<string, string>;
+  steps: WorkflowStep[];
+  strategy?: { "fail-fast"?: boolean; matrix?: { "node-version"?: string[] } };
+};
 type Workflow = {
   permissions: Record<string, unknown>;
   concurrency: { group: string; "cancel-in-progress": boolean };
@@ -16,11 +21,15 @@ type Workflow = {
   jobs: Record<string, WorkflowJob>;
 };
 
-function readWorkflow(name: string): Workflow {
-  const source = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+function readYaml(relativePath: string): Record<string, unknown> {
+  const source = readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
   const document = parseDocument(source);
-  assert.deepStrictEqual(document.errors, [], `${name} must be valid YAML`);
-  return document.toJSON() as Workflow;
+  assert.deepStrictEqual(document.errors, [], `${relativePath} must be valid YAML`);
+  return document.toJSON() as Record<string, unknown>;
+}
+
+function readWorkflow(name: string): Workflow {
+  return readYaml(`.github/workflows/${name}`) as unknown as Workflow;
 }
 
 const workflows = [
@@ -44,6 +53,55 @@ function namedStep(workflow: Workflow, name: string): WorkflowStep {
   return step;
 }
 
+test("CI prioritizes Node 24, tests the supported Node 22 line, and disables matrix fail-fast", () => {
+  const workflow = readWorkflow("ci.yml");
+  const strategy = workflow.jobs.quality?.strategy;
+  assert.deepStrictEqual(strategy?.matrix?.["node-version"], ["24.x", "22.x"]);
+  assert.equal(strategy?.["fail-fast"], false);
+
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+    engines: { node: string };
+  };
+  assert.equal(packageJson.engines.node, "^24.0.0 || ^22.12.0");
+});
+
+test("Kaseki sweeps use Node 24 and share a single main-only preflight action", () => {
+  for (const { name, workflow } of workflows) {
+    assert.equal(workflow.jobs[Object.keys(workflow.jobs)[0]!]!.if, "github.ref == 'refs/heads/main'", `${name} remains main-only`);
+    const steps = allWorkflowSteps(workflow);
+    const setupNode = steps.find(step => step.uses?.startsWith("actions/setup-node@"));
+    const preflight = steps.find(step => step.name === "Verify Kaseki controller and gateway");
+    assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
+    assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
+    assert.deepStrictEqual(preflight?.with, {
+      "base-url": "${{ vars.KASEKI_BASE_URL }}",
+      "api-token": "${{ secrets.KASEKI_API_TOKEN }}",
+    });
+  }
+
+  const action = readYaml(".github/actions/kaseki-preflight/action.yml") as {
+    inputs: Record<string, { required?: boolean }>;
+    runs: { steps: WorkflowStep[] };
+  };
+  assert.equal(action.inputs["base-url"]?.required, true);
+  assert.equal(action.inputs["api-token"]?.required, true);
+  assert.ok(action.runs.steps.some(step => step.uses?.startsWith("CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@")));
+  assert.ok(action.runs.steps.some(step => step.run?.includes("/ready")));
+  assert.ok(action.runs.steps.some(step => step.run?.includes("/api/gateway-test?stage=1")));
+});
+
+test("DRY sweep scope includes server code and excludes workflow helper scripts", () => {
+  const workflow = readWorkflow("kaseki-dry.yaml");
+  const allowlist = workflow.jobs.dry_sweep?.env?.ALLOWLIST;
+  assert.equal(allowlist, "src/**/*,api/**/*,server/**/*,tests/**/*");
+});
+
+test("actionlint suppresses only the pinned tool's unsupported self-repository syntax", () => {
+  const workflow = readWorkflow("workflow-validation.yml");
+  const run = allWorkflowSteps(workflow).find(step => step.name === "Download and verify actionlint")?.run ?? "";
+  assert.match(run, /-ignore 'specifying action "\\\$\/\.github\/actions\/kaseki-preflight" in invalid format because ref is missing'/);
+});
+
 test("all Kaseki workflow bash steps pass bash syntax validation", () => {
   for (const { name, workflow } of workflows) {
     const scripts = allWorkflowSteps(workflow).filter(step => step.run).map(step => step.run!);
@@ -53,6 +111,14 @@ test("all Kaseki workflow bash steps pass bash syntax validation", () => {
       const result = spawnSync("bash", ["-n"], { encoding: "utf8", input: script });
       assert.equal(result.status, 0, `${name} bash step ${index}: ${result.stderr}`);
     }
+  }
+
+  const action = readYaml(".github/actions/kaseki-preflight/action.yml") as {
+    runs: { steps: WorkflowStep[] };
+  };
+  for (const [index, script] of action.runs.steps.filter(step => step.run).map(step => step.run!).entries()) {
+    const result = spawnSync("bash", ["-n"], { encoding: "utf8", input: script });
+    assert.equal(result.status, 0, `Kaseki preflight bash step ${index}: ${result.stderr}`);
   }
 });
 
@@ -69,7 +135,7 @@ test("[CI-KASEKI-01] workflows run on main with least permissions and shared ser
   }
 });
 
-test("[CI-KASEKI-01] workflows check out helpers without persisting credentials and pin Node", () => {
+test("[CI-KASEKI-01] workflows check out helpers without persisting credentials and select Node 24", () => {
   for (const { name, workflow } of workflows) {
     const steps = allWorkflowSteps(workflow);
     const checkout = steps.find(step => step.uses?.startsWith("actions/checkout@"));
@@ -78,7 +144,7 @@ test("[CI-KASEKI-01] workflows check out helpers without persisting credentials 
     assert.ok(checkout, `${name} should check out the helper scripts`);
     assert.equal(checkout.with?.["persist-credentials"], false);
     assert.ok(setupNode, `${name} should select a supported Node runtime`);
-    assert.equal(setupNode.with?.["node-version"], "22.12.0");
+    assert.equal(setupNode.with?.["node-version"], "24.x");
   }
 });
 
