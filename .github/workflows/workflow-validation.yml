@@ -41,7 +41,9 @@ jobs:
 
           printf '%s  %s\n' "$ACTIONLINT_SHA256" "$archive" | sha256sum --check --status
           tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" -color
+          # actionlint 1.7.12 predates GitHub's $/ self-repository action syntax; ignore only this path's parser message.
+          "$RUNNER_TEMP/actionlint" -color \
+            -ignore 'specifying action "\$/.github/actions/kaseki-preflight" in invalid format because ref is missing'
 
   zizmor:
     name: zizmor

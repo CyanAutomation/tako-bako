@@ -72,7 +72,7 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
     const setupNode = steps.find(step => step.uses?.startsWith("actions/setup-node@"));
     const preflight = steps.find(step => step.name === "Verify Kaseki controller and gateway");
     assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
-    assert.equal(preflight?.uses, "./.github/actions/kaseki-preflight");
+    assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
     assert.deepStrictEqual(preflight?.with, {
       "base-url": "${{ vars.KASEKI_BASE_URL }}",
       "api-token": "${{ secrets.KASEKI_API_TOKEN }}",
@@ -94,6 +94,12 @@ test("DRY sweep scope includes server code and excludes workflow helper scripts"
   const workflow = readWorkflow("kaseki-dry.yaml");
   const allowlist = workflow.jobs.dry_sweep?.env?.ALLOWLIST;
   assert.equal(allowlist, "src/**/*,api/**/*,server/**/*,tests/**/*");
+});
+
+test("actionlint suppresses only the pinned tool's unsupported self-repository syntax", () => {
+  const workflow = readWorkflow("workflow-validation.yml");
+  const run = allWorkflowSteps(workflow).find(step => step.name === "Download and verify actionlint")?.run ?? "";
+  assert.match(run, /-ignore 'specifying action "\\\$\/\.github\/actions\/kaseki-preflight" in invalid format because ref is missing'/);
 });
 
 test("all Kaseki workflow bash steps pass bash syntax validation", () => {

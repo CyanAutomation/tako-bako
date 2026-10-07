@@ -53,7 +53,7 @@ jobs:
           node-version: 24.x
 
       - name: Verify Kaseki controller and gateway
-        uses: ./.github/actions/kaseki-preflight
+        uses: $/.github/actions/kaseki-preflight
         with:
           base-url: ${{ vars.KASEKI_BASE_URL }}
           api-token: ${{ secrets.KASEKI_API_TOKEN }}
