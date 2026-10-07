@@ -298,7 +298,7 @@ describe("puzzle proxy", () => {
     assert.strictEqual(result.headers.get("cache-control"), "no-store");
   });
 
-  it("emits a structured success metric", async () => {
+  it("[TB-OBS-01] logs required fields for a successful generation metric", async () => {
     stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "dojo-day" }), { status: 200, headers: { "content-type": "application/json" } })));
     const { response } = responseRecorder();
 
@@ -307,7 +307,20 @@ describe("puzzle proxy", () => {
     assert.strictEqual(metricCalls[0]?.[0], "tako_bako_api_metric");
     const metricFields = metricCalls[0]?.[1] as Record<string, unknown>;
     assertPartialMatch(metricFields, { operation: "generate", outcome: "success", status: 200 });
-    assert.strictEqual(typeof metricFields.durationMs, "number");
+    const durationMs = metricFields.durationMs;
+    assert.ok(typeof durationMs === "number" && Number.isFinite(durationMs) && durationMs >= 0);
+  });
+
+  it("[TB-OBS-01] clamps metric duration when the wall clock moves backwards", async () => {
+    const timestamps = [1_000, 900];
+    mock.method(Date, "now", () => timestamps.shift() ?? 900);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: {} } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 400);
+    const metricFields = metricCalls[0]?.[1] as Record<string, unknown>;
+    assertPartialMatch(metricFields, { operation: "generate", outcome: "invalid_request", status: 400, durationMs: 0 });
   });
 
   it("reports an upstream timeout distinctly and emits structured telemetry", async () => {

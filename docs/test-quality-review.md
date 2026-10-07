@@ -20,4 +20,12 @@ The origin-derivation and query-order tests were removed after request-level and
 
 The responsive-tabs test now covers the generated accessible selector and tab relationships. Width-specific CSS visibility still has no browser-level assertion. The mutation evidence is a targeted spot check: five representative behavior changes were introduced temporarily, and all five were caught. This is not a full mutation score.
 
-The full 232-test suite passed twice after the changes. Running each of the 29 test files separately also passed; the aggregate sequential profile was 8.27 seconds, with the slowest file at 0.96 seconds.
+At the time of this earlier focused review, the 232-test suite passed twice. Running each of the 29 test files separately also passed; the aggregate sequential profile was 8.27 seconds, with the slowest file at 0.96 seconds.
+
+## Follow-up from the all-tests review
+
+The follow-up consolidated duplicate button and cache-boundary assertions, replaced the cache race simulation with overlapping `loadPuzzle` requests, and checks browser history and keyboard behavior through focused app-level tests. Puzzle Challenge level tests now assert disabled state and accessible names; the error-flow test checks its status role. Main-app async tests drain promise callbacks without timer sleeps.
+
+The cache expires records at the exact freshness deadline. `TB-CACHE-01` documents that deadline and the supported cleanup of earlier records without `createdAt`. `TB-OBS-01` documents the generation and health metric fields; tests cover finite, non-negative durations, including a backward wall-clock step. `TB-URL-03` documents that loading an existing puzzle URL does not add a history entry.
+
+The full quality gate passed after this follow-up: lint, all 228 tests, TypeScript checks, and the production build. TDD checks first reproduced the exact-deadline cache bug and negative metric duration, then passed after the fixes.

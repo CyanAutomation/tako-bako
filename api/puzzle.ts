@@ -26,7 +26,7 @@ function logMetric(operation: Operation, outcome: string, status: number, starte
     operation,
     outcome,
     status,
-    durationMs: Date.now() - startedAt,
+    durationMs: Math.max(0, Date.now() - startedAt),
     ...details,
   });
 }

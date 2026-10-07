@@ -16,10 +16,10 @@ export default async function handler(request: VercelRequest, response: VercelRe
     const ready = upstream.ok;
     response.setHeader("cache-control", "no-store");
     response.status(ready ? 200 : 503).json({ status: ready ? "ok" : "degraded", dependencies: { yokaiba: ready ? "ok" : "unavailable" } });
-    console.info("tako_bako_api_metric", { operation: "health", outcome: ready ? "success" : "dependency_unavailable", status: ready ? 200 : 503, durationMs: Date.now() - startedAt });
+    console.info("tako_bako_api_metric", { operation: "health", outcome: ready ? "success" : "dependency_unavailable", status: ready ? 200 : 503, durationMs: Math.max(0, Date.now() - startedAt) });
   } catch (error) {
     response.setHeader("cache-control", "no-store");
     response.status(503).json({ status: "degraded", dependencies: { yokaiba: "unavailable" } });
-    console.error("tako_bako_api_metric", { operation: "health", outcome: "dependency_error", status: 503, durationMs: Date.now() - startedAt, error: error instanceof Error ? error.message : String(error) });
+    console.error("tako_bako_api_metric", { operation: "health", outcome: "dependency_error", status: 503, durationMs: Math.max(0, Date.now() - startedAt), error: error instanceof Error ? error.message : String(error) });
   }
 }
