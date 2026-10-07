@@ -77,7 +77,7 @@ export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl 
   if (typeof apiToken !== "string" || apiToken.length === 0) throw new TypeError("apiToken is required");
   if (typeof runId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new TypeError("runId is invalid");
 
-  const url = new URL(`/api/runs/${encodeURIComponent(runId)}/status`, baseUrl);
+  const url = new URL(`/api/v1/runs/${encodeURIComponent(runId)}/status`, baseUrl);
   if (url.protocol !== "https:") throw new TypeError("Kaseki status URL must use HTTPS");
 
   return async () => {

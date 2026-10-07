@@ -87,7 +87,7 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
   assert.equal(action.inputs["api-token"]?.required, true);
   assert.ok(action.runs.steps.some(step => step.uses?.startsWith("CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@")));
   assert.ok(action.runs.steps.some(step => step.run?.includes("/ready")));
-  assert.ok(action.runs.steps.some(step => step.run?.includes("/api/gateway-test?stage=1")));
+  assert.ok(action.runs.steps.some(step => step.run?.includes("/api/v1/gateway-test?stage=1")));
 });
 
 test("DRY sweep scope includes server code and excludes workflow helper scripts", () => {
@@ -220,7 +220,7 @@ test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retr
 
   assert.deepStrictEqual(await fetchStatus(), { status: "running" });
   assert.equal(calls.length, 2);
-  assert.equal(String(calls[0]?.input), "https://kaseki.example/api/runs/run_123/status");
+  assert.equal(String(calls[0]?.input), "https://kaseki.example/api/v1/runs/run_123/status");
   assert.equal(new Headers(calls[1]?.init?.headers).get("authorization"), "Bearer test-token");
   assert.throws(() => createKasekiStatusFetcher({ baseUrl: "http://kaseki.example", apiToken: "test-token", runId: "run_123" }), /HTTPS/);
 });
