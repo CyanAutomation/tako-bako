@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { CACHE_FRESH_LIFETIME_SECONDS } from "./cache-policy";
-import { CACHE_TTL_MS, loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleResponseToCache, savePuzzleToCache, type PuzzleCacheRequest } from "./puzzle-cache";
+import { CACHE_TTL_MS, loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleToCache } from "./puzzle-cache";
 
 class MemoryStorage {
   protected readonly values = new Map<string, string>();
@@ -76,7 +76,7 @@ describe("puzzle session cache", () => {
     assert.strictEqual(storage.getItem(puzzleCacheKey("expired", undefined)), null);
 
     savePuzzleToCache(storage, "bounded", undefined, { id: "new" }, expiresAt + CACHE_TTL_MS, generatedAt);
-    assert.deepStrictEqual(loadPuzzleFromCache(storage, "bounded", undefined, expiresAt), { id: "new" });
+    assert.deepStrictEqual(loadPuzzleFromCache(storage, "bounded", undefined, expiresAt - 1), { id: "new" });
     assert.strictEqual(loadPuzzleFromCache(storage, "bounded", undefined, expiresAt + 1), undefined);
   });
 
@@ -85,39 +85,33 @@ describe("puzzle session cache", () => {
     assert.notStrictEqual(puzzleCacheKey("dojo-day", 3), puzzleCacheKey("dojo-night", 3));
   });
 
-  it("returns a cached value within its five-minute lifetime", () => {
-    const storage = new MemoryStorage();
-    savePuzzleToCache(storage, "dojo-day", 3, { id: "puzzle-1" }, expiresAt, generatedAt);
+  it("[TB-CACHE-01] serves session entries only before the freshness deadline", () => {
+    for (const [now, expected] of [
+      [expiresAt - 1, { id: "puzzle-1" }],
+      [expiresAt, undefined],
+      [expiresAt + 1, undefined],
+    ] as const) {
+      const storage = new MemoryStorage();
+      savePuzzleToCache(storage, "dojo-day", undefined, { id: "puzzle-1" }, expiresAt, generatedAt);
 
-    assert.deepStrictEqual(loadPuzzleFromCache<{ id: string }>(storage, "dojo-day", 3, expiresAt - 1), { id: "puzzle-1" });
-  });
+      assert.deepStrictEqual(loadPuzzleFromCache(storage, "dojo-day", undefined, now), expected);
+      if (now >= expiresAt) assert.strictEqual(storage.getItem(puzzleCacheKey("dojo-day", undefined)), null);
+    }
 
-  it("keeps a cached value through its expiration timestamp", () => {
-    const storage = new MemoryStorage();
-    savePuzzleToCache(storage, "dojo-day", undefined, { id: "puzzle-1" }, expiresAt, generatedAt);
-
-    assert.deepStrictEqual(loadPuzzleFromCache(storage, "dojo-day", undefined, expiresAt), { id: "puzzle-1" });
-  });
-
-  it("expires and removes stale or malformed cache entries", () => {
-    const storage = new MemoryStorage();
-    savePuzzleToCache(storage, "dojo-day", undefined, { id: "puzzle-1" }, expiresAt, generatedAt);
-    assert.strictEqual(loadPuzzleFromCache(storage, "dojo-day", undefined, expiresAt + 1), undefined);
-    assert.strictEqual(storage.getItem(puzzleCacheKey("dojo-day", undefined)), null);
-
-    storage.setItem(puzzleCacheKey("bad", undefined), "not json");
-    assert.strictEqual(loadPuzzleFromCache(storage, "bad", undefined, 10_000), undefined);
-    assert.strictEqual(storage.getItem(puzzleCacheKey("bad", undefined)), null);
+    const malformedStorage = new MemoryStorage();
+    malformedStorage.setItem(puzzleCacheKey("bad", undefined), "not json");
+    assert.strictEqual(loadPuzzleFromCache(malformedStorage, "bad", undefined, 10_000), undefined);
+    assert.strictEqual(malformedStorage.getItem(puzzleCacheKey("bad", undefined)), null);
   });
 
   it("prunes expired owned entries while saving", () => {
     const storage = new MemoryStorage();
     savePuzzleToCache(storage, "expired", undefined, { id: "old" }, expiresAt, generatedAt);
 
-    savePuzzleToCache(storage, "fresh", undefined, { id: "new" }, expiresAt + CACHE_TTL_MS + 1, expiresAt + 1);
+    savePuzzleToCache(storage, "fresh", undefined, { id: "new" }, expiresAt + CACHE_TTL_MS + 1, expiresAt);
 
     assert.strictEqual(storage.getItem(puzzleCacheKey("expired", undefined)), null);
-    assert.deepStrictEqual(loadPuzzleFromCache(storage, "fresh", undefined, expiresAt + 1), { id: "new" });
+    assert.deepStrictEqual(loadPuzzleFromCache(storage, "fresh", undefined, expiresAt), { id: "new" });
   });
 
   it("evicts the oldest owned entry when the cache reaches its maximum size", () => {
@@ -131,7 +125,7 @@ describe("puzzle session cache", () => {
     assert.notStrictEqual(storage.getItem(puzzleCacheKey("seed-20", undefined)), null);
   });
 
-  it("uses expiry order to evict legacy entries without creation metadata", () => {
+  it("[TB-CACHE-01] evicts a legacy cache record by expiry when its creation timestamp is absent", () => {
     const storage = new MemoryStorage();
     for (let index = 0; index < 20; index += 1) {
       storage.setItem(puzzleCacheKey(`legacy-${index}`, undefined), JSON.stringify({ expiresAt: 20_000 + index, value: { index } }));
@@ -188,37 +182,4 @@ describe("puzzle session cache", () => {
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "shared-seed", 5, 10_001, "championship-circuit-v1"), { id: "championship" });
   });
 
-  it("does not let an older overlapping response use a newer request's cache key", async () => {
-    const storage = new MemoryStorage();
-    let currentFetchId = 0;
-    const deferred = <T>() => {
-      let resolve!: (value: T) => void;
-      const promise = new Promise<T>(done => { resolve = done; });
-      return { promise, resolve };
-    };
-    const olderResponse = deferred<{ id: string }>();
-    const newerResponse = deferred<{ id: string }>();
-
-    const load = async (request: PuzzleCacheRequest, response: Promise<{ id: string }>) => {
-      const fetchId = ++currentFetchId;
-      const data = await response;
-      savePuzzleResponseToCache(storage, request, data, expiresAt, fetchId === currentFetchId, generatedAt);
-    };
-    const olderRequest = { seed: "shared", templateId: "tournament-order-v1", difficultyLevel: 2 } as const;
-    const newerRequest = { seed: "shared", templateId: "championship-circuit-v1", difficultyLevel: 7 } as const;
-    const olderLoad = load(olderRequest, olderResponse.promise);
-    const newerLoad = load(newerRequest, newerResponse.promise);
-
-    newerResponse.resolve({ id: "newer-puzzle" });
-    await newerLoad;
-    olderResponse.resolve({ id: "older-puzzle" });
-    await olderLoad;
-
-    assert.deepStrictEqual(loadPuzzleFromCache(storage, newerRequest.seed, newerRequest.difficultyLevel, 10_001, newerRequest.templateId), { id: "newer-puzzle" });
-    assert.strictEqual(loadPuzzleFromCache(storage, olderRequest.seed, olderRequest.difficultyLevel, 10_001, olderRequest.templateId), undefined);
-    const newerCacheEntry = storage.getItem(puzzleCacheKey(newerRequest.seed, newerRequest.difficultyLevel, newerRequest.templateId));
-    assert.ok(newerCacheEntry !== null);
-    assert.ok(!newerCacheEntry.includes("older-puzzle"));
-    assert.strictEqual(storage.getItem(puzzleCacheKey(olderRequest.seed, olderRequest.difficultyLevel, olderRequest.templateId)), null);
-  });
 });

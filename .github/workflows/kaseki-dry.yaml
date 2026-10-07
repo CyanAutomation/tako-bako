@@ -73,8 +73,8 @@ jobs:
           done
 
       - name: Verify controller health
-        # Keep the immutable SHA pin; ignore the pedantic tag check until the action PR is released.
-        uses: CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@30db5d15e117b8d8de13eb66766d48cf6b7d618b # zizmor: ignore[stale-action-refs]
+        # Pin the merged health-probe action; it has no release tag yet.
+        uses: CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@0400e036f8bd03d3c6a8ad1dd68ee74d85ac0aa6 # zizmor: ignore[stale-action-refs]
         with:
           base-url: ${{ vars.KASEKI_BASE_URL }}
 
