@@ -6,7 +6,7 @@ A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy
 
 ## Getting Started
 
-Prerequisites: Node.js ^20.19.0 || >=22.12.0 (matching Vite's supported runtime).
+Prerequisites: Node.js ^24.0.0 || ^22.12.0 (matching package.json engines).
 
 1. Install dependencies:
 
@@ -105,30 +105,52 @@ Puzzle Challenge's 1–12 progression remains deterministic. A future Practice m
 
 ```
 src/       Application source
-  main.ts    Entry point: app shell, event handling, rendering, state management
-  puzzle.ts  Core puzzle model: Board, Mark, Puzzle types, parsePuzzle, markBoard,
-             answerFromBoard, boardSolveProgress, save/load helpers
-  puzzle-cache.ts  Freshness-aware session cache enforcing a 5-minute end-to-end puzzle age
-  curriculum.ts   Tier/course definitions, level mapping, course resolution
-  progress.ts     Puzzle Challenge progress storage (localStorage v1)
-  scenarios.ts    Scenario catalog and ID resolution
-  shared-puzzle.ts Parses shared URLs and short codes for paste-to-open flow
-  daily.ts        Daily puzzle seed generation from UTC date parts
-  sections.ts     Curricular rendering: curriculum cards, puzzle header, board toolbar,
-                  grid workspace tabs, clue panel with filtering
-  clue-strategy.ts Reasoning strategy labels and validated Jev classification results
-  player-state.ts Bounded player-state response parsing and deterministic hint policy
-  ui.ts           Reusable HTML rendering primitives: buttons, badges, dialogs, panels, tabs
-  style.css       Base stylesheet
-  expert-grid.css Expert-grid layout overrides
-  brand/          Brand assets (PNG sprites)
+  main.ts                Entry point: app shell, event handling, rendering, state management
+  app.ts                 Application mounting: state, event wiring, rendering, persistence
+  app-view.ts            View state derivation and app rendering from the current state
+  app-routing.ts         Play-mode and puzzle-settings routing from the browser URL
+  puzzle.ts              Core puzzle types: Mark, Clue, Category, Puzzle, Board, Answer
+  puzzle-board.ts        Board helpers: markBoard, answerFromBoard, boardSolveProgress, squareKey
+  puzzle-parser.ts       Parses puzzle payloads into validated Puzzle models
+  puzzle-storage.ts      Persists and loads boards and used-clue records
+  puzzle-cache.ts        Freshness-aware session cache enforcing a 5-minute end-to-end puzzle age
+  puzzle-loader.ts       Loads puzzles through the cache, retrying rate-limited generation
+  yokaiba.ts             Yokaiba generation endpoint and shared query-parameter builder
+  curriculum.ts          Tier/course definitions, level mapping, course resolution
+  progress.ts            Puzzle Challenge progress storage (localStorage v1)
+  scenarios.ts           Scenario catalog and ID resolution
+  shared-puzzle.ts       Parses shared URLs and short codes for paste-to-open flow
+  daily.ts               Daily puzzle seed generation from UTC date parts
+  sections.ts            Curricular rendering: curriculum cards, puzzle header, board toolbar,
+                         grid workspace tabs, clue panel with filtering
+  answer-verification.ts Parses and validates answer-verification responses
+  hint-request.ts        Builds hint requests and parses validated hint responses
+  clue-strategy.ts       Compatibility barrel for clue-strategy consumers
+  clue-strategy-catalog.ts Clue strategy catalog: labels and descriptions
+  clue-strategy-constraints.ts Constraint-to-strategy mapping for known clue forms
+  clue-strategy-results.ts Parses and filters Jev clue-classification results
+  events.ts              Builds anonymous calibration game-event payloads
+  player-state.ts        Bounded player-state response parsing and deterministic hint policy
+  ui.ts                  Reusable HTML rendering primitives: buttons, badges, dialogs, panels, tabs
+  ui-controls.ts         Icon-button, status, and control-group rendering helpers
+  ui-grid.ts             Three-state puzzle-grid cell rendering
+  ui-tabs.ts             ARIA tablist rendering with roving tab focus
+  ui-dialog.ts           Focus-trapping and keyboard handling for dialogs
+  ui-types.ts            Shared UI types
+  style.css              Base stylesheet
+  expert-grid.css        Expert-grid layout overrides
+  brand/                 Brand assets (PNG sprites)
 api/         Five Vercel API function handlers
   puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
   hint.ts     POST /hint assistance proxy
   clue-strategies.ts POST /clue-strategies Jev-assisted clue classification
   events.ts   POST /events anonymous calibration proxy
   health.ts   GET /health readiness check
-server/      Shared API modules, including the OpenRouter Decisions API client
+server/      Shared API modules
+  jev.ts                OpenRouter Decisions API client for Jev labels and hints
+  jev-rate-limit.ts     Rate limiting for Jev requests
+  event-payload.ts      Calibration event payload construction
+  clue-strategy-input.ts Clue-strategy request input validation
 tests/api/   API tests, kept outside Vercel's function discovery directory
 index.html      App entry HTML
 vite.config.ts  Dev proxy: /api/puzzle → /v1/puzzles/generate
