@@ -1,5 +1,8 @@
-const EVENTS = new Set(["puzzle_started", "puzzle_completed", "hint_used", "mistake", "puzzle_abandoned"]);
-const TEMPLATE_IDS = new Set(["tournament-order-v1", "tournament-order-v2", "open-division-v2", "championship-bridge-v1", "championship-circuit-v2"]);
+import { GAME_EVENT_TYPES, MAX_DIFFICULTY_LEVEL, MAX_ELAPSED_MS, MAX_MISTAKES_COUNT, MIN_DIFFICULTY_LEVEL } from "../src/events.js";
+import { scenarios } from "../src/scenarios.js";
+
+const EVENTS = new Set<string>(GAME_EVENT_TYPES);
+const TEMPLATE_IDS = new Set<string>(scenarios.map(scenario => scenario.id));
 const NUMBER_FIELDS = ["requestedDifficultyLevel", "assessedDifficultyLevel", "clueCount", "elapsedMs", "hintsUsed", "mistakes"] as const;
 const BOOLEAN_FIELDS = ["smartMarkingEnabled"] as const;
 
@@ -9,8 +12,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAllowedNumber(field: typeof NUMBER_FIELDS[number], value: unknown): value is number {
   const isDifficulty = field === "requestedDifficultyLevel" || field === "assessedDifficultyLevel";
-  const minimum = isDifficulty ? 1 : 0;
-  const maximum = isDifficulty ? 12 : field === "elapsedMs" ? 86_400_000 : 100;
+  const minimum = isDifficulty ? MIN_DIFFICULTY_LEVEL : 0;
+  const maximum = isDifficulty ? MAX_DIFFICULTY_LEVEL : field === "elapsedMs" ? MAX_ELAPSED_MS : MAX_MISTAKES_COUNT;
   return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
 }
 
