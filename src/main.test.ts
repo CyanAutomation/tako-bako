@@ -41,7 +41,11 @@ const flush = async (): Promise<void> => {
   for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
 };
 
-function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL | Request, init?: RequestInit) => Promise<unknown>) {
+function mountTestPuzzle(
+  seed: string,
+  fetchImplementation: (input: string | URL | Request, init?: RequestInit) => Promise<unknown>,
+  initialStorage: Readonly<Record<string, string>> = {},
+) {
   const listeners = new Map<string, (event: never) => void>();
   let href = `https://example.test/?seed=${seed}&mode=challenge&tier=beginner&level=1`;
   let focusedSelector: string | undefined;
@@ -52,7 +56,7 @@ function mountTestPuzzle(seed: string, fetchImplementation: (input: string | URL
     addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
     querySelector: (selector: string) => selector === "#challenge-menu" ? challengeMenuButton : null,
   };
-  const storage = new Map<string, string>();
+  const storage = new Map<string, string>(Object.entries(initialStorage));
   const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
   stubGlobal("document", { querySelector: () => root, activeElement: null });
   stubGlobal("window", {
@@ -312,6 +316,29 @@ describe("answer verification navigation", () => {
 
     assert.ok(app.root.innerHTML.includes("Not quite yet. Your notes are saved"));
     assert.strictEqual(app.storage.get(PROGRESS_STORAGE_KEY), undefined);
+  });
+
+  it("[TB-PROGRESS-RESET-01] clears Challenge progress while preserving saved puzzle state", async () => {
+    const savedBoard = JSON.stringify({ "club|Aki|Lions": "yes" });
+    const savedClues = JSON.stringify(["clue-1"]);
+    const app = mountTestPuzzle("progress-reset", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse("progress-reset", "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
+    }, {
+      [PROGRESS_STORAGE_KEY]: JSON.stringify({ version: 1, completed: ["beginner-1"] }),
+      "tako-bako.board.saved-shared-puzzle": savedBoard,
+      "tako-bako.clues.saved-shared-puzzle": savedClues,
+    });
+    await flush();
+
+    app.click({ id: "open-progress-reset" });
+    assert.match(app.root.innerHTML, /id="reset-progress"/);
+    app.click({ id: "confirm-progress-reset" });
+
+    assert.deepStrictEqual(JSON.parse(app.storage.get(PROGRESS_STORAGE_KEY)!), { version: 1, completed: [] });
+    assert.strictEqual(app.storage.get("tako-bako.board.saved-shared-puzzle"), savedBoard);
+    assert.strictEqual(app.storage.get("tako-bako.clues.saved-shared-puzzle"), savedClues);
+    assert.match(app.root.innerHTML, /Your dojo route has been reset\. Beginner Level 1 is ready\./);
   });
 
   it("shows verification failures as errors", async () => {

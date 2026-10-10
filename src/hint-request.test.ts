@@ -29,6 +29,14 @@ const options = {
 };
 
 describe("createHintRequestBody", () => {
+  it("[TB-EVENT-01] keeps hint duration bounded and treats epoch as a valid start time", () => {
+    const epochStart = createHintRequestBody({ ...options, puzzleStartedAt: 0, now: 1_000, board: {} });
+    const clockMovedBack = createHintRequestBody({ ...options, puzzleStartedAt: 9_000, now: 8_000, board: {} });
+
+    assert.strictEqual(epochStart.elapsedMs, 1_000);
+    assert.strictEqual(clockMovedBack.elapsedMs, 0);
+  });
+
   it("chooses a hint strength from confirmed progress and omits unknown squares", () => {
     const body = createHintRequestBody({ ...options, board: {
       [squareKey("club", "Aki", "Lions")]: "yes",

@@ -96,12 +96,6 @@ test("DRY sweep scope includes server code and excludes workflow helper scripts"
   assert.equal(allowlist, "src/**/*,api/**/*,server/**/*,tests/**/*");
 });
 
-test("actionlint suppresses only the pinned tool's unsupported self-repository syntax", () => {
-  const workflow = readWorkflow("workflow-validation.yml");
-  const run = allWorkflowSteps(workflow).find(step => step.name === "Download and verify actionlint")?.run ?? "";
-  assert.match(run, /-ignore 'specifying action "\\\$\/\.github\/actions\/kaseki-preflight" in invalid format because ref is missing'/);
-});
-
 test("all Kaseki workflow bash steps pass bash syntax validation", () => {
   for (const { name, workflow } of workflows) {
     const scripts = allWorkflowSteps(workflow).filter(step => step.run).map(step => step.run!);

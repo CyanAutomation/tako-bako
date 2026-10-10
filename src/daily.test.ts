@@ -10,7 +10,7 @@ describe("daily puzzle seed", () => {
     assert.strictEqual(dailySeed(new Date("2026-09-01T00:00:00.000Z")), "daily-2026-09-01");
   });
 
-  it("rejects an invalid Date at the module boundary", () => {
+  it("throws a RangeError when given an invalid Date", () => {
     assert.throws(() => dailySeed(new Date(Number.NaN)), new RangeError("dailySeed requires a valid Date"));
   });
 });
