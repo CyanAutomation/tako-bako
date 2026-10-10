@@ -1,10 +1,18 @@
 import { spawn } from "node:child_process";
-import { readdir } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const coverageDirectory = process.argv.includes("--coverage")
+  ? join(projectRoot, "coverage", "v8")
+  : undefined;
+
+if (coverageDirectory) {
+  await rm(coverageDirectory, { recursive: true, force: true });
+  await mkdir(coverageDirectory, { recursive: true });
+}
 
 async function findTests(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -29,7 +37,11 @@ const child = spawn(process.execPath, [
   "--test",
   "--test-reporter=spec",
   ...testFiles,
-], { cwd: projectRoot, stdio: "inherit" });
+], {
+  cwd: projectRoot,
+  stdio: "inherit",
+  ...(coverageDirectory ? { env: { ...process.env, NODE_V8_COVERAGE: coverageDirectory } } : {}),
+});
 
 const exitCode = await new Promise((resolveExit, reject) => {
   child.once("error", reject);

@@ -1,4 +1,5 @@
-import { renderButton, renderSelect } from "./ui-controls";
+import { renderButton } from "./ui-buttons";
+import { renderSelect } from "./ui-form-controls";
 import type { TabItem } from "./ui-types";
 
 /** Renders a complete ARIA tablist with roving tab focus. */

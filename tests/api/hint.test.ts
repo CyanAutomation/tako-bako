@@ -133,10 +133,17 @@ describe("hint proxy", () => {
 
   it("rejects malformed or unsupported hint requests before contacting Yokaiba", async () => {
     const upstream = mock.fn(); stubGlobal("fetch", upstream);
-    const { response, result } = responseRecorder();
-    await handler({ method: "POST", body: { puzzleToken: "", kind: "everything" } } as never, response as never);
-    assert.strictEqual(upstream.mock.callCount() > 0, false);
-    assert.strictEqual(result.statusCode, 400);
+    const invalidBodies = [
+      { puzzleToken: "", kind: "clue" },
+      { puzzleToken: "valid-token", kind: "everything" },
+      { puzzleToken: "valid-token", hintsUsed: -1 },
+    ];
+    for (const body of invalidBodies) {
+      const { response, result } = responseRecorder();
+      await handler({ method: "POST", body } as never, response as never);
+      assert.strictEqual(result.statusCode, 400);
+    }
+    assert.strictEqual(upstream.mock.callCount(), 0);
   });
 
   it("sets an allow header for unsupported methods", async () => {
