@@ -17,6 +17,7 @@ describe("shared UI primitives", () => {
     assert.match(markup, /<option value="weight" selected>Weight<\/option>/);
     assert.match(markup, /role="tablist" aria-label="Choose working grid"/);
     assert.match(markup, /id="grid-tab-weight"[^>]*role="tab"[^>]*aria-controls="grid-weight"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+    assert.match(markup, /id="grid-tab-weight"[^>]*data-grid-tab="weight"/);
     assert.match(markup, /id="grid-tab-club"[^>]*role="tab"[^>]*aria-selected="false"[^>]*tabindex="-1"/);
     assert.strictEqual((markup.match(/role="tab"[^>]*tabindex="0"/g) ?? []).length, 1);
   });
@@ -57,16 +58,6 @@ describe("shared UI primitives", () => {
     assert.match(toggle, /aria-label="Smart marking: on"/);
     assert.match(toggle, /aria-pressed="true"/);
     assert.match(toggle, /<span>Smart marking: on<\/span>/);
-  });
-
-  it("[TB-ACCESS-01] preserves the tab relationship and roving focus state", () => {
-    const tab = renderButton({ label: "Club", id: "grid-tab-club", role: "tab", ariaControls: "grid-club", selected: true, tabIndex: 0, className: "grid-tab", data: { gridTab: "club" } });
-
-    assert.match(tab, /role="tab"/);
-    assert.match(tab, /aria-controls="grid-club"/);
-    assert.match(tab, /aria-selected="true"/);
-    assert.match(tab, /tabindex="0"/);
-    assert.match(tab, /data-grid-tab="club"/);
   });
 
   it("escapes every dynamic button attribute while retaining false and zero states", () => {
@@ -116,7 +107,7 @@ describe("shared UI primitives", () => {
     assert.match(current, /<button\b[^>]*aria-label="Beginner Level 2, current"[^>]*disabled/);
   });
 
-  it("renders a reusable accessible dialog with labelled actions", () => {
+  it("[TB-ACCESS-04] renders a dialog with an accessible title, description, and supplied actions", () => {
     const markup = renderDialog({
       id: "reset-grid",
       eyebrow: "Reset grid",
@@ -125,10 +116,10 @@ describe("shared UI primitives", () => {
       actions: '<button id="cancel">Cancel</button>',
     });
 
-    assert.ok((markup).includes('<dialog id="reset-grid" class="confirm-modal" open'));
-    assert.ok((markup).includes('aria-modal="true"'));
-    assert.ok((markup).includes('aria-labelledby="reset-grid-title"'));
-    assert.ok((markup).includes('aria-describedby="reset-grid-description"'));
+    assert.match(markup, /<dialog id="reset-grid" class="confirm-modal" open aria-modal="true" aria-labelledby="reset-grid-title" aria-describedby="reset-grid-description">/);
+    assert.match(markup, /<h2 id="reset-grid-title">Clear Weight\?<\/h2>/);
+    assert.match(markup, /<p id="reset-grid-description">This clears every mark\.<\/p>/);
+    assert.match(markup, /<div class="modal-actions"><button id="cancel">Cancel<\/button><\/div>/);
     const picker = renderDialog({ id: "picker", title: "Pick", description: "Choose one.", content: "<section>choices</section>", actions: "<button>Close</button>", className: "course-dialog" });
     assert.ok((picker).includes('class="confirm-modal course-dialog"'));
     assert.ok((picker).includes('<div class="dialog-content"><section>choices</section></div>'));

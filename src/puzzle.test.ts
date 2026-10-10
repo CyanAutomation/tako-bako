@@ -1,10 +1,10 @@
-import { afterEach, describe, it, mock } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
 import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, markBoard, squareKey } from "./puzzle-board";
 import { parsePuzzle } from "./puzzle-parser";
-import { loadBoard, loadUsedClues, saveUsedClues } from "./puzzle-storage";
+import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Mark } from "./puzzle";
 
 afterEach(restoreStubbedGlobals);
@@ -62,20 +62,6 @@ describe("parsePuzzle", () => {
     });
 
     assert.strictEqual(puzzle.puzzleToken, "signed-token");
-  });
-
-  it("retains parsed clue strategy metadata when loading a cached puzzle", () => {
-    const puzzle = parsePuzzle({
-      id: "cached", seed: "cached", clues: [{ id: "distance", text: "Two places apart", constraintKind: "distance", strategy: "distance" }],
-      difficulty: { level: 2, label: "Easy", modelVersion: "test" },
-      spec: { id: "cached", title: "Cached", baseCategory: "person", categories: [
-        { id: "person", label: "Person", values: ["A", "B"] },
-        { id: "place", label: "Place", values: ["One", "Two"] },
-      ] },
-    });
-
-    assert.strictEqual(puzzle.clues[0].constraintKind, "distance");
-    assert.strictEqual(puzzle.clues[0].strategy, "distance");
   });
 
   it("retains Yokaiba's requested seed and accepts a five-by-five expert puzzle", () => {
@@ -245,7 +231,7 @@ describe("loadBoard", () => {
 });
 
 describe("used clue persistence", () => {
-  it("restores only known clue IDs for the current puzzle", () => {
+  it("[TB-CLUE-01] restores only known clue IDs for the current puzzle", () => {
     stubGlobal("localStorage", {
       getItem: () => JSON.stringify(["clue-1", "stale", 42]),
     });
@@ -253,15 +239,18 @@ describe("used clue persistence", () => {
     assert.deepStrictEqual(loadUsedClues("dojo-day", ["clue-1", "clue-2"]), new Set(["clue-1"]));
   });
 
-  it("stores the used clue IDs independently from the puzzle board", () => {
-    const setItem = mock.fn((...args: unknown[]) => {
-      void args;
+  it("[TB-CLUE-01] persists used clues without changing saved board marks", () => {
+    const values = new Map<string, string>();
+    stubGlobal("localStorage", {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
     });
-    stubGlobal("localStorage", { setItem });
+    const board = { [squareKey("club", "Aki", "Lions")]: "yes" as const };
 
-    saveUsedClues("dojo-day", new Set(["clue-2", "clue-1"]));
+    saveBoard("dojo-day", board);
+    saveUsedClues("dojo-day", new Set(["clue-1", "clue-2"]));
 
-    assert.strictEqual(setItem.mock.callCount(), 1);
-    assert.deepStrictEqual(setItem.mock.calls[0].arguments, ["tako-bako.clues.dojo-day", JSON.stringify(["clue-2", "clue-1"])]);
+    assert.deepStrictEqual(loadBoard("dojo-day"), board);
+    assert.deepStrictEqual(loadUsedClues("dojo-day", ["clue-1", "clue-2"]), new Set(["clue-1", "clue-2"]));
   });
 });

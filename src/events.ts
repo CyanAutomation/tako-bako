@@ -5,9 +5,10 @@ export const MAX_MISTAKES_COUNT = 100;
 export const MIN_DIFFICULTY_LEVEL = 1;
 export const MAX_DIFFICULTY_LEVEL = 12;
 
-/** Clamps elapsed playing time to 24 hours; returns undefined when no start time is known. */
-export function clampElapsedMs(startedAt: number, now: number = Date.now()): number | undefined {
-  return startedAt ? Math.min(MAX_ELAPSED_MS, now - startedAt) : undefined;
+/** Bounds elapsed playing time to 0–24 hours; returns undefined when no start time is known. */
+export function clampElapsedMs(startedAt: number | undefined, now: number = Date.now()): number | undefined {
+  if (startedAt === undefined) return undefined;
+  return Math.min(MAX_ELAPSED_MS, Math.max(0, now - startedAt));
 }
 
 export interface GameEventPayload {
