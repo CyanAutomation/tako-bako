@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { renderBoardToolbar, renderCluePanel, renderCurriculum, renderGridWorkspace, renderPuzzleHeader } from "./sections";
+import { renderBoardToolbar } from "./sections/board-toolbar";
+import { renderCluePanel } from "./sections/clue-panel";
+import { renderCurriculum } from "./sections/curriculum";
+import { renderGridWorkspace } from "./sections/grid-workspace";
+import { renderPuzzleHeader } from "./sections/puzzle-header";
 
 describe("puzzle UI sections", () => {
   it("announces puzzle status and displays its difficulty in the header", () => {

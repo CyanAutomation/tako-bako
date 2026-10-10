@@ -1,10 +1,8 @@
-import { CACHE_FRESH_LIFETIME_SECONDS } from "./cache-policy";
+import { CACHE_FRESH_LIFETIME_SECONDS } from "../cache-policy";
 
 const CACHE_PREFIX = "tako-bako.puzzle.v2";
 /** A puzzle must never be retained more than five minutes after it was generated. */
 export const CACHE_TTL_MS = CACHE_FRESH_LIFETIME_SECONDS * 1_000;
-const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
-const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
 const MAX_CACHE_ENTRIES = 20;
 const OWNED_CACHE_PREFIX = `${CACHE_PREFIX}:`;
 
@@ -14,12 +12,6 @@ export interface SessionStorageLike {
   key(index: number): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
-}
-
-export interface PuzzleCacheRequest {
-  readonly seed: string;
-  readonly difficultyLevel: number | undefined;
-  readonly templateId: string;
 }
 
 interface CachedPuzzle<T> {
@@ -112,21 +104,6 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
   }
 }
 
-/**
- * Derives the browser-cache deadline from the generation time attached by our API.
- * Missing, malformed, stale, or implausibly future metadata is deliberately not
- * cacheable. A small future tolerance avoids disabling caching for clock skew.
- */
-export function puzzleResponseExpiry(headers: Pick<Headers, "get"> | undefined, now = Date.now()): number | undefined {
-  if (!headers) return undefined;
-  const rawGeneratedAt = headers.get(PUZZLE_GENERATED_AT_HEADER);
-  if (!rawGeneratedAt || !/^\d+$/.test(rawGeneratedAt)) return undefined;
-  const generatedAt = Number(rawGeneratedAt);
-  if (!Number.isSafeInteger(generatedAt) || generatedAt > now + MAX_GENERATED_AT_CLOCK_SKEW_MS) return undefined;
-  const expiresAt = generatedAt + CACHE_TTL_MS;
-  return expiresAt > now ? Math.min(expiresAt, now + CACHE_TTL_MS) : undefined;
-}
-
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
 export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1"): void {
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return;
@@ -151,11 +128,4 @@ export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, 
       // Private browsing or persistent quota failures should never block play.
     }
   }
-}
-
-/** Stores a response only while its request is current, using that request's immutable identity. */
-export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, expiresAt: number | undefined, isCurrent: boolean, now = Date.now()): void {
-  if (!isCurrent) return;
-  if (expiresAt === undefined) return;
-  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, expiresAt, now, request.templateId);
 }

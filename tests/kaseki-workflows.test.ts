@@ -5,7 +5,7 @@ import test from "node:test";
 import { parseDocument } from "yaml";
 
 import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.mjs";
-import { createKasekiStatusFetcher, pollKasekiRun } from "../scripts/kaseki/wait-for-run.mjs";
+import { createKasekiStatusFetcher, pollKasekiRun, runKasekiPolling } from "../scripts/kaseki/wait-for-run.mjs";
 
 type WorkflowStep = { name?: string; uses?: string; run?: string; with?: Record<string, unknown>; env?: Record<string, string> };
 type WorkflowJob = {
@@ -276,4 +276,51 @@ test("[CI-KASEKI-03] polling rejects unsupported states and expired deadlines", 
     wait: async () => undefined,
   }), /timed out/);
   assert.equal(requests, 0);
+});
+
+test("[CI-KASEKI-03] polling entrypoint writes successful status and reports completion", async () => {
+  const output: string[] = [];
+  let stdout = "";
+  const result = await runKasekiPolling({
+    env: {
+      RUN_ID: "run_123",
+      SUBMITTED_AT: "1",
+      KASEKI_BASE_URL: "https://kaseki.example",
+      KASEKI_API_TOKEN: "test-token",
+      GITHUB_OUTPUT: "github-output",
+    },
+    fetchImpl: async (input: URL | RequestInfo, init?: RequestInit) => {
+      assert.equal(String(input), "https://kaseki.example/api/v1/runs/run_123/status");
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-token");
+      return new Response(JSON.stringify({ status: "completed", exitCode: 0 }));
+    },
+    appendOutput: (path: string, contents: string) => output.push(`${path}:${contents}`),
+    stdout: { write: (contents: string) => { stdout += contents; return true; } },
+    now: () => 1_000,
+    wait: async () => undefined,
+  });
+
+  assert.deepStrictEqual(result, { status: "completed", exitCode: 0 });
+  assert.deepStrictEqual(output, ["github-output:status=completed\n"]);
+  assert.equal(stdout, "Kaseki status: completed with exit code 0\n");
+});
+
+test("[CI-KASEKI-03] polling entrypoint writes terminal failure before failing the job", async () => {
+  const output: string[] = [];
+  await assert.rejects(runKasekiPolling({
+    env: {
+      RUN_ID: "run_123",
+      SUBMITTED_AT: "1",
+      KASEKI_BASE_URL: "https://kaseki.example",
+      KASEKI_API_TOKEN: "test-token",
+      GITHUB_OUTPUT: "github-output",
+    },
+    fetchImpl: async () => new Response(JSON.stringify({ status: "cancelled" })),
+    appendOutput: (path: string, contents: string) => output.push(`${path}:${contents}`),
+    stdout: { write: () => true },
+    now: () => 1_000,
+    wait: async () => undefined,
+  }), /Kaseki run ended with status cancelled/);
+
+  assert.deepStrictEqual(output, ["github-output:status=cancelled\n"]);
 });

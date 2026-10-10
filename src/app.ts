@@ -1,8 +1,10 @@
-import { answerFromBoard, boardSolveProgress, markBoard, squareKey } from "./puzzle-board";
+import { markBoard, squareKey } from "./puzzle-board/marks";
+import { answerFromBoard } from "./puzzle-board/solution";
+import { updateBoardView as updateBoardDom } from "./app-board-view";
 import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
-import { parseAnswerVerification } from "./answer-verification";
-import { createHintRequestBody, parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
+import { createHintRequestBody, type ParsedHintResponse } from "./hint-request";
+import { fetchClueStrategies, requestAnswerVerification, requestHintResponse } from "./app-requests";
 import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
@@ -10,14 +12,13 @@ import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
-import { completeCourse, loadProgress, resetProgress, saveProgress, shouldAdvanceProgress } from "./progress";
+import { completeCourse, resetProgress, shouldAdvanceProgress } from "./progress";
+import { loadProgress, saveProgress } from "./progress-storage";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
-import { parseClueStrategyResults } from "./clue-strategy-results";
 import type { ClueStrategy } from "./clue-strategy-catalog";
-import { type ClueFilter } from "./sections";
+import { type ClueFilter } from "./sections/clue-panel";
 import { trapDialogTab } from "./ui-dialog";
-import { gridCellLabel, nextGridCellKey } from "./ui-grid";
-import { nextTabId } from "./ui-tabs";
+import { handleGridCellKeydown, handleGridTabKeydown } from "./app-keyboard";
 import type { StatusTone } from "./ui-types";
 
 export interface AppAssets {
@@ -180,23 +181,16 @@ function invalidateClueStrategies(): void {
 }
 
 async function loadClueStrategies(requestedPuzzle: Puzzle): Promise<void> {
-  const unresolved = requestedPuzzle.clues.filter(clue => !clue.strategy);
-  if (unresolved.length === 0 || !requestedPuzzle.puzzleToken) return;
+  if (!requestedPuzzle.puzzleToken || requestedPuzzle.clues.every(clue => clue.strategy)) return;
   const requestGeneration = ++clueStrategyGeneration;
   activeClueStrategyRequest?.abort();
   const requestController = new AbortController();
   activeClueStrategyRequest = requestController;
   try {
-    const result = await fetch("/api/clue-strategies", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ puzzleToken: requestedPuzzle.puzzleToken, clues: unresolved.map(({ id, text, constraintKind }) => ({ id, text, ...(constraintKind ? { constraintKind } : {}) })) }),
-      signal: requestController.signal,
-    });
-    if (!result.ok) return;
-    const strategies = parseClueStrategyResults(await result.json(), unresolved.map(clue => clue.id));
+    const strategies = await fetchClueStrategies(requestedPuzzle, requestController.signal);
+    if (!strategies) return;
     if (requestGeneration !== clueStrategyGeneration || puzzle?.id !== requestedPuzzle.id) return;
-    clueStrategies = { ...clueStrategies, ...Object.fromEntries(strategies) };
+    clueStrategies = { ...clueStrategies, ...strategies };
     render();
   } catch {
     // Clue labels are optional and must not block puzzle play.
@@ -380,21 +374,6 @@ async function checkAnswer(): Promise<void> {
   }
 }
 
-async function requestAnswerVerification(token: string, answer: NonNullable<ReturnType<typeof answerFromBoard>>, signal: AbortSignal, isActive: () => boolean): Promise<boolean | undefined> {
-  const result = await fetch("/api/puzzle", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ puzzleToken: token, answer }),
-    signal,
-  });
-  if (!isActive()) return undefined;
-  if (!result.ok) throw new Error("Verification is unavailable");
-  const correct = parseAnswerVerification(await result.json());
-  if (!isActive()) return undefined;
-  if (correct === undefined) throw new Error("Invalid verification response");
-  return correct;
-}
-
 function applyAnswerResult(correct: boolean, requestedPlayMode: PlayMode, requestedCourse: Course): void {
   if (!correct) {
     mistakes = Math.min(100, mistakes + 1);
@@ -464,20 +443,6 @@ async function requestHint(): Promise<void> {
       render();
     }
   }
-}
-
-async function requestHintResponse(body: HintRequestBody, signal: AbortSignal, isActive: () => boolean): Promise<ParsedHintResponse | undefined> {
-  const response = await fetch("/api/hint", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!isActive()) return undefined;
-  const hint = parseHintResponse(await response.json());
-  if (!isActive()) return undefined;
-  if (!response.ok || !hint) throw new Error("Hint unavailable");
-  return hint;
 }
 
 function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousBoard: Board, previousUsedClueIds: ReadonlySet<string>): void {
@@ -559,74 +524,6 @@ function focusGridCell(key: string): void {
   next.setAttribute("tabindex", "0");
   activeCellKey = key;
   next.focus();
-}
-
-function changedBoardCell(key: string, current: Puzzle, base: Puzzle["spec"]["categories"][number]): { cell: HTMLButtonElement; row: string; column: string } | undefined {
-  const [categoryId, encodedRow, encodedColumn] = key.split("|");
-  if (!categoryId || !encodedRow || !encodedColumn) return undefined;
-  const category = current.spec.categories.find(candidate => candidate.id === categoryId);
-  if (!category || category.id === base.id) return undefined;
-  const cell = root.querySelector<HTMLButtonElement>(`[data-square="${CSS.escape(key)}"]`);
-  if (!cell) return undefined;
-  return { cell, row: decodeURIComponent(encodedRow), column: decodeURIComponent(encodedColumn) };
-}
-
-/** Updates only the cells and board controls changed by a mark, preserving the live grid DOM. */
-function updateBoardCell(key: string, current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
-  const target = changedBoardCell(key, current, base);
-  if (!target) return;
-  const mark = board[key] ?? "unknown";
-  target.cell.className = `mark mark-${mark}`;
-  target.cell.setAttribute("aria-label", gridCellLabel(target.row, target.column, mark));
-  const symbol = target.cell.querySelector("span") ?? target.cell;
-  symbol.textContent = mark === "yes" ? "✓" : mark === "no" ? "×" : "";
-}
-
-function updateChangedBoardCells(previous: Board, current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
-  const changedKeys = [...new Set([...Object.keys(previous), ...Object.keys(board)])]
-    .filter(key => previous[key] !== board[key]);
-  for (const key of changedKeys) updateBoardCell(key, current, base);
-}
-
-function updateProgressDisplay(progress: ReturnType<typeof boardSolveProgress>): void {
-  const progressElement = root.querySelector<HTMLElement>(".progress");
-  if (progressElement) progressElement.textContent = `${progress.matches} of ${progress.total} matches found`;
-  const readinessMeter = root.querySelector<HTMLProgressElement>(".readiness-meter__bar");
-  if (readinessMeter) {
-    readinessMeter.max = Math.max(progress.total, 1);
-    readinessMeter.value = Math.min(progress.matches, readinessMeter.max);
-    readinessMeter.setAttribute("aria-label", `${progress.matches} of ${progress.total} matches found`);
-  }
-}
-
-function updateBoardActionControls(current: Puzzle): void {
-  const check = root.querySelector<HTMLButtonElement>("#check-solution");
-  if (check) check.disabled = loading || !current.puzzleToken || !answerFromBoard(board, current.spec);
-  const undo = root.querySelector<HTMLButtonElement>("#undo");
-  if (undo) undo.disabled = loading || undoStack.length === 0;
-  const reset = root.querySelector<HTMLButtonElement>("#reset-board");
-  if (reset) reset.disabled = loading || Object.keys(board).length === 0;
-}
-
-function updateBoardProgressControls(current: Puzzle): void {
-  updateProgressDisplay(boardSolveProgress(board, current.spec));
-  updateBoardActionControls(current);
-}
-
-function updateGridResetControls(current: Puzzle, base: Puzzle["spec"]["categories"][number]): void {
-  for (const category of current.spec.categories) {
-    if (category.id === base.id) continue;
-    const reset = root.querySelector<HTMLButtonElement>(`#grid-reset-${CSS.escape(category.id)}`);
-    if (reset) reset.disabled = !Object.keys(board).some(key => key.split("|")[0] === category.id);
-  }
-}
-
-function updateBoardView(previous: Board, current: Puzzle): void {
-  const base = current.spec.categories.find(category => category.id === current.spec.baseCategory);
-  if (!base) return;
-  updateChangedBoardCells(previous, current, base);
-  updateBoardProgressControls(current);
-  updateGridResetControls(current, base);
 }
 
 function selectGrid(gridId: string, focus = false): void {
@@ -819,7 +716,7 @@ function handleBoardSquareClick(button: HTMLButtonElement): boolean {
   if (!category || !base) return true;
   const previous = board;
   saveCurrentBoard(markBoard(board, key, category, base, smartMarking));
-  updateBoardView(previous, current);
+  updateBoardDom({ root, previous, current, board, loading, undoCount: undoStack.length });
   focusGridCell(key);
   return true;
 }
@@ -895,32 +792,9 @@ function handleDialogKeydown(event: KeyboardEvent): boolean {
   return true;
 }
 
-function handleGridCellKeydown(event: KeyboardEvent): boolean {
-  const cell = (event.target as Element).closest<HTMLButtonElement>("button[data-square]");
-  if (!cell || !puzzle || cell.disabled || !cell.dataset.square) return false;
-  const category = puzzle.spec.categories.find(candidate => candidate.id === cell.dataset.square!.split("|")[0]);
-  const base = puzzle.spec.categories.find(candidate => candidate.id === puzzle!.spec.baseCategory);
-  if (!category || !base) return false;
-  const nextKey = nextGridCellKey({ categoryId: category.id, rows: base.values, columns: category.values, key: cell.dataset.square, keyName: event.key });
-  if (!nextKey) return false;
-  event.preventDefault();
-  focusGridCell(nextKey);
-  return true;
-}
-
-function handleGridTabKeydown(event: KeyboardEvent): void {
-  const tab = (event.target as Element).closest<HTMLButtonElement>("button[data-grid-tab]");
-  if (!tab || !puzzle || !tab.dataset.gridTab) return;
-  const categories = puzzle.spec.categories.filter(category => category.id !== puzzle!.spec.baseCategory);
-  const nextGridId = nextTabId(categories, tab.dataset.gridTab, event.key);
-  if (!nextGridId) return;
-  event.preventDefault();
-  selectGrid(nextGridId, true);
-}
-
 function handleGridKeydown(event: KeyboardEvent): void {
-  if (handleGridCellKeydown(event)) return;
-  handleGridTabKeydown(event);
+  if (handleGridCellKeydown(event, puzzle, focusGridCell)) return;
+  handleGridTabKeydown(event, puzzle, selectGrid);
 }
 
 root.addEventListener("keydown", event => {

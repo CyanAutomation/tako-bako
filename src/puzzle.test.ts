@@ -2,7 +2,8 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
-import { answerFromBoard, boardProgress, boardSolveProgress, cycleMark, markBoard, squareKey } from "./puzzle-board";
+import { cycleMark, markBoard, squareKey } from "./puzzle-board/marks";
+import { answerFromBoard, boardProgress, boardSolveProgress } from "./puzzle-board/solution";
 import { parsePuzzle } from "./puzzle-parser";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Mark } from "./puzzle";

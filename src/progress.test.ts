@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { completeCourse, emptyProgress, isCourseUnlocked, parseProgress, shouldAdvanceProgress } from "./progress";
+import { completeCourse, emptyProgress, isCourseUnlocked, shouldAdvanceProgress } from "./progress";
+import { parseProgress } from "./progress-storage";
 
 describe("Puzzle Challenge progress", () => {
   it("starts with Beginner Level 1 as the only available course", () => {
