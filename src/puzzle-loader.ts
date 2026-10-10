@@ -57,12 +57,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function responseBody(response: Response): Promise<unknown> {
-  try {
-    return await response.json();
-  } catch {
-    return undefined;
-  }
+function responseBody(response: Response): Promise<unknown> {
+  return response.json().catch(() => undefined);
 }
 
 async function failureForUnavailableDifficulty(response: Response): Promise<Error> {
