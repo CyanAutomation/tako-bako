@@ -1,5 +1,6 @@
 import { markBoard, squareKey } from "./puzzle-board/marks";
 import { answerFromBoard } from "./puzzle-board/solution";
+import { resolveAnswerOutcome } from "./app-answer-outcome";
 import { updateBoardView as updateBoardDom } from "./app-board-view";
 import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
@@ -12,7 +13,7 @@ import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
-import { completeCourse, resetProgress, shouldAdvanceProgress } from "./progress";
+import { resetProgress } from "./progress";
 import { loadProgress, saveProgress } from "./progress-storage";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
@@ -375,23 +376,15 @@ async function checkAnswer(): Promise<void> {
 }
 
 function applyAnswerResult(correct: boolean, requestedPlayMode: PlayMode, requestedCourse: Course): void {
-  if (!correct) {
-    mistakes = Math.min(100, mistakes + 1);
-    recordOutcome("mistake");
-    setMessage("Not quite yet. Your notes are saved, so keep refining the grid.", "warning");
-    return;
+  const outcome = resolveAnswerOutcome({ correct, playMode: requestedPlayMode, course: requestedCourse, progress });
+  mistakes = Math.min(100, mistakes + outcome.mistakeCountDelta);
+  recordOutcome(outcome.event);
+  if (outcome.persistProgress) {
+    progress = outcome.progress;
+    saveProgress(localStorage, progress);
   }
-  recordOutcome("puzzle_completed");
-  if (!shouldAdvanceProgress(requestedPlayMode)) {
-    setMessage("Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.", "success");
-    pendingCelebration = true;
-    return;
-  }
-  progress = completeCourse(progress, requestedCourse.id);
-  saveProgress(localStorage, progress);
-  const next = nextCourse(requestedCourse);
-  setMessage(next ? `Beautifully solved — ${requestedCourse.label} is complete. ${next.label} is now ready!` : "Beautifully solved — you have completed every Puzzle Challenge level!", "success");
-  pendingCelebration = true;
+  setMessage(outcome.message, outcome.tone);
+  if (outcome.celebrate) pendingCelebration = true;
 }
 
 async function requestHint(): Promise<void> {

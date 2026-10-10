@@ -49,6 +49,8 @@ interface ParsedHintRequest {
   hintIndex?: number;
 }
 
+const HINT_STRENGTHS: readonly HintStrength[] = ["clue", "elimination", "placement"];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -120,15 +122,24 @@ function parseSelectionContext(value: Record<string, unknown>): SelectionContext
 }
 
 function parseHintRequest(value: Record<string, unknown>): ParsedHintRequest | undefined {
-  if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
-  if (value.kind !== undefined && value.kind !== "clue" && value.kind !== "elimination" && value.kind !== "placement") return undefined;
-  if (value.hintsUsed !== undefined && !isBoundedInteger(value.hintsUsed, 0, MAX_HINT_COUNT)) return undefined;
+  const { puzzleToken, kind, hintsUsed } = value;
+  if (!isBoundedText(puzzleToken, MAX_TOKEN_LENGTH)) return undefined;
+  if (!isOptionalHintStrength(kind)) return undefined;
+  if (!isOptionalHintCount(hintsUsed)) return undefined;
   return {
     body: value,
-    puzzleToken: value.puzzleToken,
-    kind: value.kind as HintStrength | undefined,
-    ...(typeof value.hintsUsed === "number" && value.hintsUsed > 0 ? { hintIndex: value.hintsUsed } : {}),
+    puzzleToken,
+    kind,
+    ...(hintsUsed !== undefined && hintsUsed > 0 ? { hintIndex: hintsUsed } : {}),
   };
+}
+
+function isOptionalHintStrength(value: unknown): value is HintStrength | undefined {
+  return value === undefined || HINT_STRENGTHS.includes(value as HintStrength);
+}
+
+function isOptionalHintCount(value: unknown): value is number | undefined {
+  return value === undefined || isBoundedInteger(value, 0, MAX_HINT_COUNT);
 }
 
 function isBoundedInteger(value: unknown, minimum: number, maximum: number): value is number {
