@@ -61,6 +61,21 @@ describe("loadPuzzle", () => {
     }), error => error instanceof DifficultyUnavailableError && error.message.includes("Levels 1, 3"));
   });
 
+  it("uses the generic difficulty message when a 422 response has invalid JSON or levels", async () => {
+    const responses = [
+      new Response("not-json", { status: 422 }),
+      new Response(JSON.stringify({ availableDifficultyLevels: [0, 13] }), { status: 422 }),
+      new Response(JSON.stringify({ availableDifficultyLevels: "2" }), { status: 422 }),
+    ];
+
+    for (const response of responses) {
+      await assert.rejects(loadPuzzle(request, {
+        storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
+        fetcher: async () => response,
+      }), error => error instanceof DifficultyUnavailableError && error.message === "This seed cannot produce the selected difficulty. Try another puzzle.");
+    }
+  });
+
   it("uses the retry-after value for rate limited puzzle requests", async () => {
     await assert.rejects(loadPuzzle(request, {
       storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
@@ -73,6 +88,22 @@ describe("loadPuzzle", () => {
       storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
       fetcher: async () => new Response(JSON.stringify({ error: "Yokaiba took too long to respond. Please try again." }), { status: 504 }),
     }), /Yokaiba took too long to respond/);
+  });
+
+  it("uses the generic message for malformed or unbounded server errors", async () => {
+    const responses = [
+      new Response("not-json", { status: 500 }),
+      new Response(JSON.stringify({ error: "   " }), { status: 502 }),
+      new Response(JSON.stringify({ error: "x".repeat(241) }), { status: 503 }),
+      new Response(JSON.stringify({ error: { message: "not a string" } }), { status: 504 }),
+    ];
+
+    for (const response of responses) {
+      await assert.rejects(loadPuzzle(request, {
+        storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
+        fetcher: async () => response,
+      }), error => error instanceof Error && error.message === "The puzzle could not be collected. Please try again.");
+    }
   });
 
   it("turns a disconnected puzzle API into a useful connection message", async () => {

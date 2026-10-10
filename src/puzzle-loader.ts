@@ -53,41 +53,60 @@ function availableDifficultyLevels(value: unknown): number[] {
   return [...new Set(value)].sort((left, right) => left - right);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function responseBody(response: Response): Promise<unknown> {
+  return response.json().catch(() => undefined);
+}
+
+async function failureForUnavailableDifficulty(response: Response): Promise<Error> {
+  const body = await responseBody(response);
+  const levels = isRecord(body) ? availableDifficultyLevels(body.availableDifficultyLevels) : [];
+  return new DifficultyUnavailableError(levels);
+}
+
+function boundedApiError(body: unknown): Error | undefined {
+  if (!isRecord(body)) return undefined;
+  const message = body.error;
+  if (typeof message !== "string" || message.trim().length === 0 || message.length > MAX_API_ERROR_MESSAGE_LENGTH) return undefined;
+  return new Error(message.trim());
+}
+
+async function failureForServerError(response: Response): Promise<Error> {
+  return boundedApiError(await responseBody(response)) ?? new Error(GENERIC_PUZZLE_LOAD_ERROR);
+}
+
 async function failureForResponse(response: Response): Promise<Error> {
-  if (response.status === 422) {
-    const body = await response.json().catch(() => undefined) as { availableDifficultyLevels?: unknown } | undefined;
-    return new DifficultyUnavailableError(availableDifficultyLevels(body?.availableDifficultyLevels));
-  }
+  if (response.status === 422) return failureForUnavailableDifficulty(response);
   if (response.status === 429) return new Error(retryAfterMessage(response.headers.get("retry-after")));
-  if (response.status >= 500) {
-    const body: unknown = await response.json().catch(() => undefined);
-    if (body && typeof body === "object" && !Array.isArray(body)) {
-      const message = (body as { error?: unknown }).error;
-      if (typeof message === "string" && message.trim().length > 0 && message.length <= MAX_API_ERROR_MESSAGE_LENGTH) {
-        return new Error(message.trim());
-      }
-    }
-  }
+  if (response.status >= 500) return failureForServerError(response);
   return new Error(GENERIC_PUZZLE_LOAD_ERROR);
 }
 
-async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Puzzle> {
+function puzzleRequestUrl(request: PuzzleLoadRequest): string {
   const query = new URLSearchParams({
     seed: request.seed,
     templateId: request.templateId,
     ...(request.difficultyLevel ? { difficultyLevel: String(request.difficultyLevel) } : {}),
   });
-  let response: Response;
+  return `/api/puzzle?${query}`;
+}
+
+async function fetchPuzzleResponse(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Response> {
+  const url = puzzleRequestUrl(request);
   try {
-    response = await (dependencies.fetcher ?? fetch)(`/api/puzzle?${query}`, { signal: dependencies.signal });
+    return await (dependencies.fetcher ?? fetch)(url, { signal: dependencies.signal });
   } catch (error) {
     if (dependencies.signal.aborted) throw error;
     throw new Error(PUZZLE_SERVICE_UNAVAILABLE_MESSAGE);
   }
-  if (!response.ok) throw await failureForResponse(response);
+}
 
+async function parseAndCachePuzzle(response: Response, request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Puzzle> {
   try {
-    const puzzle = parsePuzzle(await response.json());
+    const puzzle = await parsePuzzleFromResponse(response);
     const now = dependencies.now?.() ?? Date.now();
     const expiresAt = puzzleResponseExpiry(response.headers, now);
     savePuzzleResponseToCache(dependencies.storage, request, puzzle, expiresAt, dependencies.isCurrent(), now);
@@ -96,6 +115,16 @@ async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoa
     console.error("tako_bako_client_metric", { event: "puzzle_parse_failed", error: error instanceof Error ? error.message : String(error) });
     throw error;
   }
+}
+
+async function parsePuzzleFromResponse(response: Response): Promise<Puzzle> {
+  return parsePuzzle(await response.json());
+}
+
+async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Puzzle> {
+  const response = await fetchPuzzleResponse(request, dependencies);
+  if (!response.ok) throw await failureForResponse(response);
+  return parseAndCachePuzzle(response, request, dependencies);
 }
 
 /** Loads and validates a puzzle, preferring the current session cache entry. */
