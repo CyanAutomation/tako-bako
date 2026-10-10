@@ -10,19 +10,32 @@ const POLL_INTERVAL_MS = 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 50 * 1_000;
 const MAX_STATUS_BYTES = 1_048_576;
 
-function statusRecord(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new TypeError("Kaseki returned an invalid status response");
-  }
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
-  const { status } = value;
-  if (status === "queued" || status === "running") return undefined;
-  if (status === "failed" || status === "cancelled") return { status };
-  if (status !== "completed") throw new Error("Kaseki returned an unsupported status");
+function pendingStatus(status) {
+  return status === "queued" || status === "running";
+}
 
-  const exitCode = value.exitCode ?? 0;
+function terminalFailureStatus(status) {
+  return status === "failed" || status === "cancelled";
+}
+
+function completedStatus(exitCodeValue) {
+  const exitCode = exitCodeValue ?? 0;
   if (!Number.isSafeInteger(exitCode)) throw new TypeError("Kaseki returned an invalid exit code");
   return exitCode === 0 ? { status: "completed", exitCode: 0 } : { status: "failed", exitCode };
+}
+
+function statusRecord(value) {
+  if (!isRecord(value)) throw new TypeError("Kaseki returned an invalid status response");
+
+  const { status } = value;
+  if (pendingStatus(status)) return undefined;
+  if (terminalFailureStatus(status)) return { status };
+  if (status === "completed") return completedStatus(value.exitCode);
+  throw new Error("Kaseki returned an unsupported status");
 }
 
 export async function pollKasekiRun({

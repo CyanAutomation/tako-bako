@@ -278,6 +278,25 @@ test("[CI-KASEKI-03] polling rejects unsupported states and expired deadlines", 
   assert.equal(requests, 0);
 });
 
+test("[CI-KASEKI-03] polling rejects malformed status records and completion codes", async () => {
+  const malformedResponses: unknown[] = [
+    null,
+    [],
+    {},
+    { status: "completed", exitCode: 1.5 },
+    { status: "completed", exitCode: Number.NaN },
+  ];
+
+  for (const response of malformedResponses) {
+    await assert.rejects(pollKasekiRun({
+      fetchStatus: async () => response,
+      deadlineAt: 60_000,
+      now: () => 0,
+      wait: async () => undefined,
+    }));
+  }
+});
+
 test("[CI-KASEKI-03] polling entrypoint writes successful status and reports completion", async () => {
   const output: string[] = [];
   let stdout = "";

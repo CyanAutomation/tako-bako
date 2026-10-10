@@ -135,8 +135,14 @@ describe("hint proxy", () => {
     const upstream = mock.fn(); stubGlobal("fetch", upstream);
     const invalidBodies = [
       { puzzleToken: "", kind: "clue" },
+      { puzzleToken: 7, kind: "clue" },
+      { puzzleToken: "x".repeat(16_385), kind: "clue" },
       { puzzleToken: "valid-token", kind: "everything" },
       { puzzleToken: "valid-token", hintsUsed: -1 },
+      { puzzleToken: "valid-token", hintsUsed: 101 },
+      { puzzleToken: "valid-token", hintsUsed: 1.5 },
+      { puzzleToken: "valid-token", hintsUsed: "1" },
+      { puzzleToken: "valid-token", hintsUsed: Number.NaN },
     ];
     for (const body of invalidBodies) {
       const { response, result } = responseRecorder();
@@ -144,6 +150,40 @@ describe("hint proxy", () => {
       assert.strictEqual(result.statusCode, 400);
     }
     assert.strictEqual(upstream.mock.callCount(), 0);
+  });
+
+  it("accepts the hint count boundaries and omits a zero hint index", async () => {
+    const upstream = mock.fn(async () => new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    stubGlobal("fetch", upstream);
+
+    for (const [hintsUsed, expected] of [
+      [0, { puzzleToken: "valid-token" }],
+      [100, { puzzleToken: "valid-token", hintIndex: 100 }],
+    ] as const) {
+      const { response, result } = responseRecorder();
+      await handler({ method: "POST", body: { puzzleToken: "valid-token", hintsUsed } } as never, response as never);
+      assert.strictEqual(result.statusCode, 200);
+      const requestBody = String(upstream.mock.calls.at(-1)?.arguments[1]?.body);
+      assert.deepStrictEqual(JSON.parse(requestBody), expected);
+    }
+  });
+
+  it("accepts a puzzle token at the configured size limit", async () => {
+    const upstream = mock.fn(async () => new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    stubGlobal("fetch", upstream);
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "POST", body: { puzzleToken: "x".repeat(16_384) } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    const requestBody = JSON.parse(String(upstream.mock.calls[0]?.arguments[1]?.body)) as { puzzleToken: string };
+    assert.strictEqual(requestBody.puzzleToken.length, 16_384);
   });
 
   it("sets an allow header for unsupported methods", async () => {
