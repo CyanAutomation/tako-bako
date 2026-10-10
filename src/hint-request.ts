@@ -1,8 +1,7 @@
 import { boardSolveProgress, squareKey } from "./puzzle-board";
+import { clampElapsedMs } from "./events";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
-
-const MAX_ELAPSED_MS = 86_400_000;
 
 export interface HintRequestOptions {
   puzzle: Puzzle & { puzzleToken: string };
@@ -12,7 +11,7 @@ export interface HintRequestOptions {
   hintsUsed: number;
   mistakes: number;
   difficultyLevel: number | undefined;
-  puzzleStartedAt: number;
+  puzzleStartedAt: number | undefined;
   now: number;
   smartMarking: boolean;
 }
@@ -70,7 +69,7 @@ export function createHintRequestBody(options: HintRequestOptions): HintRequestB
     totalMatches: progress.total,
     hintsUsed: options.hintsUsed,
     mistakes: options.mistakes,
-    elapsedMs: options.puzzleStartedAt ? Math.min(MAX_ELAPSED_MS, options.now - options.puzzleStartedAt) : 0,
+    elapsedMs: clampElapsedMs(options.puzzleStartedAt, options.now) ?? 0,
     smartMarking: options.smartMarking,
   };
 }

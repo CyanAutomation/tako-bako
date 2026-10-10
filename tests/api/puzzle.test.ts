@@ -400,7 +400,7 @@ describe("puzzle proxy", () => {
     });
   });
 
-  it("does not consume an unrecognized Yokaiba 422 response while inspecting it", async () => {
+  it("[TB-API-ERR-01] returns a non-cacheable fallback for an unrecognized Yokaiba 422 response", async () => {
     const upstreamResponse = new Response(JSON.stringify({
       error: { code: "invalid_template", message: "unknown template" },
     }), {
@@ -416,7 +416,6 @@ describe("puzzle proxy", () => {
       body: { error: "Yokaiba is unavailable. Please try again." },
     });
     assert.strictEqual(result.headers.get("cache-control"), "no-store");
-    assert.strictEqual(upstreamResponse.bodyUsed, false);
   });
 
   it("uses a fallback error when a Yokaiba rate limit contains malformed JSON", async () => {

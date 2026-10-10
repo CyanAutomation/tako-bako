@@ -29,3 +29,23 @@ The follow-up consolidated duplicate button and cache-boundary assertions, repla
 The cache expires records at the exact freshness deadline. `TB-CACHE-01` documents that deadline and the supported cleanup of earlier records without `createdAt`. `TB-OBS-01` documents the generation and health metric fields; tests cover finite, non-negative durations, including a backward wall-clock step. `TB-URL-03` documents that loading an existing puzzle URL does not add a history entry.
 
 The full quality gate passed after this follow-up: lint, all 228 tests, TypeScript checks, and the production build. TDD checks first reproduced the exact-deadline cache bug and negative metric duration, then passed after the fixes.
+
+## Follow-up for the lower-scoring tests
+
+The actionlint source-string assertion was removed because the workflow-validation job downloads a checksum-pinned actionlint binary and runs it against the workflows. The selected-template test now also covers the no-difficulty fallback behavior, and the tab markup test covers the `data-grid-tab` hook; the duplicate cases were removed.
+
+| Contract or area | Revised test | Scores = total | Segment |
+|---|---|---:|---|
+| Elapsed outcome time | [`omits elapsed time until a puzzle has started`](../src/events.test.ts), [`measures elapsed time from any valid start timestamp`](../src/events.test.ts), and [`bounds elapsed time to zero through 24 hours`](../src/events.test.ts) | 2/2/2/2/2 = **10** each | Keep |
+| Hint request duration | [`keeps hint duration bounded and treats epoch as a valid start time`](../src/hint-request.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Saved clue state | [`persists used clues without changing saved board marks`](../src/puzzle.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Progress reset | [`clears Challenge progress while preserving saved puzzle state`](../src/main.test.ts) | 2/2/2/1/2 = **9** | Keep |
+| Cached clue strategy | [`restores clue strategy metadata from a validated cache entry without a request`](../src/puzzle-loader.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Upstream error fallback | [`returns a non-cacheable fallback for an unrecognized Yokaiba 422 response`](../tests/api/puzzle.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Tab relationships | [`renders a labelled grid selector and one keyboard-focusable active tab`](../src/ui.test.ts) | 2/2/1/2/2 = **9** | Keep |
+| Dialog naming | [`renders a dialog with an accessible title, description, and supplied actions`](../src/ui.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Invalid daily date | [`throws a RangeError when given an invalid Date`](../src/daily.test.ts) | 2/1/2/2/2 = **9** | Keep |
+
+The progress-reset integration test uses mocked browser globals, so isolation scores 1 despite fixed inputs and deterministic storage. The invalid-date test remains as a documented module boundary. The elapsed-time tests now distinguish “not started” (`undefined`) from the valid Unix epoch (`0`) and protect the event contract from negative durations after a clock rollback.
+
+These scores are source-based. The focused elapsed-time tests first failed against the previous implementation and passed after the fix. No mutation-testing tool was run for this follow-up; mutation score is not measured here.

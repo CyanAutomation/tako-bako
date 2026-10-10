@@ -6,7 +6,7 @@ import { loadConfigFromFile } from "vite";
 import { yokaibaGenerateParams, YOKAIBA_ORIGIN } from "./yokaiba";
 
 describe("Yokaiba generation parameters", () => {
-  it("[TB-URL-01] sends the selected template and seed", () => {
+  it("[TB-URL-01] sends the selected template and seed without requesting fallback", () => {
     const parameters = yokaibaGenerateParams("tournament-order-v2", "champion-day");
 
     assert.strictEqual(parameters.get("templateId"), "tournament-order-v2");
@@ -22,11 +22,6 @@ describe("Yokaiba generation parameters", () => {
     assert.strictEqual(parameters.get("seed"), "champion-day");
     assert.strictEqual(parameters.get("difficultyLevel"), "8");
     assert.strictEqual(parameters.get("allowSeedFallback"), "true");
-  });
-
-  it("[TB-URL-01] skips allowSeedFallback when no difficulty is given", () => {
-    const parameters = yokaibaGenerateParams("open-division-v2", "seed", undefined);
-    assert.strictEqual(parameters.has("allowSeedFallback"), false);
   });
 
   it("[TB-URL-02] rewrites development puzzle requests with their selected settings", async () => {

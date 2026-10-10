@@ -60,7 +60,7 @@ let clueFilter: ClueFilter = "all";
 let activeCellKey: string | undefined;
 let challengeOptionsOpen = false;
 let sharedPuzzleOpen = false;
-let puzzleStartedAt = 0;
+let puzzleStartedAt: number | undefined;
 let hintsUsed = 0;
 let mistakes = 0;
 
@@ -154,7 +154,7 @@ function showLandingPage(): void {
   clueFilter = "all";
   challengeOptionsOpen = false;
   sharedPuzzleOpen = false;
-  puzzleStartedAt = 0;
+  puzzleStartedAt = undefined;
   hintsUsed = 0;
   mistakes = 0;
   setMessage("Choose your next puzzle when you are ready.");
@@ -494,7 +494,7 @@ function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousB
   setMessage(`Hint: ${hint.clue.text}`);
 }
 
-function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number, usedHints: number, currentMistakes: number): void {
+function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number | undefined, usedHints: number, currentMistakes: number): void {
   postGameEvent({
     schemaVersion: 1,
     event: "hint_used",
