@@ -6,7 +6,7 @@ A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy
 
 ## Getting Started
 
-Prerequisites: Node.js ^24.0.0 || ^22.12.0 (matching package.json engines).
+Prerequisites: Node.js ^24.0.0 (matching package.json engines).
 
 1. Install dependencies:
 

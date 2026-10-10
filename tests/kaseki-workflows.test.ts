@@ -53,16 +53,24 @@ function namedStep(workflow: Workflow, name: string): WorkflowStep {
   return step;
 }
 
-test("CI prioritizes Node 24, tests the supported Node 22 line, and disables matrix fail-fast", () => {
+test("CI and package metadata support only Node 24", () => {
   const workflow = readWorkflow("ci.yml");
   const strategy = workflow.jobs.quality?.strategy;
-  assert.deepStrictEqual(strategy?.matrix?.["node-version"], ["24.x", "22.x"]);
+  assert.deepStrictEqual(strategy?.matrix?.["node-version"], ["24.x"]);
   assert.equal(strategy?.["fail-fast"], false);
 
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
     engines: { node: string };
   };
-  assert.equal(packageJson.engines.node, "^24.0.0 || ^22.12.0");
+  assert.equal(packageJson.engines.node, "^24.0.0");
+
+  const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8")) as {
+    packages: { "": { engines: { node: string } } };
+  };
+  assert.equal(packageLock.packages[""].engines.node, "^24.0.0");
+
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  assert.ok(readme.includes("Prerequisites: Node.js ^24.0.0 (matching package.json engines)."));
 });
 
 test("Kaseki sweeps use Node 24 and share a single main-only preflight action", () => {
