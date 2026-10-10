@@ -39,6 +39,8 @@ function deferred<T>() {
 
 const flush = async (): Promise<void> => {
   for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
+  await new Promise<void>(resolve => setImmediate(resolve));
+  for (let turn = 0; turn < 12; turn += 1) await Promise.resolve();
 };
 
 function mountTestPuzzle(
