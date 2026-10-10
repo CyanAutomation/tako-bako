@@ -1,4 +1,5 @@
-import { escapeHtml, renderButton } from "./ui-controls";
+import { renderButton } from "./ui-buttons";
+import { escapeHtml } from "./ui-escape";
 import type { GridCardOptions, GridCellOptions } from "./ui-types";
 
 /** A standard three-state puzzle-grid control with a descriptive accessible name. */

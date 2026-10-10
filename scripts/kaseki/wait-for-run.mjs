@@ -103,38 +103,53 @@ export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl 
   };
 }
 
-function requiredEnvironment(name) {
-  const value = process.env[name];
+function requiredEnvironment(environment, name) {
+  const value = environment[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
 }
 
-async function main() {
-  const runId = requiredEnvironment("RUN_ID");
-  const submittedAtSeconds = process.env.SUBMITTED_AT
-    ? Number(process.env.SUBMITTED_AT)
-    : Date.now() / 1_000;
+export async function runKasekiPolling({
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  appendOutput = appendFileSync,
+  stdout = process.stdout,
+  now = Date.now,
+  wait = delay,
+} = {}) {
+  const runId = requiredEnvironment(env, "RUN_ID");
+  const submittedAtSeconds = env.SUBMITTED_AT
+    ? Number(env.SUBMITTED_AT)
+    : now() / 1_000;
   if (!Number.isFinite(submittedAtSeconds)) throw new TypeError("SUBMITTED_AT must be a timestamp in seconds");
 
   const fetchStatus = createKasekiStatusFetcher({
-    baseUrl: requiredEnvironment("KASEKI_BASE_URL"),
-    apiToken: requiredEnvironment("KASEKI_API_TOKEN"),
+    baseUrl: requiredEnvironment(env, "KASEKI_BASE_URL"),
+    apiToken: requiredEnvironment(env, "KASEKI_API_TOKEN"),
     runId,
+    fetchImpl,
   });
   const result = await pollKasekiRun({
     fetchStatus,
     deadlineAt: submittedAtSeconds * 1_000 + POLL_TIMEOUT_MS,
+    now,
+    wait,
   });
 
-  const outputFile = requiredEnvironment("GITHUB_OUTPUT");
-  appendFileSync(outputFile, `status=${result.status}\n`);
+  const outputFile = requiredEnvironment(env, "GITHUB_OUTPUT");
+  appendOutput(outputFile, `status=${result.status}\n`);
   if (result.exitCode !== undefined && result.exitCode !== 0) {
     throw new Error(`Kaseki run completed with exit code ${result.exitCode}`);
   }
   if (result.status !== "completed") {
     throw new Error(`Kaseki run ended with status ${result.status}`);
   }
-  process.stdout.write("Kaseki status: completed with exit code 0\n");
+  stdout.write("Kaseki status: completed with exit code 0\n");
+  return result;
+}
+
+async function main() {
+  await runKasekiPolling();
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

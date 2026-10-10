@@ -54,6 +54,8 @@ Tako Bako includes a guided progression called Puzzle Challenge. The course has 
 
 Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layer.
 
+Run `npm run test:coverage` to save raw V8 coverage under `coverage/v8`; pass that directory to `npx fallow health --coverage coverage/v8` for coverage-based CRAP scores.
+
 Selected test contracts and their links to product behavior are listed in [docs/test-traceability.md](docs/test-traceability.md). The follow-up scores and verification evidence are in [docs/test-quality-review.md](docs/test-quality-review.md).
 
 Use individual commands during active development:

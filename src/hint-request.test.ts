@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { createHintRequestBody, parseHintResponse } from "./hint-request";
-import { squareKey } from "./puzzle-board";
+import { squareKey } from "./puzzle-board/marks";
 import type { Puzzle } from "./puzzle";
 
 const puzzle: Puzzle & { puzzleToken: string } = {

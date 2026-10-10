@@ -1,4 +1,5 @@
-import type { ButtonOptions, IconName, LevelCardOptions, PanelOptions, SegmentedControlOptions, SelectOptions, StatusOptions } from "./ui-types";
+import type { ButtonOptions, IconName } from "./ui-types";
+import { escapeHtml } from "./ui-escape";
 
 const iconPaths: Record<IconName, string> = {
   share: '<path d="M14 5h5v5M19 5l-8 8"/><path d="M19 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
@@ -12,8 +13,6 @@ const iconPaths: Record<IconName, string> = {
   "arrow-left": '<path d="m14 5-7 7 7 7"/><path d="M7 12h11"/>',
   "arrow-right": '<path d="m10 5 7 7-7 7"/><path d="M17 12H6"/>',
 };
-
-export const escapeHtml = (value: string) => value.replace(/[&<>'"`]/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;", "`": "&#96;" })[character]!);
 
 function renderIcon(icon: IconName): string {
   return `<svg class="icon icon--${icon}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[icon]}</svg>`;
@@ -66,42 +65,4 @@ function buttonContent(options: ButtonOptions): string {
 /** A consistent semantic button used by page, toolbar, and settings actions. */
 export function renderButton(options: ButtonOptions): string {
   return `<button${buttonAttributes(options)}>${buttonContent(options)}</button>`;
-}
-
-/** A consistent live message banner for loading, progress, and error feedback. */
-export function renderStatus({ message, tone = "neutral" }: StatusOptions): string {
-  return `<p class="status status--${tone}" role="status">${escapeHtml(message)}</p>`;
-}
-
-/** A semantic panel shell shared by supporting content such as clues. */
-export function renderPanel({ tag = "section", className, labelledBy, content }: PanelOptions): string {
-  const aria = labelledBy ? ` aria-labelledby="${escapeHtml(labelledBy)}"` : "";
-  return `<${tag} class="${escapeHtml(className)}"${aria}>${content}</${tag}>`;
-}
-
-/** A compact visual label for counts and puzzle metadata. */
-export function renderBadge(label: string, className = "badge"): string {
-  return `<span class="${escapeHtml(className)}">${escapeHtml(label)}</span>`;
-}
-
-/** A consistent progression tile with an explicit visual and accessible state. */
-export function renderLevelCard({ courseId, label, level, state }: LevelCardOptions): string {
-  const stateLabel = state === "complete" ? "Complete" : state === "current" ? "Current" : state === "available" ? "Ready" : "Locked";
-  return `<li class="course course--${state}">${renderButton({ label: String(level), ariaLabel: `${label}, ${state}`, variant: state === "current" ? "primary" : "secondary", disabled: state === "locked" || state === "current", data: { course: courseId } })}<span class="course-state" aria-hidden="true">${stateLabel}</span></li>`;
-}
-
-/** Groups related controls under one accessible label. */
-export function renderControlGroup(label: string, controls: string, className = "control-group"): string {
-  return `<div class="${escapeHtml(className)}" aria-label="${escapeHtml(label)}">${controls}</div>`;
-}
-
-/** A shared, mutually exclusive control for filters and compact mode choices. */
-export function renderSegmentedControl({ label, items, className = "segmented-control" }: SegmentedControlOptions): string {
-  return `<div class="${escapeHtml(className)}" role="group" aria-label="${escapeHtml(label)}">${items.map(item => renderButton({ label: item.label, pressed: item.selected, data: item.data })).join("")}</div>`;
-}
-
-/** A reusable native select with a visible label for compact configuration controls. */
-export function renderSelect({ id, label, ariaLabel, options, selectedId, className = "select-control" }: SelectOptions): string {
-  const entries = options.map(option => `<option value="${escapeHtml(option.id)}" ${option.id === selectedId ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("");
-  return `<label class="${escapeHtml(className)}">${escapeHtml(label)} <select id="${escapeHtml(id)}"${ariaLabel ? ` aria-label="${escapeHtml(ariaLabel)}"` : ""}>${entries}</select></label>`;
 }

@@ -2,7 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { CACHE_FRESH_LIFETIME_SECONDS } from "./cache-policy";
-import { CACHE_TTL_MS, loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleToCache } from "./puzzle-cache";
+import { CACHE_TTL_MS, loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache } from "./puzzle-cache/core";
+import { puzzleResponseExpiry } from "./puzzle-cache/response";
 
 class MemoryStorage {
   protected readonly values = new Map<string, string>();

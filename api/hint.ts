@@ -3,7 +3,7 @@ import { clueStrategyLabel, isClueStrategy } from "../src/clue-strategy-catalog.
 import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { derivePlayerStateFeatures, hintStrengthForProgress, hintStrengthRank, MIN_PLAYER_STATE_CONFIDENCE, parsePlayerStateAssessment, policyForPlayerState, serializePlayerStateFeatures, type HintStrength, type PlayerStateFeatures, type PlayerStatePolicy } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { clientAddressFromForwardedFor } from "../server/jev-rate-limit.js";
+import { clientAddressFromForwardedFor } from "../server/client-address.js";
 
 const URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
 const MAX_TOKEN_LENGTH = 16_384;
