@@ -15,7 +15,8 @@ class MemoryStorage implements SessionStorageLike {
 
 const request: PuzzleLoadRequest = { seed: "dojo-day", templateId: "tournament-order-v1", difficultyLevel: 2 };
 const puzzle = {
-  id: "puzzle-1", seed: "dojo-day", templateId: "tournament-order-v1", clues: [],
+  id: "puzzle-1", seed: "dojo-day", templateId: "tournament-order-v1",
+  clues: [{ id: "distance", text: "Two places apart", constraintKind: "distance", strategy: "distance" }],
   difficulty: { level: 2, label: "Easy", modelVersion: "v1" },
   spec: { id: "tournament-order-v1", title: "Tournament Order", baseCategory: "person", categories: [
     { id: "person", label: "Person", values: ["Aki", "Ben"] },
@@ -24,7 +25,7 @@ const puzzle = {
 };
 
 describe("loadPuzzle", () => {
-  it("uses a validated cached puzzle without issuing a request", async () => {
+  it("[TB-CACHE-02] restores clue strategy metadata from a validated cache entry without a request", async () => {
     const storage = new MemoryStorage();
     savePuzzleToCache(storage, request.seed, request.difficultyLevel, puzzle, 20_000, 10_000, request.templateId);
     let calls = 0;
@@ -35,6 +36,8 @@ describe("loadPuzzle", () => {
     });
 
     assert.strictEqual(result.id, "puzzle-1");
+    assert.strictEqual(result.clues[0]?.constraintKind, "distance");
+    assert.strictEqual(result.clues[0]?.strategy, "distance");
     assert.strictEqual(calls, 0);
   });
 

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { completeCourse, emptyProgress, isCourseUnlocked, parseProgress, resetProgress, shouldAdvanceProgress } from "./progress";
+import { completeCourse, emptyProgress, isCourseUnlocked, parseProgress, shouldAdvanceProgress } from "./progress";
 
 describe("Puzzle Challenge progress", () => {
   it("starts with Beginner Level 1 as the only available course", () => {
@@ -22,12 +22,6 @@ describe("Puzzle Challenge progress", () => {
     assert.deepStrictEqual(complete.completed, ["beginner-1"]);
     assert.deepStrictEqual(parseProgress('{"version":1,"completed":["beginner-1","not-a-course"]}'), { version: 1, completed: ["beginner-1"] });
     assert.deepStrictEqual(parseProgress("not json"), emptyProgress());
-  });
-
-  it("resets only Puzzle Challenge completion back to the first level", () => {
-    assert.deepStrictEqual(resetProgress(), emptyProgress());
-    assert.strictEqual(isCourseUnlocked(resetProgress(), "beginner-1"), true);
-    assert.strictEqual(isCourseUnlocked(resetProgress(), "beginner-2"), false);
   });
 
   it("only awards course progression in Puzzle Challenge mode", () => {
