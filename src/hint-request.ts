@@ -1,4 +1,5 @@
-import { boardSolveProgress, squareKey } from "./puzzle-board";
+import { squareKey } from "./puzzle-board/marks";
+import { boardSolveProgress } from "./puzzle-board/solution";
 import { clampElapsedMs } from "./events";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";

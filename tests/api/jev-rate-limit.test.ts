@@ -2,7 +2,8 @@ import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
-import { allowJevDecision, clientAddressFromForwardedFor } from "../../server/jev-rate-limit.js";
+import { allowJevDecision } from "../../server/jev-rate-limit.js";
+import { clientAddressFromForwardedFor } from "../../server/client-address.js";
 
 const TEST_REST_URL = "https://test-db.upstash.io";
 

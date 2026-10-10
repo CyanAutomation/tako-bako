@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { loadPuzzle, DifficultyUnavailableError, retryAfterMessage, type PuzzleLoadRequest } from "./puzzle-loader";
-import { loadPuzzleFromCache, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache";
+import { loadPuzzleFromCache, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache/core";
 
 class MemoryStorage implements SessionStorageLike {
   private readonly entries = new Map<string, string>();
@@ -80,6 +80,27 @@ describe("loadPuzzle", () => {
       storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
       fetcher: async () => { throw new TypeError("Failed to fetch"); },
     }), /The puzzle service couldn’t be reached\. Please check your connection and try again\./);
+  });
+
+  it("preserves an aborted request instead of converting it to a connection failure", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const abortError = new DOMException("The request was aborted", "AbortError");
+
+    await assert.rejects(loadPuzzle(request, {
+      storage: new MemoryStorage(), signal: controller.signal, isCurrent: () => true,
+      fetcher: async () => { throw abortError; },
+    }), error => error === abortError);
+  });
+
+  it("rejects malformed network puzzle data without caching it", async () => {
+    const storage = new MemoryStorage();
+    await assert.rejects(loadPuzzle(request, {
+      storage, signal: new AbortController().signal, isCurrent: () => true,
+      fetcher: async () => new Response(JSON.stringify({ id: "incomplete" }), { headers: { "x-tako-bako-generated-at": "10000" } }),
+    }), error => error instanceof Error && error.message === "invalid puzzle response");
+
+    assert.equal(loadPuzzleFromCache(storage, request.seed, request.difficultyLevel, 10_001, request.templateId), undefined);
   });
 
   it("keeps the newest puzzle in cache when overlapping requests resolve out of order", async () => {

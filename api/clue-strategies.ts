@@ -4,7 +4,7 @@ import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
 import { parseClueStrategyResults } from "../src/clue-strategy-results.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { clientAddressFromForwardedFor } from "../server/jev-rate-limit.js";
+import { clientAddressFromForwardedFor } from "../server/client-address.js";
 import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
 
 const MAX_TOKEN_LENGTH = 16_384;

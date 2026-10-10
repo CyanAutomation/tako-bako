@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
 import { mountApp } from "./app";
-import { PROGRESS_STORAGE_KEY } from "./progress";
+import { PROGRESS_STORAGE_KEY } from "./progress-storage";
 
 afterEach(restoreStubbedGlobals);
 

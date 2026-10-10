@@ -1,4 +1,5 @@
-import { loadPuzzleFromCache, puzzleCacheKey, puzzleResponseExpiry, savePuzzleResponseToCache, type PuzzleCacheRequest, type SessionStorageLike } from "./puzzle-cache";
+import { loadPuzzleFromCache, puzzleCacheKey, type SessionStorageLike } from "./puzzle-cache/core";
+import { puzzleResponseExpiry, savePuzzleResponseToCache, type PuzzleCacheRequest } from "./puzzle-cache/response";
 import { parsePuzzle } from "./puzzle-parser";
 import type { Puzzle } from "./puzzle";
 

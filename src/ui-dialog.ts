@@ -1,4 +1,4 @@
-import { escapeHtml } from "./ui-controls";
+import { escapeHtml } from "./ui-escape";
 import type { DialogOptions, DisclosureOptions, InfoDisclosureOptions } from "./ui-types";
 
 const DIALOG_FOCUSABLE_SELECTOR = "button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])";
