@@ -1,6 +1,7 @@
 import { squareKey } from "./puzzle-board/marks";
 import { boardSolveProgress } from "./puzzle-board/solution";
 import { clampElapsedMs } from "./events";
+import { hintStrengthForProgress } from "./player-state";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
 
@@ -38,11 +39,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hintKind(matches: number, total: number): HintRequestBody["kind"] {
-  if (matches === 0) return "clue";
-  return matches < Math.ceil(total / 2) ? "elimination" : "placement";
-}
-
 function boardContext(puzzle: Puzzle, board: Board): HintRequestBody["board"] {
   const base = puzzle.spec.categories.find(category => category.id === puzzle.spec.baseCategory);
   if (!base) return [];
@@ -59,7 +55,7 @@ export function createHintRequestBody(options: HintRequestOptions): HintRequestB
   const progress = boardSolveProgress(options.board, options.puzzle.spec);
   return {
     puzzleToken: options.puzzle.puzzleToken,
-    kind: hintKind(progress.matches, progress.total),
+    kind: hintStrengthForProgress(progress.matches, progress.total),
     clues: options.puzzle.clues.map(clue => ({
       id: clue.id,
       text: clue.text,
