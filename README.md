@@ -1,4 +1,4 @@
-[![CI](https://github.com/CyanAutomation/tako-bako/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/CyanAutomation/tako-bako/actions/workflows/ci.yml) [![Workflow validation](https://github.com/CyanAutomation/tako-bako/actions/workflows/workflow-validation.yml/badge.svg?branch=main)](https://github.com/CyanAutomation/tako-bako/actions/workflows/workflow-validation.yml)
+[![CI](https://github.com/CyanAutomation/tako-bako/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/CyanAutomation/tako-bako/actions/workflows/ci.yml) [![Workflow validation](https://github.com/CyanAutomation/tako-bako/actions/workflows/workflow-validation.yml/badge.svg?branch=main)](https://github.com/CyanAutomation/tako-bako/actions/workflows/workflow-validation.yml) [![Deployment smoke test](https://github.com/CyanAutomation/tako-bako/actions/workflows/deployment-smoke.yml/badge.svg?branch=main)](https://github.com/CyanAutomation/tako-bako/actions/workflows/deployment-smoke.yml)
 
 # Tako Bako
 
