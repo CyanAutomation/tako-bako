@@ -46,7 +46,13 @@ export async function checkExternalLinks(markdownSources, fetcher = globalThis.f
 }
 
 async function markdownFiles(directory) {
-  const entries = await readdir(directory, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
   const paths = await Promise.all(entries.map(async entry => {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) return markdownFiles(path);
@@ -56,8 +62,19 @@ async function markdownFiles(directory) {
 }
 
 async function readMarkdownSources(root) {
-  const paths = [join(root, "README.md"), ...await markdownFiles(join(root, "docs"))];
-  return Promise.all(paths.map(path => readFile(path, "utf8")));
+  const readmePath = join(root, "README.md");
+  let readme;
+  try {
+    readme = await readFile(readmePath, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      throw new Error(`Required README.md not found in ${root}`, { cause: error });
+    }
+    throw error;
+  }
+
+  const docsPaths = await markdownFiles(join(root, "docs"));
+  return [readme, ...await Promise.all(docsPaths.map(path => readFile(path, "utf8")))];
 }
 
 async function curlFetch(url) {
@@ -70,10 +87,14 @@ async function curlFetch(url) {
   return { status };
 }
 
+export async function checkExternalLinksInRepository(root, fetcher = curlFetch) {
+  return checkExternalLinks(await readMarkdownSources(root), fetcher);
+}
+
 const scriptPath = fileURLToPath(import.meta.url);
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === pathToFileURL(scriptPath).href) {
   const root = resolve(dirname(scriptPath), "..");
-  const errors = await checkExternalLinks(await readMarkdownSources(root), curlFetch);
+  const errors = await checkExternalLinksInRepository(root);
   if (errors.length) {
     for (const error of errors) process.stderr.write(`${error}\n`);
     process.exitCode = 1;
