@@ -4,6 +4,8 @@
 
 A logic grid puzzle game built around zebra/Einstein puzzles, rendered in a cozy 16-bit aesthetic. Solve deduction puzzles by placing clues on a grid and eliminating impossibilities until only one solution remains.
 
+[Play Tako Bako in your browser](https://tako-bako.vercel.app/).
+
 ## Getting Started
 
 Prerequisites: Node.js ^24.0.0 (matching package.json engines).
@@ -52,9 +54,9 @@ Tako Bako includes a guided progression called Puzzle Challenge. The course has 
 
 ## Development
 
-Run the full quality gate with `npm run check` -- this executes linting, tests, and builds for both the app and API layer.
+Run the full quality gate with `npm run check` -- this executes linting, tests, README link and project-path checks, and builds both the app and API layer.
 
-Run `npm run test:coverage` to save raw V8 coverage under `coverage/v8`; pass that directory to `npx fallow health --coverage coverage/v8` for coverage-based CRAP scores.
+Run `npm run test:coverage` to save raw V8 coverage under `coverage/v8`. For coverage-based CRAP scores, run the pinned Fallow CLI with `npx --yes fallow@3.33.1 health --coverage coverage/v8`. This downloads the versioned tool without adding it to the project dependencies; update the pin deliberately when adopting a newer release.
 
 Selected test contracts and their links to product behavior are listed in [docs/test-traceability.md](docs/test-traceability.md). The follow-up scores and verification evidence are in [docs/test-quality-review.md](docs/test-quality-review.md).
 
@@ -68,6 +70,10 @@ Use individual commands during active development:
 Build output goes to the `dist` directory. The TypeScript compiler runs separately for the app (`tsconfig.app.json`) and API layer (`tsconfig.api.json`).
 
 Vite proxies `/api/puzzle` requests to Yokaiba during development, routing queries to `/v1/puzzles/generate` with translated query parameters.
+
+## Contributing and support
+
+Report bugs or request features in [GitHub Issues](https://github.com/CyanAutomation/tako-bako/issues). For code changes, open a pull request and run `npm run check` before submitting. The project is licensed under [GNU GPL v3](LICENSE).
 
 ## Deployment
 
@@ -105,56 +111,25 @@ Puzzle Challenge's 1–12 progression remains deterministic. A future Practice m
 
 ## Project Structure
 
-```
-src/       Application source
-  main.ts                Entry point: app shell, event handling, rendering, state management
-  app.ts                 Application mounting: state, event wiring, rendering, persistence
-  app-view.ts            View state derivation and app rendering from the current state
-  app-routing.ts         Play-mode and puzzle-settings routing from the browser URL
-  puzzle.ts              Core puzzle types: Mark, Clue, Category, Puzzle, Board, Answer
-  puzzle-board.ts        Board helpers: markBoard, answerFromBoard, boardSolveProgress, squareKey
-  puzzle-parser.ts       Parses puzzle payloads into validated Puzzle models
-  puzzle-storage.ts      Persists and loads boards and used-clue records
-  puzzle-cache.ts        Freshness-aware session cache enforcing a 5-minute end-to-end puzzle age
-  puzzle-loader.ts       Loads puzzles through the cache, retrying rate-limited generation
-  yokaiba.ts             Yokaiba generation endpoint and shared query-parameter builder
-  curriculum.ts          Tier/course definitions, level mapping, course resolution
-  progress.ts            Puzzle Challenge progress storage (localStorage v1)
-  scenarios.ts           Scenario catalog and ID resolution
-  shared-puzzle.ts       Parses shared URLs and short codes for paste-to-open flow
-  daily.ts               Daily puzzle seed generation from UTC date parts
-  sections.ts            Curricular rendering: curriculum cards, puzzle header, board toolbar,
-                         grid workspace tabs, clue panel with filtering
-  answer-verification.ts Parses and validates answer-verification responses
-  hint-request.ts        Builds hint requests and parses validated hint responses
-  clue-strategy.ts       Compatibility barrel for clue-strategy consumers
-  clue-strategy-catalog.ts Clue strategy catalog: labels and descriptions
-  clue-strategy-constraints.ts Constraint-to-strategy mapping for known clue forms
-  clue-strategy-results.ts Parses and filters Jev clue-classification results
-  events.ts              Builds anonymous calibration game-event payloads
-  player-state.ts        Bounded player-state response parsing and deterministic hint policy
-  ui.ts                  Reusable HTML rendering primitives: buttons, badges, dialogs, panels, tabs
-  ui-controls.ts         Icon-button, status, and control-group rendering helpers
-  ui-grid.ts             Three-state puzzle-grid cell rendering
-  ui-tabs.ts             ARIA tablist rendering with roving tab focus
-  ui-dialog.ts           Focus-trapping and keyboard handling for dialogs
-  ui-types.ts            Shared UI types
-  style.css              Base stylesheet
-  expert-grid.css        Expert-grid layout overrides
-  brand/                 Brand assets (PNG sprites)
-api/         Five Vercel API function handlers
-  puzzle.ts   GET /puzzle (generate) and POST /puzzle (verify) handler
-  hint.ts     POST /hint assistance proxy
-  clue-strategies.ts POST /clue-strategies Jev-assisted clue classification
-  events.ts   POST /events anonymous calibration proxy
-  health.ts   GET /health readiness check
-server/      Shared API modules
-  jev.ts                OpenRouter Decisions API client for Jev labels and hints
-  jev-rate-limit.ts     Rate limiting for Jev requests
-  event-payload.ts      Calibration event payload construction
-  clue-strategy-input.ts Clue-strategy request input validation
-tests/api/   API tests, kept outside Vercel's function discovery directory
-index.html      App entry HTML
-vite.config.ts  Dev proxy: /api/puzzle → /v1/puzzles/generate
-vercel.json     Vercel deployment config, security headers, output dir
+```text
+src/                       Browser application
+  main.ts                  Browser entry point
+  app.ts                   Application state, events, rendering, and persistence
+  app-routing.ts           URL routing for play modes and puzzle settings
+  app-requests.ts          Browser API requests
+  puzzle-board/            Board marking and solution helpers
+  puzzle-cache/            Puzzle response cache and freshness handling
+  sections/                Board, clue, curriculum, and grid-workspace views
+  curriculum.ts            Puzzle Challenge course definitions
+  daily.ts                 Daily puzzle seed generation
+  scenarios.ts             Puzzle scenario catalog
+  shared-puzzle.ts         Shared puzzle URL parsing
+  ui.ts                    Shared interface components and controls
+api/                       Vercel serverless API handlers
+server/                    Shared API and provider modules
+tests/api/                 API tests outside Vercel function discovery
+docs/                      Test traceability and quality review
+scripts/                   Test runner and development utilities
+vite.config.ts             Development server and API proxy
+vercel.json                Deployment, security headers, and asset caching
 ```
