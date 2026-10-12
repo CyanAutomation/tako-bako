@@ -13,7 +13,8 @@
     "test": "node scripts/run-tests.mjs",
     "test:coverage": "node scripts/run-tests.mjs --coverage",
     "lint": "eslint .",
-    "check": "npm run lint && npm run test && npm run build"
+    "check": "npm run lint && npm run test && npm run check:docs && npm run build",
+    "check:docs": "node scripts/check-readme.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
