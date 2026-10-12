@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, it } from "node:test";
 
-import { checkExternalLinks, extractExternalLinks } from "../scripts/check-external-links.mjs";
+import { checkExternalLinks, checkExternalLinksInRepository, extractExternalLinks } from "../scripts/check-external-links.mjs";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { recursive: true, force: true })));
+});
+
+async function createRepository() {
+  const root = await mkdtemp(join(tmpdir(), "tako-bako-link-check-"));
+  temporaryDirectories.push(root);
+  return root;
+}
 
 describe("external Markdown link check", () => {
   it("extracts unique HTTP links and ignores local and non-web targets", () => {
@@ -27,5 +42,23 @@ describe("external Markdown link check", () => {
 
     assert.deepStrictEqual(requests.sort(), ["https://example.com/missing", "https://example.com/ok"]);
     assert.deepStrictEqual(errors, ["External link returned HTTP 404: https://example.com/missing"]);
+  });
+
+  it("checks a repository without an optional docs directory", async () => {
+    const root = await createRepository();
+    await writeFile(join(root, "README.md"), "[Home](https://example.com)");
+
+    const errors = await checkExternalLinksInRepository(root, async () => ({ status: 200 } as Response));
+
+    assert.deepStrictEqual(errors, []);
+  });
+
+  it("reports a clear error when the required README is missing", async () => {
+    const root = await createRepository();
+
+    await assert.rejects(
+      checkExternalLinksInRepository(root, async () => ({ status: 200 } as Response)),
+      /Required README\.md not found/,
+    );
   });
 });
