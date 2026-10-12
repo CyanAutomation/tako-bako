@@ -70,7 +70,7 @@ test("CI and package metadata support only Node 24", () => {
   assert.equal(packageLock.packages[""].engines.node, "^24.0.0");
 
   const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-  assert.ok(readme.includes("Prerequisites: Node.js ^24.0.0 (matching package.json engines)."));
+  assert.match(readme, /\*\*Prerequisite:\*\* Node\.js `\^24\.0\.0`\./);
 });
 
 test("Kaseki sweeps use Node 24 and share a single main-only preflight action", () => {
