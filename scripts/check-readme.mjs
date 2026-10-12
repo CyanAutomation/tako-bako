@@ -1,5 +1,5 @@
-import { access, readFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { access, readFile, readdir } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -10,7 +10,7 @@ function extractRelativeLinkTargets(markdown) {
     const destination = match[1].startsWith("<") && match[1].endsWith(">")
       ? match[1].slice(1, -1)
       : match[1];
-    if (!destination || destination.startsWith("#") || destination.startsWith("//") || /^[a-z][a-z\d+.-]*:/i.test(destination)) {
+    if (!destination || destination.startsWith("//") || /^[a-z][a-z\d+.-]*:/i.test(destination)) {
       continue;
     }
 
@@ -20,7 +20,8 @@ function extractRelativeLinkTargets(markdown) {
     } catch {
       pathname = destination.split(/[?#]/, 1)[0];
     }
-    if (pathname) targets.push({ destination, pathname });
+    const fragment = destination.includes("#") ? destination.slice(destination.indexOf("#") + 1).split("?", 1)[0] : "";
+    targets.push({ destination, pathname, fragment });
   }
   return targets;
 }
@@ -62,18 +63,52 @@ async function exists(path) {
   }
 }
 
+function extractHeadingAnchors(markdown) {
+  const anchors = new Set();
+  const occurrences = new Map();
+  for (const match of markdown.matchAll(/^#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm)) {
+    const title = match[1]
+      .replace(/<[^>]*>/g, "")
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/[`*_~]/g, "")
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s-]/gu, "")
+      .trim()
+      .replace(/\s+/g, "-");
+    if (!title) continue;
+    const occurrence = occurrences.get(title) ?? 0;
+    occurrences.set(title, occurrence + 1);
+    anchors.add(occurrence ? `${title}-${occurrence}` : title);
+  }
+  return anchors;
+}
+
 export async function checkReadme(root, readmeRelativePath = "README.md") {
   const readmePath = resolve(root, readmeRelativePath);
   const markdown = await readFile(readmePath, "utf8");
   const readmeDirectory = dirname(readmePath);
   const errors = [];
+  const anchorCache = new Map();
 
-  for (const { destination, pathname } of extractRelativeLinkTargets(markdown)) {
+  for (const { destination, pathname, fragment } of extractRelativeLinkTargets(markdown)) {
     const target = isAbsolute(pathname)
       ? resolve(root, `.${pathname}`)
-      : resolve(readmeDirectory, pathname);
+      : pathname ? resolve(readmeDirectory, pathname) : readmePath;
     if (!await exists(target)) {
       errors.push(`${readmeRelativePath}: relative link target does not exist: ${destination}`);
+      continue;
+    }
+    if (fragment && target.toLowerCase().endsWith(".md")) {
+      if (!anchorCache.has(target)) anchorCache.set(target, readFile(target, "utf8").then(extractHeadingAnchors));
+      let decodedFragment = fragment;
+      try {
+        decodedFragment = decodeURIComponent(fragment);
+      } catch {
+        // Keep the raw fragment so it is reported as a missing anchor.
+      }
+      if (!(await anchorCache.get(target)).has(decodedFragment.toLowerCase())) {
+        errors.push(`${readmeRelativePath}: relative link fragment does not exist: ${destination}`);
+      }
     }
   }
 
@@ -86,14 +121,36 @@ export async function checkReadme(root, readmeRelativePath = "README.md") {
   return errors;
 }
 
+async function markdownFiles(directory) {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
+  const paths = await Promise.all(entries.map(async entry => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return markdownFiles(path);
+    return entry.isFile() && entry.name.toLowerCase().endsWith(".md") ? [path] : [];
+  }));
+  return paths.flat();
+}
+
+export async function checkDocumentation(root) {
+  const markdownPaths = ["README.md", ...(await markdownFiles(join(root, "docs"))).map(path => relative(root, path))];
+  const checked = await Promise.all(markdownPaths.map(readmePath => checkReadme(root, readmePath)));
+  return checked.flat();
+}
+
 const scriptPath = fileURLToPath(import.meta.url);
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === pathToFileURL(scriptPath).href) {
   const root = resolve(dirname(scriptPath), "..");
-  const errors = await checkReadme(root);
+  const errors = await checkDocumentation(root);
   if (errors.length) {
     for (const error of errors) process.stderr.write(`${error}\n`);
     process.exitCode = 1;
   } else {
-    process.stdout.write("README relative links and project structure paths are valid.\n");
+    process.stdout.write("README and docs relative links and project structure paths are valid.\n");
   }
 }

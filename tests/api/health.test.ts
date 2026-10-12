@@ -1,5 +1,6 @@
 import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { assertPartialMatch, rejectedMock, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
 import handler from "../../api/health.js";
@@ -17,6 +18,14 @@ function responseRecorder() {
 
 describe("health readiness", () => {
   afterEach(() => { restoreStubbedGlobals(); mock.restoreAll(); });
+
+  it("keeps the README health example aligned with the ready response", () => {
+    const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+    const example = /```json\s*([\s\S]*?)\s*```/.exec(readme)?.[1];
+
+    assert.ok(example);
+    assert.deepStrictEqual(JSON.parse(example), { status: "ok", dependencies: { yokaiba: "ok" } });
+  });
 
   it("[TB-OBS-01] reports readiness and logs a valid success metric", async () => {
     stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ status: "ok" }), { status: 200 })));
