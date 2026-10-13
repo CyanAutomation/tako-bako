@@ -1,19 +1,16 @@
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
-import process from "node:process";
-import { fileURLToPath, pathToFileURL, URL } from "node:url";
+import { join } from "node:path";
+import { fileURLToPath, URL } from "node:url";
 import { promisify } from "node:util";
+import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.mjs";
+import { runMarkdownCheck } from "./run-markdown-check.mjs";
 
 const execFileAsync = promisify(execFile);
 
 export function extractExternalLinks(markdown) {
   const links = new Set();
-  const pattern = /\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+[^)]*)?\s*\)/g;
-  for (const match of markdown.matchAll(pattern)) {
-    const destination = match[1].startsWith("<") && match[1].endsWith(">")
-      ? match[1].slice(1, -1)
-      : match[1];
+  for (const destination of extractMarkdownDestinations(markdown)) {
     try {
       const url = new URL(destination);
       if (url.protocol === "http:" || url.protocol === "https:") links.add(url.href);
@@ -43,22 +40,6 @@ export async function checkExternalLinks(markdownSources, fetcher = globalThis.f
     }
   }));
   return results.filter(Boolean);
-}
-
-async function markdownFiles(directory) {
-  let entries;
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return [];
-    throw error;
-  }
-  const paths = await Promise.all(entries.map(async entry => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) return markdownFiles(path);
-    return entry.isFile() && entry.name.toLowerCase().endsWith(".md") ? [path] : [];
-  }));
-  return paths.flat();
 }
 
 async function readMarkdownSources(root) {
@@ -92,13 +73,4 @@ export async function checkExternalLinksInRepository(root, fetcher = curlFetch) 
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === pathToFileURL(scriptPath).href) {
-  const root = resolve(dirname(scriptPath), "..");
-  const errors = await checkExternalLinksInRepository(root);
-  if (errors.length) {
-    for (const error of errors) process.stderr.write(`${error}\n`);
-    process.exitCode = 1;
-  } else {
-    process.stdout.write("External Markdown links are reachable.\n");
-  }
-}
+await runMarkdownCheck(scriptPath, checkExternalLinksInRepository, "External Markdown links are reachable.");

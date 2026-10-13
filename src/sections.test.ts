@@ -56,6 +56,14 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
   });
 
+  it("escapes clue and category text before rendering it as markup", () => {
+    const markup = renderCluePanel({ clues: [{ id: "one", text: "<script>unsafe()</script>" }], activeCategory: { id: "club", label: "<Club & Team>", values: ["Lions"] }, cluesOpen: false, usedClueIds: new Set() });
+
+    assert.ok(markup.includes("&lt;script&gt;unsafe()&lt;/script&gt;"));
+    assert.ok(markup.includes("&lt;Club &amp; Team&gt;"));
+    assert.doesNotMatch(markup, /<script>/);
+  });
+
   it("[TB-ACCESS-03] offers focused clue views without changing the original clue numbering", () => {
     const clues = [{ id: "one", text: "Aki was associated with Lions." }, { id: "two", text: "Hana was associated with Wolves." }];
     const markup = renderCluePanel({ clues, activeCategory: { id: "club", label: "Club", values: ["Lions", "Wolves"] }, cluesOpen: true, usedClueIds: new Set(["two"]), clueFilter: "remaining" });
