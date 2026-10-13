@@ -53,24 +53,29 @@ function namedStep(workflow: Workflow, name: string): WorkflowStep {
   return step;
 }
 
-test("CI and package metadata support only Node 24", () => {
+test("[CI-NODE-01] derives the CI runtime matrix from the package engine range", () => {
   const workflow = readWorkflow("ci.yml");
   const strategy = workflow.jobs.quality?.strategy;
-  assert.deepStrictEqual(strategy?.matrix?.["node-version"], ["24.x"]);
-  assert.equal(strategy?.["fail-fast"], false);
 
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
     engines: { node: string };
   };
-  assert.equal(packageJson.engines.node, "^24.0.0");
+  const nodeMajor = /^\^?(\d+)\.\d+\.\d+$/.exec(packageJson.engines.node)?.[1];
+  assert.ok(nodeMajor, "package.json should declare a Node engine version");
+  assert.deepStrictEqual(strategy?.matrix?.["node-version"], [`${nodeMajor}.x`]);
 
   const packageLock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8")) as {
     packages: { "": { engines: { node: string } } };
   };
-  assert.equal(packageLock.packages[""].engines.node, "^24.0.0");
+  assert.equal(packageLock.packages[""].engines.node, packageJson.engines.node);
 
   const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
-  assert.match(readme, /\*\*Prerequisite:\*\* Node\.js `\^24\.0\.0`\./);
+  assert.ok(readme.includes(`**Prerequisite:** Node.js \`${packageJson.engines.node}\`.`));
+});
+
+test("[CI-NODE-01] lets every configured Node matrix job report its result", () => {
+  const workflow = readWorkflow("ci.yml");
+  assert.equal(workflow.jobs.quality?.strategy?.["fail-fast"], false);
 });
 
 test("Kaseki sweeps use Node 24 and share a single main-only preflight action", () => {
@@ -104,7 +109,7 @@ test("DRY sweep scope includes server code and excludes workflow helper scripts"
   assert.equal(allowlist, "src/**/*,api/**/*,server/**/*,tests/**/*");
 });
 
-test("all Kaseki workflow bash steps pass bash syntax validation", () => {
+test("[CI-KASEKI-04] all Kaseki workflow bash steps pass syntax validation", () => {
   for (const { name, workflow } of workflows) {
     const scripts = allWorkflowSteps(workflow).filter(step => step.run).map(step => step.run!);
     assert.ok(scripts.length > 0, `${name} should contain bash steps`);

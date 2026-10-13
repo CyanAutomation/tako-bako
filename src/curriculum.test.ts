@@ -37,7 +37,7 @@ describe("Puzzle Challenge curriculum", () => {
     assertPartialMatch(firstAvailableCourse(["beginner-1", "beginner-2", "beginner-3", "beginner-4"]), { tier: "intermediate", level: 1 });
   });
 
-  it("summarises current-tier progress for the compact header status", () => {
+  it("[TB-CHALLENGE-02] shows the active tier's completed-course count", () => {
     assert.strictEqual(courseProgressLabel(courseFor("beginner", 3)!, new Set(["beginner-1", "beginner-2"])), "Beginner · 2/4 complete");
     assert.strictEqual(courseProgressLabel(courseFor("advanced", 1)!, new Set(["beginner-1", "intermediate-1"])), "Advanced · 0/4 complete");
   });
