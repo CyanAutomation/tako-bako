@@ -249,7 +249,7 @@ describe("puzzle proxy", () => {
     assertPartialMatch(metricCalls[0]?.[1], { operation: "generate", outcome: "success", retryCount: 1 });
   });
 
-  it("logs the upstream failure code and retry count for targeted generation errors", async () => {
+  it("[TB-OBS-02] records the upstream failure code and retry count for generation errors", async () => {
     stubGlobal("fetch", resolvedSequenceMock(
       new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),
       new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),

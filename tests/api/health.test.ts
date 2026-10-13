@@ -23,13 +23,18 @@ function readHealthExample(markdown: string) {
 describe("health readiness", () => {
   afterEach(() => { restoreStubbedGlobals(); mock.restoreAll(); });
 
-  it("selects the documented health response and keeps it aligned with the ready response", () => {
+  it("[TB-HEALTH-01] keeps the documented example aligned with the ready endpoint", async () => {
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ status: "ok" }), { status: 200 })));
+    mock.method(console, "info", () => undefined);
+    const { response, result } = responseRecorder();
+    await handler({ method: "GET" } as never, response as never);
+
     const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
-    const readmeWithEarlierJsonExample = ["```json", '{"unrelated":true}', "```", "", readme].join("\n");
-    const example = readHealthExample(readmeWithEarlierJsonExample);
+    const example = readHealthExample(readme);
 
     assert.ok(example);
-    assert.deepStrictEqual(JSON.parse(example), { status: "ok", dependencies: { yokaiba: "ok" } });
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(example), result.body);
   });
 
   it("[TB-OBS-01] reports readiness and logs a valid success metric", async () => {

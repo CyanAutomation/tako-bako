@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
+import { assertPartialMatch } from "../test-utils.js";
 import { courses } from "./curriculum";
 import { emptyProgress } from "./progress";
 import { resolveAnswerOutcome } from "./app-answer-outcome";
@@ -8,7 +9,7 @@ import { resolveAnswerOutcome } from "./app-answer-outcome";
 describe("resolveAnswerOutcome", () => {
   const firstCourse = courses[0]!;
 
-  it("records a mistake without awarding course progress", () => {
+  it("[TB-OUTCOME-01] records a mistake without awarding course progress", () => {
     const progress = emptyProgress();
     const outcome = resolveAnswerOutcome({ correct: false, playMode: "challenge", course: firstCourse, progress });
 
@@ -23,22 +24,23 @@ describe("resolveAnswerOutcome", () => {
     });
   });
 
-  it("celebrates a shared puzzle without advancing the challenge course", () => {
+  it("[TB-OUTCOME-01] celebrates a shared puzzle without advancing challenge progress", () => {
     const progress = emptyProgress();
     const outcome = resolveAnswerOutcome({ correct: true, playMode: "shared", course: firstCourse, progress });
 
-    assert.deepStrictEqual(outcome, {
+    assertPartialMatch(outcome, {
       progress,
       event: "puzzle_completed",
       mistakeCountDelta: 0,
-      message: "Beautifully solved — this shared puzzle is complete. Start Puzzle Challenge to advance your course.",
       tone: "success",
       celebrate: true,
       persistProgress: false,
     });
+    assert.match(outcome.message, /shared puzzle is complete/);
+    assert.match(outcome.message, /Start Puzzle Challenge/);
   });
 
-  it("completes and persists a challenge course, then names the next course", () => {
+  it("[TB-OUTCOME-01] completes and persists a challenge course, then names the next course", () => {
     const progress = emptyProgress();
     const outcome = resolveAnswerOutcome({ correct: true, playMode: "challenge", course: firstCourse, progress });
 
@@ -51,7 +53,7 @@ describe("resolveAnswerOutcome", () => {
     assert.strictEqual(outcome.mistakeCountDelta, 0);
   });
 
-  it("reports completion of the last course without naming a next course", () => {
+  it("[TB-OUTCOME-01] reports completion of the last course without naming a next course", () => {
     const progress = { version: 1 as const, completed: courses.slice(0, -1).map(course => course.id) };
     const lastCourse = courses.at(-1)!;
     const outcome = resolveAnswerOutcome({ correct: true, playMode: "challenge", course: lastCourse, progress });

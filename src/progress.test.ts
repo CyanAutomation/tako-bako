@@ -18,10 +18,16 @@ describe("Puzzle Challenge progress", () => {
     assert.strictEqual(isCourseUnlocked(progress, "beginner-3"), false);
   });
 
-  it("is idempotent and ignores malformed stored values", () => {
+  it("[TB-CHALLENGE-03] does not duplicate progress when a course is completed twice", () => {
     const complete = completeCourse(completeCourse(emptyProgress(), "beginner-1"), "beginner-1");
     assert.deepStrictEqual(complete.completed, ["beginner-1"]);
+  });
+
+  it("[TB-CHALLENGE-03] restores only known course IDs from saved progress", () => {
     assert.deepStrictEqual(parseProgress('{"version":1,"completed":["beginner-1","not-a-course"]}'), { version: 1, completed: ["beginner-1"] });
+  });
+
+  it("[TB-CHALLENGE-03] starts with empty progress when stored JSON is malformed", () => {
     assert.deepStrictEqual(parseProgress("not json"), emptyProgress());
   });
 
