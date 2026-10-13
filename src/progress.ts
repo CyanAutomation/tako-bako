@@ -1,9 +1,5 @@
 import { courseForId, courses, type CourseId } from "./curriculum";
-
-export interface ChallengeProgress {
-  version: 1;
-  completed: CourseId[];
-}
+import type { ChallengeProgress } from "./progress-types";
 
 export function emptyProgress(): ChallengeProgress {
   return { version: 1, completed: [] };

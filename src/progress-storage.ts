@@ -1,5 +1,6 @@
 import { courseForId, type CourseId } from "./curriculum";
-import { emptyProgress, type ChallengeProgress } from "./progress";
+import { emptyProgress } from "./progress";
+import type { ChallengeProgress } from "./progress-types";
 
 export const PROGRESS_STORAGE_KEY = "tako-bako.challenge-progress.v1";
 
