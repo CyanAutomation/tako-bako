@@ -17,7 +17,7 @@ import type { SelectionContext } from "./hint-context-types.js";
 import { isRecord } from "./hint-validation.js";
 import { recordJevMetric } from "./jev-metrics.js";
 
-const URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
+const HINT_API_URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
 
 async function classifyPlayerState(features: PlayerStateFeatures, clientAddress?: string): Promise<PlayerStateAssessment | undefined> {
   const startedAt = Date.now();
@@ -48,7 +48,7 @@ async function fetchPrimaryHint(
   response: VercelResponse,
   hintIndex?: number,
 ): Promise<{ upstream: Response; payload: unknown } | undefined> {
-  const upstream = await fetch(URL, {
+  const upstream = await fetch(HINT_API_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ puzzleToken, ...(hintKind === undefined ? {} : { kind: hintKind }), ...(hintIndex === undefined ? {} : { hintIndex }) }),

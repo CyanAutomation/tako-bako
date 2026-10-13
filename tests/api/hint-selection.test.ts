@@ -38,6 +38,17 @@ describe("hintCandidates", () => {
     assert.strictEqual(candidates[1]?.id, "clue:fresh");
   });
 
+  it("caps upstream candidate text while preserving the original hint payload", () => {
+    const clueText = "🐟".repeat(600);
+    const payload = { kind: "clue", clue: { id: "upstream", text: clueText } };
+    const candidate = hintCandidates(payload, { clues: [], usedClueIds: new Set(), board: [] })[0];
+
+    assert.ok(candidate);
+    assert.ok(candidate.text.length <= 512);
+    assert.ok(candidate.text.endsWith("🐟…"));
+    assert.deepStrictEqual(candidate.payload, payload);
+  });
+
   it("rejects duplicate clue IDs and board coordinates in optional selection context", () => {
     assert.strictEqual(parseSelectionContext({ clues: [{ id: "same", text: "One." }, { id: "same", text: "Two." }] }), undefined);
     assert.strictEqual(parseSelectionContext({ board: [

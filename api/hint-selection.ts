@@ -20,11 +20,21 @@ export interface HintCandidate {
   clueId?: string;
 }
 
+const MAX_CANDIDATE_TEXT_LENGTH = 512;
+
+function boundedCandidateText(text: string): string {
+  if (text.length <= MAX_CANDIDATE_TEXT_LENGTH) return text;
+  let end = MAX_CANDIDATE_TEXT_LENGTH - 1;
+  const lastCodeUnit = text.charCodeAt(end - 1);
+  if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+  return `${text.slice(0, end)}…`;
+}
+
 function placementCandidate(id: string, payload: Record<string, unknown>): HintCandidate | undefined {
   if (payload.kind !== "placement" || !isRecord(payload.placement)) return undefined;
   const { subject, category, value } = payload.placement;
   if (typeof subject !== "string" || typeof category !== "string" || typeof value !== "string") return undefined;
-  return { id, payload, type: "placement", text: `${subject} matches ${value} in ${category}.` };
+  return { id, payload, type: "placement", text: boundedCandidateText(`${subject} matches ${value} in ${category}.`) };
 }
 
 function clueCandidate(id: string, payload: Record<string, unknown>): HintCandidate | undefined {
@@ -34,7 +44,7 @@ function clueCandidate(id: string, payload: Record<string, unknown>): HintCandid
     id,
     payload,
     type,
-    text: payload.clue.text,
+    text: boundedCandidateText(payload.clue.text),
     ...(typeof payload.clue.id === "string" ? { clueId: payload.clue.id } : {}),
   };
 }
@@ -58,7 +68,7 @@ function appendUnusedClues(candidates: HintCandidate[], primary: HintCandidate |
       id: `clue:${clue.id}`,
       payload: { kind: "clue", clue: { id: clue.id, text: clue.text } },
       type: "clue",
-      text: `${clue.text}${clue.strategy ? ` (reasoning strategy: ${clueStrategyLabel(clue.strategy)})` : ""}`,
+      text: boundedCandidateText(`${clue.text}${clue.strategy ? ` (reasoning strategy: ${clueStrategyLabel(clue.strategy)})` : ""}`),
     });
   }
 }
