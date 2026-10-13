@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
 import { cycleMark, markBoard, squareKey } from "./puzzle-board/marks";
-import { answerFromBoard, boardProgress, boardSolveProgress } from "./puzzle-board/solution";
+import { answerFromBoard } from "./puzzle-board/answer";
+import { boardProgress, boardSolveProgress } from "./puzzle-board/progress";
 import { parsePuzzle } from "./puzzle-parser";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Mark } from "./puzzle";

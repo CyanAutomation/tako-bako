@@ -1,6 +1,7 @@
 import { parseAnswerVerification } from "./answer-verification";
 import { parseClueStrategyResults } from "./clue-strategy-results";
-import { parseHintResponse, type HintRequestBody, type ParsedHintResponse } from "./hint-request";
+import { parseHintResponse, type ParsedHintResponse } from "./hint-response";
+import type { HintRequestBody } from "./hint-request";
 import type { Answer, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
 
