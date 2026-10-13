@@ -34,6 +34,7 @@ describe("health readiness", () => {
 
     assert.ok(example);
     assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, { status: "ok", dependencies: { yokaiba: "ok" } });
     assert.deepStrictEqual(JSON.parse(example), result.body);
   });
 
