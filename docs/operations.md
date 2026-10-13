@@ -48,7 +48,7 @@ Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies
 
 Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients.
 
-Puzzle and health API logs use the `tako_bako_api_metric` label. Records include operation, outcome, HTTP status, and finite non-negative duration in milliseconds; operation-specific records may include retry and upstream status details. The events forwarding handler intentionally does not log gameplay event contents.
+Puzzle and health API logs use the `tako_bako_api_metric` label. Records include operation, outcome, HTTP status, and finite non-negative duration in milliseconds; generation failures may also include retry count, upstream status, and a recognized upstream error code. The events forwarding handler intentionally does not log gameplay event contents.
 
 ## Response headers
 

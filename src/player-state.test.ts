@@ -144,8 +144,8 @@ describe("player puzzle state", () => {
     }
   });
 
-  it("evaluates synthetic labeled states through typed parsing and deterministic policy", () => {
-    const scenarios = [
+  it("[TB-HINT-01] applies bounded hint policy to accepted Jev player-state choices", () => {
+    const cases = [
       { state: "progressing", features: features({ affirmativeCount: 4, readinessPercent: 25 }), expectedHint: "elimination" },
       { state: "stalled", features: features({ hintsUsed: 1, elapsedMs: 180_000 }), expectedHint: "elimination" },
       { state: "likely_wrong_turn", features: features({ affirmativeCount: 10, readinessPercent: 63, mistakes: 1 }), expectedHint: "elimination" },
@@ -153,10 +153,11 @@ describe("player puzzle state", () => {
       { state: "ready_for_stronger_hint", features: features({ affirmativeCount: 3, readinessPercent: 19, hintsUsed: 2 }), expectedHint: "placement" },
     ] as const;
 
-    for (const scenario of scenarios) {
-      const assessment = parsePlayerStateAssessment({ answers: { player_state: { type: "choice", choice: scenario.state, confidence: 0.88 } } });
-      assert.strictEqual(assessment?.state, scenario.state);
-      assert.strictEqual(policyForPlayerState(assessment!.state, scenario.features).hintKind, scenario.expectedHint);
+    for (const testCase of cases) {
+      const assessment = parsePlayerStateAssessment({ answers: { player_state: { type: "choice", choice: testCase.state, confidence: 0.88 } } });
+      assert.ok(assessment, `${testCase.state} should be accepted`);
+      assert.strictEqual(assessment.state, testCase.state);
+      assert.strictEqual(policyForPlayerState(assessment.state, testCase.features).hintKind, testCase.expectedHint);
     }
   });
 });
