@@ -1,7 +1,8 @@
 import { squareKey } from "./puzzle-board/marks";
-import { answerFromBoard, boardSolveProgress } from "./puzzle-board/solution";
+import { answerFromBoard } from "./puzzle-board/answer";
+import { boardSolveProgress } from "./puzzle-board/progress";
 import { courseProgressLabel, nextCourse, type Course } from "./curriculum";
-import type { ChallengeProgress } from "./progress";
+import type { ChallengeProgress } from "./progress-types";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
 import { renderBoardToolbar } from "./sections/board-toolbar";

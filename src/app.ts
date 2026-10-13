@@ -1,11 +1,8 @@
 import { markBoard, squareKey } from "./puzzle-board/marks";
-import { answerFromBoard } from "./puzzle-board/solution";
-import { resolveAnswerOutcome } from "./app-answer-outcome";
 import { updateBoardView as updateBoardDom } from "./app-board-view";
 import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
-import { createHintRequestBody, type ParsedHintResponse } from "./hint-request";
-import { fetchClueStrategies, requestAnswerVerification, requestHintResponse } from "./app-requests";
+import { fetchClueStrategies } from "./app-requests";
 import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
@@ -21,6 +18,7 @@ import { type ClueFilter } from "./sections/clue-panel";
 import { trapDialogTab } from "./ui-dialog";
 import { handleGridCellKeydown, handleGridTabKeydown } from "./app-keyboard";
 import type { StatusTone } from "./ui-types";
+import { createAppGameplayActions } from "./app-gameplay";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -91,6 +89,42 @@ function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used
   });
 }
 
+const gameplay = createAppGameplayActions({
+  state: {
+    get puzzle() { return puzzle; },
+    set puzzle(value) { puzzle = value; },
+    get board() { return board; },
+    set board(value) { board = value; },
+    get loading() { return loading; },
+    set loading(value) { loading = value; },
+    get playMode() { return playMode; },
+    set playMode(value) { playMode = value; },
+    get activeCourse() { return activeCourse; },
+    set activeCourse(value) { activeCourse = value; },
+    get progress() { return progress; },
+    set progress(value) { progress = value; },
+    get difficultyLevel() { return difficultyLevel; },
+    set difficultyLevel(value) { difficultyLevel = value; },
+    get puzzleStartedAt() { return puzzleStartedAt; },
+    set puzzleStartedAt(value) { puzzleStartedAt = value; },
+    get hintsUsed() { return hintsUsed; },
+    set hintsUsed(value) { hintsUsed = value; },
+    get mistakes() { return mistakes; },
+    set mistakes(value) { mistakes = value; },
+    get smartMarking() { return smartMarking; },
+    set smartMarking(value) { smartMarking = value; },
+    get pendingCelebration() { return pendingCelebration; },
+    set pendingCelebration(value) { pendingCelebration = value; },
+    get usedClueIds() { return usedClueIds; },
+    set usedClueIds(value) { usedClueIds = value; },
+    get clueStrategies() { return clueStrategies; },
+    set clueStrategies(value) { clueStrategies = value; },
+  },
+  setMessage,
+  render,
+  recordOutcome,
+});
+
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
   challengeOptionsOpen = false;
   activeCourse = course;
@@ -123,16 +157,12 @@ function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requested
 let currentFetchId = 0;
 let puzzleLoadFailed = false;
 let activePuzzleRequest: AbortController | undefined;
-let verificationGeneration = 0;
-let activeVerificationRequest: AbortController | undefined;
-let hintGeneration = 0;
-let activeHintRequest: AbortController | undefined;
 let clueStrategyGeneration = 0;
 let activeClueStrategyRequest: AbortController | undefined;
 
 function showLandingPage(): void {
-  invalidateVerification();
-  invalidateHint();
+  gameplay.invalidateVerification();
+  gameplay.invalidateHint();
   invalidateClueStrategies();
   currentFetchId += 1;
   activePuzzleRequest?.abort();
@@ -163,18 +193,6 @@ function showLandingPage(): void {
   render();
 }
 
-function invalidateVerification(): void {
-  verificationGeneration += 1;
-  activeVerificationRequest?.abort();
-  activeVerificationRequest = undefined;
-}
-
-function invalidateHint(): void {
-  hintGeneration += 1;
-  activeHintRequest?.abort();
-  activeHintRequest = undefined;
-}
-
 function invalidateClueStrategies(): void {
   clueStrategyGeneration += 1;
   activeClueStrategyRequest?.abort();
@@ -201,8 +219,8 @@ async function loadClueStrategies(requestedPuzzle: Puzzle): Promise<void> {
 }
 
 async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
-  invalidateVerification();
-  invalidateHint();
+  gameplay.invalidateVerification();
+  gameplay.invalidateHint();
   invalidateClueStrategies();
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
@@ -332,140 +350,6 @@ function dismissResetDialog(): void {
   restoreResetFocus();
 }
 
-async function checkAnswer(): Promise<void> {
-  if (!puzzle) return;
-  const requestedPuzzle = puzzle;
-  const requestedPuzzleId = requestedPuzzle.id;
-  const requestedPuzzleToken = requestedPuzzle.puzzleToken;
-  const requestedPlayMode = playMode;
-  const requestedCourse = activeCourse;
-  const requestGeneration = ++verificationGeneration;
-  activeVerificationRequest?.abort();
-  const requestController = new AbortController();
-  activeVerificationRequest = requestController;
-  const isActiveRequest = () => requestGeneration === verificationGeneration
-    && puzzle?.id === requestedPuzzleId
-    && puzzle.puzzleToken === requestedPuzzleToken;
-  const answer = answerFromBoard(board, requestedPuzzle.spec);
-  if (!answer) {
-    setMessage("Choose one ✓ in each row and column before checking your solution.", "warning");
-    render();
-    return;
-  }
-  if (!requestedPuzzleToken) {
-    setMessage("Solution checking is temporarily unavailable for this dojo puzzle.", "error");
-    render();
-    return;
-  }
-  loading = true;
-  setMessage("Tako is checking your solution…");
-  render();
-  try {
-    const correct = await requestAnswerVerification(requestedPuzzleToken, answer, requestController.signal, isActiveRequest);
-    if (correct !== undefined) applyAnswerResult(correct, requestedPlayMode, requestedCourse);
-  } catch {
-    if (!isActiveRequest()) return;
-    setMessage("Tako can’t check your solution just now. Your marks are safely saved—please try again in a moment.", "error");
-  } finally {
-    if (isActiveRequest()) {
-      activeVerificationRequest = undefined;
-      loading = false;
-      render();
-    }
-  }
-}
-
-function applyAnswerResult(correct: boolean, requestedPlayMode: PlayMode, requestedCourse: Course): void {
-  const outcome = resolveAnswerOutcome({ correct, playMode: requestedPlayMode, course: requestedCourse, progress });
-  mistakes = Math.min(100, mistakes + outcome.mistakeCountDelta);
-  recordOutcome(outcome.event);
-  if (outcome.persistProgress) {
-    progress = outcome.progress;
-    saveProgress(localStorage, progress);
-  }
-  setMessage(outcome.message, outcome.tone);
-  if (outcome.celebrate) pendingCelebration = true;
-}
-
-async function requestHint(): Promise<void> {
-  if (!puzzle) return;
-  const requestedPuzzle = puzzle;
-  const requestedPuzzleId = requestedPuzzle.id;
-  const requestedPuzzleToken = requestedPuzzle.puzzleToken;
-  if (!requestedPuzzleToken) return;
-  const requestedBoard = { ...board };
-  const requestedUsedClueIds = new Set(usedClueIds);
-  const requestedDifficultyLevel = difficultyLevel;
-  const requestedPuzzleStartedAt = puzzleStartedAt;
-  const requestedHintsUsed = hintsUsed;
-  const requestGeneration = ++hintGeneration;
-  activeHintRequest?.abort();
-  const requestController = new AbortController();
-  activeHintRequest = requestController;
-  const isActiveRequest = () => requestGeneration === hintGeneration
-    && puzzle?.id === requestedPuzzleId
-    && puzzle.puzzleToken === requestedPuzzleToken;
-  const body = createHintRequestBody({
-    puzzle: { ...requestedPuzzle, puzzleToken: requestedPuzzleToken },
-    board: requestedBoard,
-    usedClueIds: requestedUsedClueIds,
-    clueStrategies,
-    hintsUsed: requestedHintsUsed,
-    mistakes,
-    difficultyLevel: requestedDifficultyLevel,
-    puzzleStartedAt: requestedPuzzleStartedAt,
-    now: Date.now(),
-    smartMarking,
-  });
-  loading = true;
-  setMessage("Tako is finding the next helpful nudge…");
-  render();
-  try {
-    const hint = await requestHintResponse(body, requestController.signal, isActiveRequest);
-    if (!hint) return;
-    applyHintResponse(hint, requestedPuzzleId, requestedBoard, requestedUsedClueIds);
-    hintsUsed = requestedHintsUsed + 1;
-    recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, hintsUsed, mistakes);
-  } catch {
-    if (!isActiveRequest()) return;
-    setMessage("Tako can’t offer a hint just now. Please try again in a moment.", "error");
-  } finally {
-    if (isActiveRequest()) {
-      activeHintRequest = undefined;
-      loading = false;
-      render();
-    }
-  }
-}
-
-function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousBoard: Board, previousUsedClueIds: ReadonlySet<string>): void {
-  if (hint.kind === "placement") {
-    board = { ...previousBoard, [squareKey(hint.placement.category, hint.placement.subject, hint.placement.value)]: "yes" };
-    saveBoard(puzzleId, board);
-    setMessage(`Hint: ${hint.placement.subject} matches ${hint.placement.value}.`);
-    return;
-  }
-  if (hint.clue.id !== undefined) {
-    usedClueIds = new Set(previousUsedClueIds).add(hint.clue.id);
-    saveUsedClues(puzzleId, usedClueIds);
-  }
-  setMessage(`Hint: ${hint.clue.text}`);
-}
-
-function recordHintUsage(requestedPuzzle: Puzzle, requestedDifficultyLevel: number | undefined, requestedPuzzleStartedAt: number | undefined, usedHints: number, currentMistakes: number): void {
-  postGameEvent({
-    schemaVersion: 1,
-    event: "hint_used",
-    templateId: requestedPuzzle.templateId,
-    requestedDifficultyLevel,
-    assessedDifficultyLevel: requestedPuzzle.difficulty.level,
-    clueCount: requestedPuzzle.clues.length,
-    elapsedMs: clampElapsedMs(requestedPuzzleStartedAt),
-    hintsUsed: usedHints,
-    mistakes: currentMistakes,
-  });
-}
-
 async function sharePuzzle(): Promise<void> {
   try {
     await navigator.clipboard.writeText(window.location.href);
@@ -547,8 +431,8 @@ function handlePuzzleNavigationClick(button: HTMLButtonElement): boolean {
 }
 
 function handleBoardActionClick(button: HTMLButtonElement): boolean {
-  if (button.id === "check-solution") void checkAnswer();
-  else if (button.id === "hint") void requestHint();
+  if (button.id === "check-solution") void gameplay.checkAnswer();
+  else if (button.id === "hint") void gameplay.requestHint();
   else if (button.id === "undo") restoreBoard();
   else if (button.id === "reset-board") openResetBoardDialog();
   else return false;
@@ -565,8 +449,8 @@ function handleGridResetClick(button: HTMLButtonElement): boolean {
 }
 
 function confirmProgressReset(): void {
-  invalidateVerification();
-  invalidateHint();
+  gameplay.invalidateVerification();
+  gameplay.invalidateHint();
   currentFetchId += 1;
   loading = false;
   difficultyUnavailable = false;

@@ -1,5 +1,6 @@
 import { nextCourse, type Course } from "./curriculum";
-import { completeCourse, shouldAdvanceProgress, type ChallengeProgress } from "./progress";
+import { completeCourse, shouldAdvanceProgress } from "./progress";
+import type { ChallengeProgress } from "./progress-types";
 import type { PlayMode } from "./app-routing";
 import type { StatusTone } from "./ui-types";
 

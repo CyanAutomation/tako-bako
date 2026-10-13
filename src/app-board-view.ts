@@ -1,4 +1,5 @@
-import { boardSolveProgress, answerFromBoard } from "./puzzle-board/solution";
+import { answerFromBoard } from "./puzzle-board/answer";
+import { boardSolveProgress } from "./puzzle-board/progress";
 import { gridCellLabel } from "./ui-grid";
 import type { Board, Puzzle } from "./puzzle";
 
