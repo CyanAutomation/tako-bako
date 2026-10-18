@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
-import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.mjs";
-import { createKasekiStatusFetcher, pollKasekiRun, runKasekiPolling } from "../scripts/kaseki/wait-for-run.mjs";
+import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.ts";
+import { createKasekiStatusFetcher, pollKasekiRun, runKasekiPolling } from "../scripts/kaseki/wait-for-run.ts";
 
 type WorkflowStep = { name?: string; uses?: string; run?: string; with?: Record<string, unknown>; env?: Record<string, string> };
 type WorkflowJob = {
@@ -183,7 +183,7 @@ test("[CI-KASEKI-03] idempotency keys are stable UUIDv5 values for each workflow
 });
 
 test("[CI-KASEKI-03] idempotency CLI reads GitHub run context", () => {
-  const result = spawnSync(process.execPath, ["scripts/kaseki/idempotency-key.mjs"], {
+  const result = spawnSync(process.execPath, ["scripts/kaseki/idempotency-key.ts"], {
     encoding: "utf8",
     env: {
       PATH: process.env.PATH,
@@ -199,8 +199,8 @@ test("[CI-KASEKI-03] idempotency CLI reads GitHub run context", () => {
 
 test("[CI-KASEKI-03] workflows invoke the tested idempotency and status helpers", () => {
   for (const { name, workflow } of workflows) {
-    assert.match(namedStep(workflow, "Create idempotency key").run ?? "", /node scripts\/kaseki\/idempotency-key\.mjs/);
-    assert.match(namedStep(workflow, "Wait for Kaseki completion").run ?? "", /node scripts\/kaseki\/wait-for-run\.mjs/);
+    assert.match(namedStep(workflow, "Create idempotency key").run ?? "", /node scripts\/kaseki\/idempotency-key\.ts/);
+    assert.match(namedStep(workflow, "Wait for Kaseki completion").run ?? "", /node scripts\/kaseki\/wait-for-run\.ts/);
     assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.KASEKI_API_TOKEN, "${{ secrets.KASEKI_API_TOKEN }}");
     assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.RUN_ID, "${{ steps.submit.outputs.run_id }}");
     if (name === "kaseki-dry.yaml") {

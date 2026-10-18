@@ -14,7 +14,7 @@ if (coverageDirectory) {
   await mkdir(coverageDirectory, { recursive: true });
 }
 
-async function findTests(directory) {
+async function findTests(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const found = await Promise.all(entries.map(entry => {
     const path = join(directory, entry.name);
@@ -43,7 +43,7 @@ const child = spawn(process.execPath, [
   ...(coverageDirectory ? { env: { ...process.env, NODE_V8_COVERAGE: coverageDirectory } } : {}),
 });
 
-const exitCode = await new Promise((resolveExit, reject) => {
+const exitCode = await new Promise<number>((resolveExit, reject) => {
   child.once("error", reject);
   child.once("close", code => resolveExit(code ?? 1));
 });

@@ -62,7 +62,7 @@ Useful commands:
 | `npm run preview` | Preview the production build locally |
 | `npm run check:external-links` | Check external links in README and `docs/` (requires network access and `curl`) |
 
-The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinned tool command `npx --yes fallow@3.33.1 health --coverage coverage/v8`; it downloads the CLI without adding it to project dependencies. TypeScript checks run separately for the app (`tsconfig.app.json`) and API (`tsconfig.api.json`).
+The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinned tool command `npx --yes fallow@3.33.1 health --coverage coverage/v8`; it downloads the CLI without adding it to project dependencies. TypeScript checks run separately for the app (`tsconfig.app.json`), API (`tsconfig.api.json`), and Node tooling (`tsconfig.node.json`).
 
 External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
 

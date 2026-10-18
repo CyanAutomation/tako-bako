@@ -1,10 +1,20 @@
 import { access, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.mjs";
-import { runMarkdownCheck } from "./run-markdown-check.mjs";
+import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.ts";
+import { runMarkdownCheck } from "./run-markdown-check.ts";
 
-function extractRelativeLinkTargets(markdown) {
+type ProjectTreeDirectory = { indentation: number; path: string };
+type LinkTarget = { destination: string; pathname: string; fragment: string };
+type MissingLinkArguments = LinkTarget & {
+  root: string;
+  readmeDirectory: string;
+  readmePath: string;
+  readmeRelativePath: string;
+  anchorCache: Map<string, Promise<Set<string>>>;
+};
+
+function extractRelativeLinkTargets(markdown: string): LinkTarget[] {
   const targets = [];
   for (const destination of extractMarkdownDestinations(markdown)) {
     if (!destination || destination.startsWith("//") || /^[a-z][a-z\d+.-]*:/i.test(destination)) {
@@ -23,7 +33,7 @@ function extractRelativeLinkTargets(markdown) {
   return targets;
 }
 
-function projectTreeContent(markdown) {
+function projectTreeContent(markdown: string): string | undefined {
   const heading = /^## Project Structure\s*$/im.exec(markdown);
   if (!heading) return undefined;
 
@@ -36,28 +46,32 @@ function projectTreeContent(markdown) {
   return afterHeading.slice(contentStart, contentStart + fenceEnd.index);
 }
 
-function addProjectTreePath(line, directories, paths) {
+function addProjectTreePath(line: string, directories: ProjectTreeDirectory[], paths: string[]): void {
   const entry = /^(\s*)(\S+)\s{2,}\S/.exec(line);
   if (!entry) return;
 
   const indentation = entry[1].length;
-  while (directories.length && directories.at(-1).indentation >= indentation) directories.pop();
+  while (directories.length > 0) {
+    const lastDirectory = directories.at(-1);
+    if (!lastDirectory || lastDirectory.indentation < indentation) break;
+    directories.pop();
+  }
   const parent = directories.at(-1)?.path;
   const projectPath = parent ? join(parent, entry[2]) : entry[2];
   paths.push(projectPath);
   if (entry[2].endsWith("/")) directories.push({ indentation, path: projectPath });
 }
 
-function extractProjectTreePaths(markdown) {
+function extractProjectTreePaths(markdown: string): string[] {
   const tree = projectTreeContent(markdown);
   if (!tree) return [];
-  const paths = [];
-  const directories = [];
+  const paths: string[] = [];
+  const directories: ProjectTreeDirectory[] = [];
   for (const line of tree.split(/\r?\n/)) addProjectTreePath(line, directories, paths);
   return paths;
 }
 
-async function exists(path) {
+async function exists(path: string): Promise<boolean> {
   try {
     await access(path);
     return true;
@@ -66,9 +80,9 @@ async function exists(path) {
   }
 }
 
-function extractHeadingAnchors(markdown) {
-  const anchors = new Set();
-  const occurrences = new Map();
+function extractHeadingAnchors(markdown: string): Set<string> {
+  const anchors = new Set<string>();
+  const occurrences = new Map<string, number>();
   for (const match of markdown.matchAll(/^#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/gm)) {
     const title = match[1]
       .replace(/<[^>]*>/g, "")
@@ -86,29 +100,33 @@ function extractHeadingAnchors(markdown) {
   return anchors;
 }
 
-async function missingLinkError({ root, readmeDirectory, readmePath, readmeRelativePath, destination, pathname, fragment, anchorCache }) {
+async function missingLinkError({ root, readmeDirectory, readmePath, readmeRelativePath, destination, pathname, fragment, anchorCache }: MissingLinkArguments): Promise<string | undefined> {
   const target = isAbsolute(pathname)
     ? resolve(root, `.${pathname}`)
     : pathname ? resolve(readmeDirectory, pathname) : readmePath;
   if (!await exists(target)) return `${readmeRelativePath}: relative link target does not exist: ${destination}`;
   if (!fragment || !target.toLowerCase().endsWith(".md")) return undefined;
 
-  if (!anchorCache.has(target)) anchorCache.set(target, readFile(target, "utf8").then(extractHeadingAnchors));
+  let anchors = anchorCache.get(target);
+  if (!anchors) {
+    anchors = readFile(target, "utf8").then(extractHeadingAnchors);
+    anchorCache.set(target, anchors);
+  }
   let decodedFragment = fragment;
   try {
     decodedFragment = decodeURIComponent(fragment);
   } catch {
     // Keep the raw fragment so it is reported as a missing anchor.
   }
-  return (await anchorCache.get(target)).has(decodedFragment.toLowerCase())
+  return (await anchors).has(decodedFragment.toLowerCase())
     ? undefined
     : `${readmeRelativePath}: relative link fragment does not exist: ${destination}`;
 }
 
-async function checkRelativeLinks(root, readmeRelativePath, readmePath, markdown) {
+async function checkRelativeLinks(root: string, readmeRelativePath: string, readmePath: string, markdown: string): Promise<string[]> {
   const readmeDirectory = dirname(readmePath);
   const errors = [];
-  const anchorCache = new Map();
+  const anchorCache = new Map<string, Promise<Set<string>>>();
 
   for (const { destination, pathname, fragment } of extractRelativeLinkTargets(markdown)) {
     const error = await missingLinkError({ root, readmeDirectory, readmePath, readmeRelativePath, destination, pathname, fragment, anchorCache });
@@ -117,7 +135,7 @@ async function checkRelativeLinks(root, readmeRelativePath, readmePath, markdown
   return errors;
 }
 
-async function checkProjectPaths(root, readmeRelativePath, markdown) {
+async function checkProjectPaths(root: string, readmeRelativePath: string, markdown: string): Promise<string[]> {
   const errors = [];
   for (const projectPath of extractProjectTreePaths(markdown)) {
     if (!await exists(resolve(root, projectPath))) {
@@ -127,7 +145,7 @@ async function checkProjectPaths(root, readmeRelativePath, markdown) {
   return errors;
 }
 
-export async function checkReadme(root, readmeRelativePath = "README.md") {
+export async function checkReadme(root: string, readmeRelativePath = "README.md"): Promise<string[]> {
   const readmePath = resolve(root, readmeRelativePath);
   const markdown = await readFile(readmePath, "utf8");
   return [
@@ -136,7 +154,7 @@ export async function checkReadme(root, readmeRelativePath = "README.md") {
   ];
 }
 
-export async function checkDocumentation(root) {
+export async function checkDocumentation(root: string): Promise<string[]> {
   const markdownPaths = ["README.md", ...(await markdownFiles(join(root, "docs"))).map(path => relative(root, path))];
   const checked = await Promise.all(markdownPaths.map(readmePath => checkReadme(root, readmePath)));
   return checked.flat();
