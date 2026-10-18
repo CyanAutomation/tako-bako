@@ -6,8 +6,8 @@ import { parseClueStrategyResults } from "../src/clue-strategy-results.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
 import { clientAddressFromForwardedFor } from "../server/client-address.js";
 import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
+import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
 
-const MAX_TOKEN_LENGTH = 16_384;
 const YOKAIBA_HINT_URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
 
 type StrategyResult = { strategy: ClueStrategy; confidence: number };
@@ -35,7 +35,7 @@ function partitionKnownStrategies(clues: readonly InputClue[]): { results: Map<s
 }
 
 function isValidPuzzleToken(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_TOKEN_LENGTH;
+  return isBoundedText(value, MAX_PUZZLE_TOKEN_LENGTH);
 }
 
 async function puzzleTokenIsUsable(token: string): Promise<boolean> {
