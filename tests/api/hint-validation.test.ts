@@ -17,6 +17,9 @@ describe("MAX_PUZZLE_TOKEN_LENGTH boundary", () => {
     assert.equal(isBoundedText("", MAX_PUZZLE_TOKEN_LENGTH), false);
     assert.equal(isBoundedText(7, MAX_PUZZLE_TOKEN_LENGTH), false);
     assert.equal(isBoundedText(null, MAX_PUZZLE_TOKEN_LENGTH), false);
+  });
+
+  it("isRecord accepts plain objects and rejects arrays", () => {
     assert.equal(isRecord({ puzzleToken: "x" }), true);
     assert.equal(isRecord(["x"]), false);
   });
