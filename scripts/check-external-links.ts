@@ -3,13 +3,20 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import { promisify } from "node:util";
-import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.mjs";
-import { runMarkdownCheck } from "./run-markdown-check.mjs";
+import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.ts";
+import { runMarkdownCheck } from "./run-markdown-check.ts";
 
 const execFileAsync = promisify(execFile);
 
-export function extractExternalLinks(markdown) {
-  const links = new Set();
+type LinkCheckResponse = {
+  status: number;
+  body?: { cancel(): Promise<void> } | null;
+};
+
+type LinkFetcher = (url: string, init?: RequestInit) => Promise<LinkCheckResponse>;
+
+export function extractExternalLinks(markdown: string): string[] {
+  const links = new Set<string>();
   for (const destination of extractMarkdownDestinations(markdown)) {
     try {
       const url = new URL(destination);
@@ -21,7 +28,7 @@ export function extractExternalLinks(markdown) {
   return [...links];
 }
 
-export async function checkExternalLinks(markdownSources, fetcher = globalThis.fetch) {
+export async function checkExternalLinks(markdownSources: readonly string[], fetcher: LinkFetcher = globalThis.fetch): Promise<string[]> {
   const links = [...new Set(markdownSources.flatMap(extractExternalLinks))];
   const results = await Promise.all(links.map(async url => {
     try {
@@ -39,10 +46,10 @@ export async function checkExternalLinks(markdownSources, fetcher = globalThis.f
       return `External link could not be checked: ${url} (${error instanceof Error ? error.message : String(error)})`;
     }
   }));
-  return results.filter(Boolean);
+  return results.filter((result): result is string => result !== undefined);
 }
 
-async function readMarkdownSources(root) {
+async function readMarkdownSources(root: string): Promise<string[]> {
   const readmePath = join(root, "README.md");
   let readme;
   try {
@@ -58,7 +65,7 @@ async function readMarkdownSources(root) {
   return [readme, ...await Promise.all(docsPaths.map(path => readFile(path, "utf8")))];
 }
 
-async function curlFetch(url) {
+async function curlFetch(url: string): Promise<LinkCheckResponse> {
   const { stdout } = await execFileAsync("curl", [
     "--silent", "--show-error", "--location", "--max-time", "10", "--output", "/dev/null",
     "--write-out", "%{http_code}", "--url", url,
@@ -68,7 +75,7 @@ async function curlFetch(url) {
   return { status };
 }
 
-export async function checkExternalLinksInRepository(root, fetcher = curlFetch) {
+export async function checkExternalLinksInRepository(root: string, fetcher: LinkFetcher = curlFetch): Promise<string[]> {
   return checkExternalLinks(await readMarkdownSources(root), fetcher);
 }
 

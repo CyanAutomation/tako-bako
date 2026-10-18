@@ -6,14 +6,23 @@ import { fileURLToPath } from "node:url";
 
 const UUID_V5_NAMESPACE_URL = Buffer.from("6ba7b8119dad11d180b400c04fd430c8", "hex");
 
-export function createKasekiIdempotencyKey({ repository, workflow, runId }) {
-  for (const [name, value] of Object.entries({ repository, workflow, runId })) {
-    if (typeof value !== "string" || value.length === 0) {
-      throw new TypeError(`${name} is required to create a Kaseki idempotency key`);
-    }
+function requiredString(value: unknown, name: string): string {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new TypeError(`${name} is required to create a Kaseki idempotency key`);
   }
+  return value;
+}
 
-  const name = JSON.stringify([repository, workflow, runId]);
+export function createKasekiIdempotencyKey({ repository, workflow, runId }: {
+  repository: unknown;
+  workflow: unknown;
+  runId: unknown;
+}): string {
+  const requiredRepository = requiredString(repository, "repository");
+  const requiredWorkflow = requiredString(workflow, "workflow");
+  const requiredRunId = requiredString(runId, "runId");
+
+  const name = JSON.stringify([requiredRepository, requiredWorkflow, requiredRunId]);
   const digest = createHash("sha1").update(UUID_V5_NAMESPACE_URL).update(name).digest();
   digest[6] = (digest[6] & 0x0f) | 0x50;
   digest[8] = (digest[8] & 0x3f) | 0x80;
