@@ -15,26 +15,26 @@ describe("puzzle UI sections", () => {
     assert.ok((header).includes("Level 3: Moderate"));
   });
 
-  it("labels the board actions and exposes their interaction roles", () => {
+  it("[TB-ACCESS-05] gives board actions accessible names and groups them under a labelled control", () => {
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
-    assert.ok((toolbar).includes('2 of 4 matches found'));
-    assert.ok((toolbar).includes('id="undo"'));
-    assert.ok((toolbar).includes('id="reset-board"'));
-    assert.ok((toolbar).includes('id="check-solution"'));
-    assert.ok((toolbar).includes('Choose one match in each row and column, then check your solution.'));
-    assert.ok((toolbar).includes('>Check my solution</span>'));
-    assert.ok(!(toolbar).includes('id="redo"'));
-    assert.ok((toolbar).includes('id="smart-marking-toggle"'));
-    assert.ok((toolbar).includes('id="hint"'));
-    assert.ok((toolbar).includes('aria-label="Smart marking: on. An efficiency tool'));
-    assert.ok((toolbar).includes('class="board-actions"'));
-    assert.ok((toolbar).includes('aria-label="Board actions"'));
-    assert.ok((toolbar).includes('data-action-role="utility"'));
-    assert.ok((toolbar).includes('data-action-role="efficiency"'));
-    assert.ok((toolbar).includes('data-action-role="primary"'));
-    assert.ok((toolbar).includes('class="readiness-meter"'));
-    assert.ok((toolbar).includes('<progress class="readiness-meter__bar" aria-label="2 of 4 matches found" max="4" value="2"></progress>'));
-    assert.doesNotMatch(toolbar, /style=/);
+
+    assert.match(toolbar, /<div[^>]*role="group"[^>]*aria-label="Board actions">/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Undo last mark")[^>]*>[\s\S]*?<span>Undo<\/span><\/button>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Reset all board marks")[^>]*>[\s\S]*?<span>Reset board<\/span><\/button>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Get a hint")[^>]*>[\s\S]*?<span>Hint<\/span><\/button>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Check my solution")(?=[^>]*disabled)[^>]*>[\s\S]*?<span>Check my solution<\/span><\/button>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Smart marking: on\.[^"]*")(?=[^>]*aria-pressed="true")[^>]*>/);
+  });
+
+  it("[TB-ACCESS-05] announces match progress and whether the solution is ready to check", () => {
+    const incomplete = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: false });
+    assert.match(incomplete, /2 of 4 matches found/);
+    assert.match(incomplete, /Choose one match in each row and column, then check your solution\./);
+    assert.match(incomplete, /<progress\b[^>]*aria-label="2 of 4 matches found"[^>]*max="4"[^>]*value="2"><\/progress>/);
+
+    const ready = renderBoardToolbar({ matches: 4, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: false, hintDisabled: false, smartMarking: false });
+    assert.match(ready, /Your solution is ready to check\./);
+    assert.match(ready, /<button\b(?=[^>]*aria-label="Check my solution")(?!(?:[^>]*\sdisabled))[^>]*>/);
   });
 
   it("labels the grid workspace for assistive technology", () => {
@@ -86,9 +86,9 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('A compact 4×4 introduction with no-guess beginner puzzles.'));
   });
 
-  it("makes the active clue context explicit with a reusable category chip", () => {
+  it("[TB-ACCESS-06] identifies the active grid and explains which clues are highlighted", () => {
     const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set() });
 
-    assert.ok((markup).includes('class="category-chip">Club</span>'));
+    assert.match(markup, /Club<\/span> clues that mention this grid are highlighted\./);
   });
 });
