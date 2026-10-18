@@ -4,7 +4,7 @@ import { escapeHtml } from "./ui-escape";
 
 /** Groups related controls under one accessible label. */
 export function renderControlGroup(label: string, controls: string, className = "control-group"): string {
-  return `<div class="${escapeHtml(className)}" aria-label="${escapeHtml(label)}">${controls}</div>`;
+  return `<div class="${escapeHtml(className)}" role="group" aria-label="${escapeHtml(label)}">${controls}</div>`;
 }
 
 /** A shared, mutually exclusive control for filters and compact mode choices. */

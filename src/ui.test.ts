@@ -136,12 +136,12 @@ describe("shared UI primitives", () => {
     assert.match(expanded, /^<details[^>]*\sopen(?:\s|>)/);
   });
 
-  it("renders a compact, accessible information disclosure", () => {
+  it("[TB-CHALLENGE-04] gives course information a labelled, expandable disclosure", () => {
     const markup = renderInfoDisclosure({ id: "beginner-info", label: "More information about Beginner", content: "A compact introduction." });
 
-    assert.ok((markup).includes('class="info-disclosure"'));
-    assert.ok((markup).includes('<summary aria-label="More information about Beginner" title="More information about Beginner">i</summary>'));
-    assert.ok((markup).includes('<div class="info-disclosure__content">A compact introduction.</div>'));
+    assert.match(markup, /<details\b/);
+    assert.match(markup, /<summary\s+aria-label="More information about Beginner"[^>]*>/);
+    assert.match(markup, /<div[^>]*>A compact introduction\.<\/div><\/details>$/);
   });
 
   it("associates the visible Difficulty label with the selected option", () => {

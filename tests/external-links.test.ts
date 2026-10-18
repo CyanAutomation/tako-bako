@@ -47,10 +47,15 @@ describe("external Markdown link check", () => {
   it("checks a repository without an optional docs directory", async () => {
     const root = await createRepository();
     await writeFile(join(root, "README.md"), "[Home](https://example.com)");
+    const requested: string[] = [];
 
-    const errors = await checkExternalLinksInRepository(root, async () => ({ status: 200 } as Response));
+    const errors = await checkExternalLinksInRepository(root, async input => {
+      requested.push(String(input));
+      return { status: 200 } as Response;
+    });
 
     assert.deepStrictEqual(errors, []);
+    assert.deepStrictEqual(requested, ["https://example.com/"]);
   });
 
   it("reports a clear error when the required README is missing", async () => {

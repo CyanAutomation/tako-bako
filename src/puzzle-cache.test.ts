@@ -161,17 +161,14 @@ describe("puzzle session cache", () => {
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "new", undefined, 10_002), { id: "new" });
   });
 
-  it("returns undefined when reading from storage throws", () => {
-    const storage = new ThrowingReadStorage();
+  it("fails safely when reading storage or cleaning an invalid entry throws", () => {
+    const readFailure = new ThrowingReadStorage();
+    const cleanupFailure = new ThrowingRemovalStorage();
+    cleanupFailure.setItem(puzzleCacheKey("bad", undefined), "not json");
 
-    assert.strictEqual(loadPuzzleFromCache(storage, "dojo-day", undefined, 10_000), undefined);
-  });
-
-  it("returns undefined when removing an invalid entry throws", () => {
-    const storage = new ThrowingRemovalStorage();
-    storage.setItem(puzzleCacheKey("bad", undefined), "not json");
-
-    assert.strictEqual(loadPuzzleFromCache(storage, "bad", undefined, 10_000), undefined);
+    for (const [storage, seed] of [[readFailure, "dojo-day"], [cleanupFailure, "bad"]] as const) {
+      assert.strictEqual(loadPuzzleFromCache(storage, seed, undefined, 10_000), undefined);
+    }
   });
 
   it("keeps identically seeded scenarios in separate cache entries", () => {
