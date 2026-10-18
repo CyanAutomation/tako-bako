@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import { checkExternalLinks, checkExternalLinksInRepository, extractExternalLinks } from "../scripts/check-external-links.mjs";
+import { checkExternalLinks, checkExternalLinksInRepository, extractExternalLinks } from "../scripts/check-external-links.ts";
 
 const temporaryDirectories: string[] = [];
 

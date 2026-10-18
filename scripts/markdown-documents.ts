@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-export function extractMarkdownDestinations(markdown) {
+export function extractMarkdownDestinations(markdown: string): string[] {
   const destinations = [];
   const pattern = /\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+[^)]*)?\s*\)/g;
   for (const match of markdown.matchAll(pattern)) {
@@ -11,7 +11,7 @@ export function extractMarkdownDestinations(markdown) {
   return destinations;
 }
 
-export async function markdownFiles(directory) {
+export async function markdownFiles(directory: string): Promise<string[]> {
   let entries;
   try {
     entries = await readdir(directory, { withFileTypes: true });

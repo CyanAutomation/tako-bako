@@ -10,25 +10,51 @@ const POLL_INTERVAL_MS = 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 50 * 1_000;
 const MAX_STATUS_BYTES = 1_048_576;
 
-function isRecord(value) {
+type KasekiRunResult = {
+  status: "completed" | "failed" | "cancelled";
+  exitCode?: number;
+};
+
+type WaitFunction = (milliseconds: number) => Promise<unknown>;
+
+type PollKasekiRunOptions = {
+  fetchStatus: () => Promise<unknown>;
+  deadlineAt: number;
+  now?: () => number;
+  wait?: WaitFunction;
+  pollIntervalMs?: number;
+};
+
+type KasekiPollingOptions = {
+  env?: NodeJS.ProcessEnv;
+  fetchImpl?: typeof fetch;
+  appendOutput?: (path: string, data: string) => unknown;
+  stdout?: { write(chunk: string): unknown };
+  now?: () => number;
+  wait?: WaitFunction;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function pendingStatus(status) {
+function pendingStatus(status: unknown): status is "queued" | "running" {
   return status === "queued" || status === "running";
 }
 
-function terminalFailureStatus(status) {
+function terminalFailureStatus(status: unknown): status is "failed" | "cancelled" {
   return status === "failed" || status === "cancelled";
 }
 
-function completedStatus(exitCodeValue) {
+function completedStatus(exitCodeValue: unknown): KasekiRunResult {
   const exitCode = exitCodeValue ?? 0;
-  if (!Number.isSafeInteger(exitCode)) throw new TypeError("Kaseki returned an invalid exit code");
+  if (typeof exitCode !== "number" || !Number.isSafeInteger(exitCode)) {
+    throw new TypeError("Kaseki returned an invalid exit code");
+  }
   return exitCode === 0 ? { status: "completed", exitCode: 0 } : { status: "failed", exitCode };
 }
 
-function statusRecord(value) {
+function statusRecord(value: unknown): KasekiRunResult | undefined {
   if (!isRecord(value)) throw new TypeError("Kaseki returned an invalid status response");
 
   const { status } = value;
@@ -44,7 +70,7 @@ export async function pollKasekiRun({
   now = Date.now,
   wait = delay,
   pollIntervalMs = POLL_INTERVAL_MS,
-}) {
+}: PollKasekiRunOptions): Promise<KasekiRunResult> {
   if (typeof fetchStatus !== "function") throw new TypeError("fetchStatus must be a function");
   if (!Number.isFinite(deadlineAt)) throw new TypeError("deadlineAt must be a finite timestamp");
   if (!Number.isFinite(pollIntervalMs) || pollIntervalMs < 0) throw new TypeError("pollIntervalMs must be non-negative");
@@ -60,7 +86,7 @@ export async function pollKasekiRun({
   throw new Error("Kaseki run timed out before reaching a terminal status");
 }
 
-async function readJsonBody(response) {
+async function readJsonBody(response: Response): Promise<unknown> {
   if (!response.body) return JSON.parse(await response.text());
 
   const reader = response.body.getReader();
@@ -86,8 +112,14 @@ async function readJsonBody(response) {
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
-export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl = globalThis.fetch }) {
+export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl = globalThis.fetch }: {
+  baseUrl: string;
+  apiToken: string;
+  runId: string;
+  fetchImpl?: typeof fetch;
+}): () => Promise<unknown> {
   if (typeof apiToken !== "string" || apiToken.length === 0) throw new TypeError("apiToken is required");
+  if (/[\r\n]/.test(apiToken)) throw new TypeError("apiToken must not contain newline characters");
   if (typeof runId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new TypeError("runId is invalid");
 
   const url = new URL(`/api/v1/runs/${encodeURIComponent(runId)}/status`, baseUrl);
@@ -116,7 +148,7 @@ export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl 
   };
 }
 
-function requiredEnvironment(environment, name) {
+function requiredEnvironment(environment: NodeJS.ProcessEnv, name: string): string {
   const value = environment[name];
   if (!value) throw new Error(`${name} is required`);
   return value;
@@ -129,7 +161,7 @@ export async function runKasekiPolling({
   stdout = process.stdout,
   now = Date.now,
   wait = delay,
-} = {}) {
+}: KasekiPollingOptions = {}): Promise<KasekiRunResult> {
   const runId = requiredEnvironment(env, "RUN_ID");
   const submittedAtSeconds = env.SUBMITTED_AT
     ? Number(env.SUBMITTED_AT)

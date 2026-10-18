@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
-import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.mjs";
-import { createKasekiStatusFetcher, pollKasekiRun, runKasekiPolling } from "../scripts/kaseki/wait-for-run.mjs";
+import { createKasekiIdempotencyKey } from "../scripts/kaseki/idempotency-key.ts";
+import { createKasekiStatusFetcher, pollKasekiRun, runKasekiPolling } from "../scripts/kaseki/wait-for-run.ts";
 
 type WorkflowStep = { name?: string; uses?: string; run?: string; with?: Record<string, unknown>; env?: Record<string, string> };
 type WorkflowJob = {
@@ -183,7 +183,7 @@ test("[CI-KASEKI-03] idempotency keys are stable UUIDv5 values for each workflow
 });
 
 test("[CI-KASEKI-03] idempotency CLI reads GitHub run context", () => {
-  const result = spawnSync(process.execPath, ["scripts/kaseki/idempotency-key.mjs"], {
+  const result = spawnSync(process.execPath, ["scripts/kaseki/idempotency-key.ts"], {
     encoding: "utf8",
     env: {
       PATH: process.env.PATH,
@@ -199,8 +199,8 @@ test("[CI-KASEKI-03] idempotency CLI reads GitHub run context", () => {
 
 test("[CI-KASEKI-03] workflows invoke the tested idempotency and status helpers", () => {
   for (const { name, workflow } of workflows) {
-    assert.match(namedStep(workflow, "Create idempotency key").run ?? "", /node scripts\/kaseki\/idempotency-key\.mjs/);
-    assert.match(namedStep(workflow, "Wait for Kaseki completion").run ?? "", /node scripts\/kaseki\/wait-for-run\.mjs/);
+    assert.match(namedStep(workflow, "Create idempotency key").run ?? "", /node scripts\/kaseki\/idempotency-key\.ts/);
+    assert.match(namedStep(workflow, "Wait for Kaseki completion").run ?? "", /node scripts\/kaseki\/wait-for-run\.ts/);
     assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.KASEKI_API_TOKEN, "${{ secrets.KASEKI_API_TOKEN }}");
     assert.equal(namedStep(workflow, "Wait for Kaseki completion").env?.RUN_ID, "${{ steps.submit.outputs.run_id }}");
     if (name === "kaseki-dry.yaml") {
@@ -210,7 +210,7 @@ test("[CI-KASEKI-03] workflows invoke the tested idempotency and status helpers"
 });
 
 test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retries transient failures", async () => {
-  const calls: { input: URL | RequestInfo; init?: RequestInit }[] = [];
+  const calls: { input: Parameters<typeof fetch>[0]; init?: RequestInit }[] = [];
   const responses = [
     new Response("unavailable", { status: 503 }),
     new Response(JSON.stringify({ status: "running" }), { status: 200 }),
@@ -229,6 +229,11 @@ test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retr
   assert.equal(calls.length, 2);
   assert.equal(String(calls[0]?.input), "https://kaseki.example/api/v1/runs/run_123/status");
   assert.equal(new Headers(calls[1]?.init?.headers).get("authorization"), "Bearer test-token");
+  assert.throws(() => createKasekiStatusFetcher({
+    baseUrl: "https://kaseki.example",
+    apiToken: "test-token\r\nX-Injected: true",
+    runId: "run_123",
+  }), /newline/);
   assert.throws(() => createKasekiStatusFetcher({ baseUrl: "http://kaseki.example", apiToken: "test-token", runId: "run_123" }), /HTTPS/);
 });
 
@@ -321,7 +326,7 @@ test("[CI-KASEKI-03] polling entrypoint writes successful status and reports com
       KASEKI_API_TOKEN: "test-token",
       GITHUB_OUTPUT: "github-output",
     },
-    fetchImpl: async (input: URL | RequestInfo, init?: RequestInit) => {
+    fetchImpl: async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       assert.equal(String(input), "https://kaseki.example/api/v1/runs/run_123/status");
       assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-token");
       return new Response(JSON.stringify({ status: "completed", exitCode: 0 }));

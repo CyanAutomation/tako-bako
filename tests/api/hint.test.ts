@@ -153,10 +153,13 @@ describe("hint proxy", () => {
   });
 
   it("accepts the hint count boundaries and omits a zero hint index", async () => {
-    const upstream = mock.fn(async () => new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }));
+    const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
     stubGlobal("fetch", upstream);
 
     for (const [hintsUsed, expected] of [
@@ -172,10 +175,13 @@ describe("hint proxy", () => {
   });
 
   it("accepts a puzzle token at the configured size limit", async () => {
-    const upstream = mock.fn(async () => new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }));
+    const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return new Response(JSON.stringify({ kind: "clue", clue: { text: "A useful clue." } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
     stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
 
