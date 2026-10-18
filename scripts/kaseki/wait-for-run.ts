@@ -119,6 +119,7 @@ export function createKasekiStatusFetcher({ baseUrl, apiToken, runId, fetchImpl 
   fetchImpl?: typeof fetch;
 }): () => Promise<unknown> {
   if (typeof apiToken !== "string" || apiToken.length === 0) throw new TypeError("apiToken is required");
+  if (/[\r\n]/.test(apiToken)) throw new TypeError("apiToken must not contain newline characters");
   if (typeof runId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(runId)) throw new TypeError("runId is invalid");
 
   const url = new URL(`/api/v1/runs/${encodeURIComponent(runId)}/status`, baseUrl);

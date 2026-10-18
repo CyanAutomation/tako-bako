@@ -16,7 +16,8 @@ describe("OpenRouter Jev client", () => {
   it("uses the Decisions API only after reserving shared quota", async () => {
     configureJevForTests();
     process.env.JEV_MODEL = "typesafe/jev-1.13";
-    const fetchMock = mock.fn(async (input: string | URL | Request) => {
+    const fetchMock = mock.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      void init;
       if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       return new Response(JSON.stringify({ answers: { route: { type: "choice", choice: "billing" } } }), { status: 200 });
     });

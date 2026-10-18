@@ -187,9 +187,12 @@ describe("puzzle proxy", () => {
   });
 
   it("[TB-INPUT-01] accepts documented seed and difficulty boundaries in shared links and API requests", async () => {
-    const upstream = mock.fn(async () => new Response(JSON.stringify({ id: "boundary-puzzle" }), {
-      status: 200, headers: { "content-type": "application/json" },
-    }));
+    const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return new Response(JSON.stringify({ id: "boundary-puzzle" }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    });
     stubGlobal("fetch", upstream);
 
     for (const { seed, difficultyLevel } of [
