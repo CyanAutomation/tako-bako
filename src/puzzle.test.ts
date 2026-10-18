@@ -87,11 +87,7 @@ describe("parsePuzzle", () => {
     assert.deepStrictEqual(boardProgress({}, puzzle.spec), { marked: 0, total: 75 });
   });
 
-  it("rejects a malformed response before it reaches the board", () => {
-    assert.throws(() => parsePuzzle({ id: "missing everything" }), new RegExp("invalid puzzle response"));
-  });
-
-  it("rejects malformed nested records and optional metadata at their boundaries", () => {
+  it("rejects malformed puzzle responses before they reach the board", () => {
     const valid = {
       id: "valid", seed: "valid", clues: [],
       difficulty: { level: 1, label: "Easy", modelVersion: "v1" },
@@ -101,6 +97,7 @@ describe("parsePuzzle", () => {
       ] },
     };
     const malformed: unknown[] = [
+      { id: "missing everything" },
       { ...valid, clues: [null] },
       { ...valid, difficulty: { ...valid.difficulty, label: "" } },
       { ...valid, spec: { ...valid.spec, categories: [valid.spec.categories[0], { ...valid.spec.categories[1], id: "" }] } },
@@ -110,7 +107,7 @@ describe("parsePuzzle", () => {
     ];
 
     for (const value of malformed) {
-      assert.throws(() => parsePuzzle(value), new RegExp("invalid puzzle response"));
+      assert.throws(() => parsePuzzle(value), /invalid puzzle response/);
     }
   });
 

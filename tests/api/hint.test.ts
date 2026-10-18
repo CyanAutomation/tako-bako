@@ -134,6 +134,8 @@ describe("hint proxy", () => {
   it("rejects malformed or unsupported hint requests before contacting Yokaiba", async () => {
     const upstream = mock.fn(); stubGlobal("fetch", upstream);
     const invalidBodies = [
+      [],
+      null,
       { puzzleToken: "", kind: "clue" },
       { puzzleToken: 7, kind: "clue" },
       { puzzleToken: "x".repeat(16_385), kind: "clue" },

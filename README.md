@@ -42,11 +42,11 @@ Each puzzle has several categories of clues, such as “The cat owner lives next
 
 Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5×5), Championship Bridge (bridge to the expert board), and Championship Circuit (three expert grids). Older Tournament Order v1 links remain available; Open Division v1 and Championship Circuit v1 links open their current versions.
 
-Clues can be filtered as All, To review, or Used. Used-clue status is saved separately from board marks. Use arrow keys to move through grid cells. Grid tabs, clue filters, and dialogs expose their names and selected state to assistive technology.
+Clues can be filtered as All, To review, or Used. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. Grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
 
 ### Puzzle Challenge
 
-Puzzle Challenge guides players through twelve levels: Beginner uses Tournament Order 1–4; Intermediate uses Open Division 5–7 and Championship Bridge 8; Advanced uses Championship Bridge 9 and Championship Circuit 10–12. Levels unlock sequentially, and the header shows completion within the active tier. Hints begin with a clue and can offer an elimination or a revealed placement as progress increases. Daily puzzles roll over at midnight UTC and advance with a correct answer. Players can also replay a tier, start the daily puzzle fresh, or reset Challenge progress without deleting saved boards or breaking shared links.
+Puzzle Challenge guides players through twelve levels: Beginner uses Tournament Order 1–4; Intermediate uses Open Division 5–7 and Championship Bridge 8; Advanced uses Championship Bridge 9 and Championship Circuit 10–12. Each tier's introductory description is available from a labelled information disclosure. Levels unlock sequentially, and the header shows completion within the active tier. Hints begin with a clue and can offer an elimination or a revealed placement as progress increases. Daily puzzles roll over at midnight UTC and advance with a correct answer. Players can also replay a tier, start the daily puzzle fresh, or reset Challenge progress without deleting saved boards or breaking shared links.
 
 ## Development
 
