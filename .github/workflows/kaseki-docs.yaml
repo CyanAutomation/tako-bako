@@ -56,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          key="$(node scripts/kaseki/idempotency-key.mjs)"
+          key="$(node scripts/kaseki/idempotency-key.ts)"
 
           [[ "$key" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
           printf 'key=%s\n' "$key" >> "$GITHUB_OUTPUT"
@@ -175,7 +175,7 @@ jobs:
           RUN_ID: ${{ steps.submit.outputs.run_id }}
         run: |
           set -euo pipefail
-          node scripts/kaseki/wait-for-run.mjs
+          node scripts/kaseki/wait-for-run.ts
 
       - name: Publish run details
         if: always()

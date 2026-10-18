@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { checkDocumentation, checkReadme } from "../scripts/check-readme.mjs";
+import { checkDocumentation, checkReadme } from "../scripts/check-readme.ts";
 
 test("README documentation check accepts existing relative links and project paths", async () => {
   const root = await mkdtemp(join(tmpdir(), "tako-bako-readme-check-"));
