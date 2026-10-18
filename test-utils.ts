@@ -39,11 +39,12 @@ export function restoreStubbedGlobals(): void {
   originalGlobalDescriptors.clear();
 }
 
-export function resolvedMock<T>(value: T) {
-  return mock.fn((...args: unknown[]) => {
+export function resolvedMock<T extends Response>(value: T) {
+  const fetchMock: typeof fetch = async (...args) => {
     void args;
-    return Promise.resolve(value);
-  });
+    return value;
+  };
+  return mock.fn(fetchMock);
 }
 
 export function rejectedMock(error: unknown) {

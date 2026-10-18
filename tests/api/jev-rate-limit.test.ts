@@ -25,7 +25,10 @@ function redisCountResponse(clientCount: number, globalCount: number, allowed = 
 describe("Jev shared rate limit", () => {
   it("atomically reserves a per-client and global quota without sending the raw address", async () => {
     configureRedis();
-    const fetchMock = mock.fn(async () => redisCountResponse(1, 1));
+    const fetchMock = mock.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return redisCountResponse(1, 1);
+    });
     stubGlobal("fetch", fetchMock);
 
     assert.strictEqual(await allowJevDecision("203.0.113.4"), true);

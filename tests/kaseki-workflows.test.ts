@@ -210,7 +210,7 @@ test("[CI-KASEKI-03] workflows invoke the tested idempotency and status helpers"
 });
 
 test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retries transient failures", async () => {
-  const calls: { input: URL | RequestInfo; init?: RequestInit }[] = [];
+  const calls: { input: Parameters<typeof fetch>[0]; init?: RequestInit }[] = [];
   const responses = [
     new Response("unavailable", { status: 503 }),
     new Response(JSON.stringify({ status: "running" }), { status: 200 }),
@@ -229,6 +229,11 @@ test("[CI-KASEKI-03] status fetch uses the authenticated HTTPS endpoint and retr
   assert.equal(calls.length, 2);
   assert.equal(String(calls[0]?.input), "https://kaseki.example/api/v1/runs/run_123/status");
   assert.equal(new Headers(calls[1]?.init?.headers).get("authorization"), "Bearer test-token");
+  assert.throws(() => createKasekiStatusFetcher({
+    baseUrl: "https://kaseki.example",
+    apiToken: "test-token\r\nX-Injected: true",
+    runId: "run_123",
+  }), /newline/);
   assert.throws(() => createKasekiStatusFetcher({ baseUrl: "http://kaseki.example", apiToken: "test-token", runId: "run_123" }), /HTTPS/);
 });
 
@@ -321,7 +326,7 @@ test("[CI-KASEKI-03] polling entrypoint writes successful status and reports com
       KASEKI_API_TOKEN: "test-token",
       GITHUB_OUTPUT: "github-output",
     },
-    fetchImpl: async (input: URL | RequestInfo, init?: RequestInit) => {
+    fetchImpl: async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
       assert.equal(String(input), "https://kaseki.example/api/v1/runs/run_123/status");
       assert.equal(new Headers(init?.headers).get("authorization"), "Bearer test-token");
       return new Response(JSON.stringify({ status: "completed", exitCode: 0 }));
