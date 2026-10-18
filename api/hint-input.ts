@@ -1,7 +1,6 @@
 import type { HintStrength } from "../src/player-state.js";
-import { isBoundedInteger, isBoundedText } from "./hint-validation.js";
+import { isBoundedInteger, isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
 
-const MAX_TOKEN_LENGTH = 16_384;
 const MAX_HINT_COUNT = 100;
 const HINT_STRENGTHS: readonly HintStrength[] = ["clue", "elimination", "placement"];
 
@@ -22,7 +21,7 @@ function isOptionalHintCount(value: unknown): value is number | undefined {
 
 export function parseHintRequest(value: Record<string, unknown>): ParsedHintRequest | undefined {
   const { puzzleToken, kind, hintsUsed } = value;
-  if (!isBoundedText(puzzleToken, MAX_TOKEN_LENGTH)) return undefined;
+  if (!isBoundedText(puzzleToken, MAX_PUZZLE_TOKEN_LENGTH)) return undefined;
   if (!isOptionalHintStrength(kind) || !isOptionalHintCount(hintsUsed)) return undefined;
   return {
     body: value,

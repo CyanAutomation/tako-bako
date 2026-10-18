@@ -3,10 +3,10 @@ import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SEC
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
 import { yokaibaGenerateParams, YOKAIBA_GENERATE_URL, YOKAIBA_ORIGIN } from "../src/yokaiba.js";
+import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
 
 const YOKAIBA_VERIFY_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/verify`;
 
-const MAX_TOKEN_LENGTH = 16_384;
 const MAX_ASSIGNMENTS = 32;
 const MAX_VALUES_PER_ASSIGNMENT = 32;
 const MAX_ANSWER_STRING_LENGTH = 256;
@@ -62,7 +62,7 @@ function parseAssignments(value: unknown): Record<string, string[]> | undefined 
 
 function parseCompletion(value: unknown): Completion | undefined {
   if (!isRecord(value)) return undefined;
-  if (typeof value.puzzleToken !== "string" || value.puzzleToken.length === 0 || value.puzzleToken.length > MAX_TOKEN_LENGTH) return undefined;
+  if (!isBoundedText(value.puzzleToken, MAX_PUZZLE_TOKEN_LENGTH)) return undefined;
   if (!isRecord(value.answer)) return undefined;
   const assignments = parseAssignments(value.answer.assignments);
   if (!assignments) return undefined;
