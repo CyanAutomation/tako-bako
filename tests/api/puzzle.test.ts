@@ -156,6 +156,8 @@ describe("puzzle proxy", () => {
   });
 
   it("caches deterministic generated puzzles at the CDN", async () => {
+    const generatedAt = 1_800_000_000_000;
+    mock.method(Date, "now", () => generatedAt);
     stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "dojo-day" }), {
       status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123", etag: '"yokaiba-v1-cached"' },
     })));
@@ -176,9 +178,7 @@ describe("puzzle proxy", () => {
       result.headers.get("x-tako-bako-cache-policy"),
       `edge-${CACHE_FRESH_LIFETIME_SECONDS / 60}m-swr-${CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS / (60 * 60)}h`,
     );
-    const generatedAt = Number(result.headers.get("x-tako-bako-generated-at"));
-    assert.ok(Number.isSafeInteger(generatedAt));
-    assert.ok(Math.abs(Date.now() - generatedAt) < 1_000);
+    assert.strictEqual(Number(result.headers.get("x-tako-bako-generated-at")), generatedAt);
     const serverTiming = result.headers.get("server-timing");
     assert.ok(serverTiming);
     assert.match(serverTiming, /^yokaiba;dur=\d+$/);
