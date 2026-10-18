@@ -24,11 +24,13 @@ A browser-based logic grid game for puzzle fans. Solve zebra and Einstein-style 
 **Prerequisite:** Node.js `^24.0.0`.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. No provider credentials are needed to run the browser game locally. Puzzle generation uses the development proxy; optional model-assisted clue labels and hints require server-side configuration when deployed.
+Open <http://localhost:5173>. The Vite development server proxies puzzle generation to Yokaiba and requires network access. It does not run Vercel's serverless handlers, so answer checking and server-assisted hints and clue labels are available in the deployed app. Local play and puzzle generation need no provider credentials; optional model-assisted features require server-side configuration when deployed.
+
+If puzzle generation fails, check network access to Yokaiba and inspect the `/api/puzzle` response in your browser's developer tools. See [operations troubleshooting](docs/operations.md#local-troubleshooting) for more help.
 
 ## How to play
 
@@ -66,15 +68,15 @@ The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinn
 
 External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
 
-The Vite development server proxies puzzle-generation GET requests through `/api/puzzle` to Yokaiba. Vercel serverless handlers are not run by `npm run dev`; see [Deployment and API](#deployment-and-api) for the health endpoint and [operations documentation](docs/operations.md) for deployment details.
+For deployed route behavior and the health endpoint, see [Deployment and API](#deployment-and-api) and the [operations guide](docs/operations.md#deployment). Local and deployed service issues are covered in [operations troubleshooting](docs/operations.md#local-troubleshooting).
 
 Selected test contracts and product behavior are mapped in [test traceability](docs/test-traceability.md). The focused test review and verification notes are in [test quality review](docs/test-quality-review.md).
 
 ## Deployment and API
 
-Vercel serves the Vite app and five serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, and readiness. The [operations reference](docs/operations.md) describes handler behavior, caching, security headers, and provider configuration.
+Vercel serves the Vite app and five serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, and readiness. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
 
-`GET /api/puzzle` accepts a required `seed`, an optional allow-listed `templateId`, and an optional `difficultyLevel` from 1 to 12. Verification (`POST /api/puzzle`) and hints (`POST /api/hint`) require the signed `puzzleToken` returned with a generated puzzle; these routes support the app's flows and are not a standalone public SDK.
+`GET /api/puzzle` accepts a required `seed`, an optional allow-listed `templateId`, and an optional `difficultyLevel` from 1 to 12. Verification (`POST /api/puzzle`) and hints (`POST /api/hint`) require the signed `puzzleToken` returned with a generated puzzle. These endpoints support the app's own flows.
 
 Check the deployed app and its required Yokaiba dependency with:
 
@@ -118,5 +120,7 @@ vercel.json                Deployment, security headers, and caching
 ```
 
 ## Contributing and support
+
+The hosted game is available at [tako-bako.vercel.app](https://tako-bako.vercel.app/). The project does not currently publish a supported-browser matrix; include your browser name and version when reporting an issue.
 
 Report bugs or request features in [GitHub Issues](https://github.com/CyanAutomation/tako-bako/issues). For code changes, open a pull request and run `npm run check` before submitting. The project is licensed under [GNU GPL v3](LICENSE).
