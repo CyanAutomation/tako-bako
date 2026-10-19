@@ -86,6 +86,14 @@ describe("puzzle session cache", () => {
     assert.notStrictEqual(puzzleCacheKey("dojo-day", 3), puzzleCacheKey("dojo-night", 3));
   });
 
+  it("keeps v4, v5, and comparison models in separate cache entries while preserving the default key", () => {
+    const defaultKey = puzzleCacheKey("shared", 4, "tournament-order-v2");
+
+    assert.notStrictEqual(defaultKey, puzzleCacheKey("shared", 4, "tournament-order-v2", "v5"));
+    assert.notStrictEqual(puzzleCacheKey("shared", 4, "tournament-order-v2", "v5"), puzzleCacheKey("shared", 4, "tournament-order-v2", "compare"));
+    assert.strictEqual(defaultKey, "tako-bako.puzzle.v2:tournament-order-v2:shared:4");
+  });
+
   it("[TB-CACHE-01] serves session entries only before the freshness deadline", () => {
     for (const [now, expected] of [
       [expiresAt - 1, { id: "puzzle-1" }],

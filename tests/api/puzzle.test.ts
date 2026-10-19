@@ -200,7 +200,7 @@ describe("puzzle proxy", () => {
       { seed: "z".repeat(128), difficultyLevel: "12" },
     ]) {
       const sharedInput = parseSharedPuzzleInput(`https://example.test/?seed=${seed}&mode=shared&difficulty=${difficultyLevel}`);
-      assert.deepStrictEqual(sharedInput, { seed, difficultyLevel: Number(difficultyLevel) });
+      assert.deepStrictEqual(sharedInput, { seed, difficultyLevel: Number(difficultyLevel), difficultyModel: "v4" });
 
       const { response, result } = responseRecorder();
       await handler({ method: "GET", query: { seed, difficultyLevel } } as never, response as never);
@@ -222,6 +222,7 @@ describe("puzzle proxy", () => {
       { seed: "x".repeat(129) },
       { seed: "valid-seed", difficultyLevel: "0" },
       { seed: "valid-seed", difficultyLevel: "13" },
+      { seed: "valid-seed", difficultyModel: "v6" },
     ];
 
     for (const query of invalidRequests) {
@@ -232,8 +233,26 @@ describe("puzzle proxy", () => {
     }
 
     assert.strictEqual(upstream.mock.callCount(), 0);
-    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=0"), { seed: "valid-seed" });
-    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=13"), { seed: "valid-seed" });
+    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=0"), { seed: "valid-seed", difficultyModel: "v4" });
+    assert.deepStrictEqual(parseSharedPuzzleInput("https://example.test/?seed=valid-seed&difficulty=13"), { seed: "valid-seed", difficultyModel: "v4" });
+  });
+
+  it("accepts and forwards v5 and comparison model selection", async () => {
+    const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
+      void args;
+      return new Response(JSON.stringify({ id: "model-puzzle" }), {
+        status: 200, headers: { "content-type": "application/json" },
+      });
+    });
+    stubGlobal("fetch", upstream);
+
+    for (const difficultyModel of ["v4", "v5", "compare"] as const) {
+      const { response, result } = responseRecorder();
+      await handler({ method: "GET", query: { seed: "shared-seed", difficultyModel } } as never, response as never);
+      assert.equal(result.statusCode, 200);
+      const forwardedUrl = new URL(String(upstream.mock.calls.at(-1)?.arguments[0]));
+      assert.equal(forwardedUrl.searchParams.get("difficultyModel"), difficultyModel);
+    }
   });
 
   it("retries one transient upstream generation failure before surfacing an error", async () => {

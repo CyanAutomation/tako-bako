@@ -96,11 +96,13 @@ export function parsePuzzle(value: unknown): Puzzle {
   const spec = parseSpec(value.spec);
   const requestedSeed = optionalBoundedText(value.requestedSeed, value.seed);
   const templateId = optionalBoundedText(value.templateId, spec.id);
+  const difficultyModel = value.difficultyModel === "v4" || value.difficultyModel === "v5" || value.difficultyModel === "compare" ? value.difficultyModel : undefined;
   return {
     id: value.id,
     seed: value.seed,
     requestedSeed,
     templateId,
+    ...(difficultyModel ? { difficultyModel } : {}),
     ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}),
     clues,
     difficulty,

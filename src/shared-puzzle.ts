@@ -2,6 +2,7 @@ export interface SharedPuzzleInput {
   seed: string;
   templateId?: string;
   difficultyLevel?: number;
+  difficultyModel?: "v4" | "v5" | "compare";
   tier?: string;
   level?: number;
 }
@@ -21,10 +22,15 @@ export function parseSharedPuzzleInput(value: string): SharedPuzzleInput | undef
     const tier = url.searchParams.get("tier") || undefined;
     const level = parseDifficultyLevel(url.searchParams.get("level"));
     const requestedDifficulty = parseDifficultyLevel(url.searchParams.get("difficulty"));
+    const difficultyModelValue = url.searchParams.get("difficultyModel");
+    const difficultyModel = difficultyModelValue === "v4" || difficultyModelValue === "v5" || difficultyModelValue === "compare"
+      ? difficultyModelValue
+      : "v4";
     return {
       seed,
       ...(templateId ? { templateId } : {}),
       ...(requestedDifficulty ? { difficultyLevel: requestedDifficulty } : {}),
+      difficultyModel,
       ...(tier ? { tier } : {}),
       ...(level ? { level } : {}),
     };
