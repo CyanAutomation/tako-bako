@@ -16,8 +16,9 @@ import { parseSelectionContext, playerStateFeatures } from "./hint-context.js";
 import type { SelectionContext } from "./hint-context-types.js";
 import { isRecord } from "./hint-validation.js";
 import { recordJevMetric } from "./jev-metrics.js";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const HINT_API_URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
+const HINT_API_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;
 
 async function classifyPlayerState(features: PlayerStateFeatures, clientAddress?: string): Promise<PlayerStateAssessment | undefined> {
   const startedAt = Date.now();

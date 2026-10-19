@@ -91,6 +91,7 @@ function optionalBoundedText(value: unknown, fallback: string): string {
 export function parsePuzzle(value: unknown): Puzzle {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.seed !== "string" || !Array.isArray(value.clues)) return invalidPuzzle();
   if ("puzzleToken" in value && typeof value.puzzleToken !== "string") return invalidPuzzle();
+  if ("puzzleFingerprint" in value && (typeof value.puzzleFingerprint !== "string" || !/^[a-f0-9]{64}$/.test(value.puzzleFingerprint))) return invalidPuzzle();
   const clues = value.clues.map(parseClue);
   const difficulty = parseDifficulty(value.difficulty);
   const spec = parseSpec(value.spec);
@@ -102,6 +103,7 @@ export function parsePuzzle(value: unknown): Puzzle {
     seed: value.seed,
     requestedSeed,
     templateId,
+    ...(typeof value.puzzleFingerprint === "string" ? { puzzleFingerprint: value.puzzleFingerprint } : {}),
     ...(difficultyModel ? { difficultyModel } : {}),
     ...(typeof value.puzzleToken === "string" ? { puzzleToken: value.puzzleToken } : {}),
     clues,

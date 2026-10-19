@@ -13,6 +13,7 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 | `/api/hint` | POST | Request a bounded solver hint, with optional Jev selection. |
 | `/api/clue-strategies` | POST | Label clue reasoning strategies; known constraint kinds use deterministic labels. |
 | `/api/events` | POST | Forward validated anonymous puzzle outcomes. |
+| `/api/feedback` | POST | Forward anonymous difficulty feedback for a signed puzzle. |
 | `/api/health` | GET | Report readiness of Tako Bako and its Yokaiba dependency. |
 
 `/api/health` returns HTTP 200 when Yokaiba is reachable and HTTP 503 when it is unavailable. It does not require credentials.
@@ -26,6 +27,32 @@ The intended maximum puzzle age is five minutes from generation. The API stamps 
 Missing, malformed, expired, or implausibly future timestamps disable browser caching. A one-minute future tolerance accounts for modest clock skew, and accepted expiry is capped at five minutes from the browser's current time. The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and a 3,600-second stale-while-revalidate lifetime. The API uses `s-maxage=300` and `stale-while-revalidate=3600`; browser storage uses the same five-minute freshness duration. Cache cleanup preserves unrelated session-storage keys.
 
 The API forwards Yokaiba rate-limit headers. One transient upstream 5xx is retried; rate-limit and validation responses are not. Course requests ask for deterministic seed fallback when a requested difficulty is unavailable. Unrecognized upstream validation responses are converted to bounded, non-cacheable gateway errors.
+
+## Anonymous puzzle difficulty feedback
+
+The completion modal asks **How difficult did you find this puzzle?** with Too easy, Just right, and Too hard choices. A Too hard rating can include one fixed, optional reason. During gameplay, players can open **More → Give feedback** to submit the same rating with an `in_progress` outcome. Feedback is optional, does not block progression, and does not add free-text fields.
+
+The browser sends only the signed `puzzleToken`, rating, optional reason, self-reported outcome, bounded hints/mistakes/time measurements, smart-marking state, and a UUID idempotency key to `/api/feedback`. Yokaiba verifies the signed token and derives the stable puzzle fingerprint, template, seeds, assessed/requested difficulty, generator and model versions, and generation strategy. Completion state and gameplay measurements are self-reported; a token does not prove that a puzzle was solved.
+
+Yokaiba persists accepted records in the dedicated `puzzle_feedback` Cloudflare D1 table. The feature does not depend on Analytics Engine or Jev. The API never stores the raw puzzle token, solution, answer grid, IP address, name, email, or free-text comments. A fingerprint-scoped browser marker suppresses repeat prompts on that browser, while a unique idempotency key makes retries safe. Yokaiba applies a separate 10 requests/minute feedback limit per client IP and stores no IP address. See [Yokaiba's migration, provisioning, retention, and read-only analysis queries](https://github.com/CyanAutomation/yokaiba/blob/main/docs/operations-and-deployment.md#anonymous-puzzle-difficulty-feedback).
+
+### Local feedback flow
+
+For an end-to-end local run, use a local Yokaiba Worker and Vercel's local serverless runtime. Apply the Yokaiba migration locally and set the same local-only token secret for that Worker:
+
+```sh
+# In the Yokaiba checkout
+npx wrangler d1 migrations apply yokaiba-puzzle-feedback --local
+# Put PUZZLE_TOKEN_SECRET=local-feedback-secret in Yokaiba's ignored .dev.vars file
+npm run dev
+
+# In the Tako Bako checkout, point Vercel handlers at that local Worker
+YOKAIBA_API_ORIGIN=http://127.0.0.1:8787 npx vercel dev
+```
+
+Open the Vercel dev URL, play a puzzle, and submit feedback. `YOKAIBA_API_ORIGIN` is server-only and must be an origin without a path or credentials. It prevents local feedback testing from writing to the production Yokaiba service. Plain `npm run dev` starts Vite and does not run Vercel handlers, so it cannot exercise `/api/feedback`.
+
+The production D1 resource ID is account-specific. Create it with `npx wrangler d1 create yokaiba-puzzle-feedback`, replace the explicit placeholder in Yokaiba's `wrangler.toml`, and apply migrations with `npx wrangler d1 migrations apply yokaiba-puzzle-feedback --remote`. Do not deploy Yokaiba until the D1 binding is configured.
 
 ## Optional Jev service
 
@@ -48,7 +75,11 @@ Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies
 
 Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients.
 
+Difficulty feedback is stored separately from event telemetry. Its D1 record contains puzzle identity/generation metadata, rating and optional fixed reason, completion state, bounded gameplay measurements, smart-marking state, and submission time. Yokaiba retains records for up to 12 months using the documented operator-run deletion query; exports should use the read-only SQL examples in Yokaiba's operations guide.
+
 Puzzle and health API logs use the `tako_bako_api_metric` label. Records include operation, outcome, HTTP status, and finite non-negative duration in milliseconds; generation failures may also include retry count, upstream status, and a recognized upstream error code. The events forwarding handler intentionally does not log gameplay event contents.
+
+The feedback handler logs only its operation, coarse outcome, status, and duration. It does not log tokens, seeds, ratings, reasons, gameplay measurements, or idempotency keys.
 
 ## Response headers
 
