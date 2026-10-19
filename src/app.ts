@@ -19,6 +19,18 @@ import { trapDialogTab } from "./ui-dialog";
 import { handleGridCellKeydown, handleGridTabKeydown } from "./app-keyboard";
 import type { StatusTone } from "./ui-types";
 import { createAppGameplayActions } from "./app-gameplay";
+import {
+  hasSubmittedPuzzleFeedback,
+  markPuzzleFeedbackSubmitted,
+  postPuzzleFeedback,
+  PUZZLE_FEEDBACK_RATINGS,
+  PUZZLE_FEEDBACK_REASONS,
+  type PuzzleFeedbackRating,
+  type PuzzleFeedbackReason,
+  type PuzzleFeedbackRequest,
+} from "./feedback";
+import { createOrReusePuzzleFeedbackRequest } from "./feedback-submission";
+import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -64,6 +76,12 @@ let sharedPuzzleOpen = false;
 let puzzleStartedAt: number | undefined;
 let hintsUsed = 0;
 let mistakes = 0;
+let puzzleCompleted = false;
+let feedbackUi: { selectedRating?: PuzzleFeedbackRating; selectedReason?: PuzzleFeedbackReason; submitting: boolean; status?: "success" | "error" } = { submitting: false };
+let feedbackEntryOpen = false;
+let actionMenuOpen = false;
+const submittedFeedbackFingerprints = new Set<string>();
+const pendingFeedbackRequests = new Map<string, PuzzleFeedbackRequest>();
 
 function setMessage(text: string, tone: StatusTone = "neutral"): void {
   message = text;
@@ -76,6 +94,7 @@ function newSeed(): string {
 
 function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used" | "mistake" | "puzzle_abandoned"): void {
   if (!puzzle) return;
+  if (event === "puzzle_completed") puzzleCompleted = true;
   postGameEvent({
     schemaVersion: 1,
     event,
@@ -171,6 +190,7 @@ function showLandingPage(): void {
   activePuzzleRequest?.abort();
   activePuzzleRequest = undefined;
   puzzle = null;
+  pendingFeedbackRequests.clear();
   board = {};
   loading = false;
   difficultyUnavailable = false;
@@ -184,6 +204,10 @@ function showLandingPage(): void {
   pendingNewChallenge = false;
   pendingProgressReset = false;
   pendingCelebration = false;
+  puzzleCompleted = false;
+  feedbackUi = { submitting: false };
+  feedbackEntryOpen = false;
+  actionMenuOpen = false;
   resetReturnFocusSelector = undefined;
   activeCellKey = undefined;
   clueFilter = "all";
@@ -231,7 +255,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   const requestedDifficultyModel = difficultyModel;
   const requestedPlayMode = playMode;
   const requestedCourse = activeCourse;
-  if (puzzle) recordOutcome("puzzle_abandoned");
+  if (shouldRecordPuzzleAbandoned(Boolean(puzzle), puzzleCompleted)) recordOutcome("puzzle_abandoned");
   loading = true;
   difficultyUnavailable = false;
   puzzleLoadFailed = false;
@@ -265,6 +289,11 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
 
 function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: "v4" | "v5" | "compare" | undefined): void {
   puzzle = data;
+  pendingFeedbackRequests.clear();
+  puzzleCompleted = false;
+  feedbackUi = { submitting: false };
+  feedbackEntryOpen = false;
+  actionMenuOpen = false;
   clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
   puzzleLoadFailed = false;
   puzzleStartedAt = Date.now();
@@ -390,6 +419,14 @@ function render(): void {
     pendingNewChallenge,
     pendingProgressReset,
     pendingCelebration,
+    puzzleCompleted,
+    feedback: feedbackUi,
+    feedbackSubmitted: Boolean(puzzle?.puzzleFingerprint && (
+      submittedFeedbackFingerprints.has(puzzle.puzzleFingerprint)
+      || hasSubmittedPuzzleFeedback(localStorage, puzzle.puzzleFingerprint)
+    )),
+    feedbackEntryOpen,
+    actionMenuOpen,
     cluesOpen,
     clueFilter,
     challengeOptionsOpen,
@@ -526,6 +563,72 @@ function handleCelebrationClick(button: HTMLButtonElement): boolean {
   return true;
 }
 
+function chooseFeedbackRating(rating: PuzzleFeedbackRating): void {
+  feedbackUi = {
+    ...feedbackUi,
+    selectedRating: rating,
+    selectedReason: rating === "too_hard" ? feedbackUi.selectedReason : undefined,
+    status: undefined,
+  };
+  if (!puzzleCompleted) {
+    actionMenuOpen = true;
+    feedbackEntryOpen = true;
+  }
+  render();
+  root.querySelector<HTMLButtonElement>(`[data-feedback-rating="${CSS.escape(rating)}"]`)?.focus();
+}
+
+function chooseFeedbackReason(reason: PuzzleFeedbackReason): void {
+  feedbackUi = { ...feedbackUi, selectedReason: feedbackUi.selectedReason === reason ? undefined : reason, status: undefined };
+  if (!puzzleCompleted) {
+    actionMenuOpen = true;
+    feedbackEntryOpen = true;
+  }
+  render();
+  root.querySelector<HTMLButtonElement>(`[data-feedback-reason="${CSS.escape(reason)}"]`)?.focus();
+}
+
+async function submitPuzzleFeedback(): Promise<void> {
+  const requestedPuzzle = puzzle;
+  const fingerprint = requestedPuzzle?.puzzleFingerprint;
+  const rating = feedbackUi.selectedRating;
+  if (!requestedPuzzle || !fingerprint || !rating || feedbackUi.submitting) return;
+  if (submittedFeedbackFingerprints.has(fingerprint) || hasSubmittedPuzzleFeedback(localStorage, fingerprint)) return;
+  const request = createOrReusePuzzleFeedbackRequest(pendingFeedbackRequests, {
+    puzzle: requestedPuzzle,
+    rating,
+    reason: feedbackUi.selectedReason,
+    outcome: puzzleCompleted ? "completed" : "in_progress",
+    hintsUsed,
+    mistakes,
+    puzzleStartedAt,
+    smartMarkingEnabled: smartMarking,
+  }, () => crypto.randomUUID());
+  if (!request) return;
+  feedbackUi = { ...feedbackUi, submitting: true, status: undefined };
+  render();
+  try {
+    await postPuzzleFeedback(request);
+    submittedFeedbackFingerprints.add(fingerprint);
+    markPuzzleFeedbackSubmitted(localStorage, fingerprint);
+    pendingFeedbackRequests.delete(fingerprint);
+    if (puzzle?.puzzleFingerprint === fingerprint) feedbackUi = { submitting: false, status: "success" };
+  } catch {
+    if (puzzle?.puzzleFingerprint === fingerprint) feedbackUi = { ...feedbackUi, submitting: false, status: "error" };
+  }
+  if (puzzle?.puzzleFingerprint === fingerprint) render();
+}
+
+function handleFeedbackClick(button: HTMLButtonElement): boolean {
+  if (button.dataset.feedbackRating && (PUZZLE_FEEDBACK_RATINGS as readonly string[]).includes(button.dataset.feedbackRating)) {
+    chooseFeedbackRating(button.dataset.feedbackRating as PuzzleFeedbackRating);
+  } else if (button.dataset.feedbackReason && (PUZZLE_FEEDBACK_REASONS as readonly string[]).includes(button.dataset.feedbackReason)) {
+    chooseFeedbackReason(button.dataset.feedbackReason as PuzzleFeedbackReason);
+  } else if (button.dataset.submitPuzzleFeedback) void submitPuzzleFeedback();
+  else return false;
+  return true;
+}
+
 function handleChallengeOptionsClick(button: HTMLButtonElement): boolean {
   if (button.id === "share-puzzle") void sharePuzzle();
   else if (button.id === "challenge-menu") {
@@ -604,6 +707,7 @@ function handleBoardSquareClick(button: HTMLButtonElement): boolean {
 }
 
 const clickActions: ((button: HTMLButtonElement) => boolean)[] = [
+  handleFeedbackClick,
   handlePuzzleNavigationClick,
   handleBoardActionClick,
   handleGridResetClick,
@@ -686,6 +790,8 @@ root.addEventListener("keydown", event => {
 
 root.addEventListener("toggle", event => {
   const details = event.target as HTMLDetailsElement;
+  if (details.classList.contains("action-menu")) actionMenuOpen = details.open;
+  if (details.classList.contains("feedback-entry")) feedbackEntryOpen = details.open;
   if (details.classList.contains("clue-drawer")) cluesOpen = details.open;
 }, true);
 

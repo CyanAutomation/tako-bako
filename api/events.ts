@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { parseEventPayload } from "../server/event-payload.js";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const URL = "https://yokaiba.scheimann.workers.dev/v1/events";
+const URL = `${yokaibaApiOrigin()}/v1/events`;
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
   if (request.method !== "POST") { response.setHeader("allow", "POST"); response.status(405).json({ error: "Method not allowed" }); return; }

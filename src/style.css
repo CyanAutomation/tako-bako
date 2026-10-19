@@ -1471,6 +1471,92 @@ footer {
 .celebration-dialog h2 {
   font-size: 1.6rem;
 }
+.puzzle-feedback {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.puzzle-feedback h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.feedback-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.feedback-choice {
+  min-height: 3.25rem;
+  padding: 0.55rem 0.45rem;
+  white-space: normal;
+  text-align: center;
+}
+.feedback-choice[aria-pressed="true"],
+.feedback-reason[aria-pressed="true"] {
+  border-color: var(--jade);
+  background: var(--jade-light);
+  box-shadow: 2px 2px 0 var(--rust);
+}
+.feedback-reasons {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.feedback-reasons legend {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+}
+.feedback-reasons legend span,
+.feedback-help {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.feedback-reasons > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+.feedback-reason {
+  min-height: 2.65rem;
+  padding: 0.45rem;
+  white-space: normal;
+  text-align: left;
+}
+.feedback-reasons p,
+.feedback-help,
+.feedback-status {
+  margin: 0;
+}
+.feedback-status {
+  color: var(--jade-dark, var(--jade));
+  font-weight: 700;
+}
+.feedback-status--error {
+  color: var(--rust);
+}
+.feedback-entry {
+  border-top: 1px solid var(--line);
+}
+.feedback-entry > summary {
+  min-height: 2.5rem;
+  padding: 0.6rem 0.4rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+.feedback-entry__content {
+  width: min(24rem, calc(100vw - 2rem));
+  padding: 0.55rem;
+}
+.feedback-entry__content .puzzle-feedback {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .celebration-dialog::before {
   display: block;
   color: var(--rust);
@@ -1513,6 +1599,12 @@ footer {
   }
   .celebration-dialog::before {
     font-size: 0.8rem;
+  }
+  .feedback-options {
+    grid-template-columns: 1fr;
+  }
+  .feedback-reasons > div {
+    grid-template-columns: 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {
