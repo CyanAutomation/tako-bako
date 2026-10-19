@@ -12,7 +12,8 @@ export default defineConfig({
           const url = new URL(path, "http://localhost");
           const seed = url.searchParams.get("seed") ?? "";
           const templateId = url.searchParams.get("templateId") ?? DEFAULT_SCENARIO_ID;
-          return `${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(templateId, seed, url.searchParams.get("difficultyLevel") ?? undefined)}`;
+          const difficultyModel = url.searchParams.get("difficultyModel");
+          return `${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(templateId, seed, url.searchParams.get("difficultyLevel") ?? undefined, difficultyModel === "v5" || difficultyModel === "compare" ? difficultyModel : undefined)}`;
         },
       },
     },

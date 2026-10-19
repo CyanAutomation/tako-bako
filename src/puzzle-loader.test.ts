@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { loadPuzzle, DifficultyUnavailableError, retryAfterMessage, type PuzzleLoadRequest } from "./puzzle-loader";
-import { loadPuzzleFromCache, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache/core";
+import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache/core";
 
 class MemoryStorage implements SessionStorageLike {
   private readonly entries = new Map<string, string>();
@@ -52,6 +52,26 @@ describe("loadPuzzle", () => {
 
     assert.strictEqual(result.id, "puzzle-1");
     assert.strictEqual(loadPuzzleFromCache<{ id: string }>(storage, request.seed, request.difficultyLevel, 10_000, request.templateId)?.id, "puzzle-1");
+  });
+
+  it("forwards v5 selection and stores it under a model-specific cache identity", async () => {
+    const storage = new MemoryStorage();
+    const v5Request: PuzzleLoadRequest = { ...request, difficultyModel: "v5" };
+    let requestedUrl = "";
+    const result = await loadPuzzle(v5Request, {
+      storage, signal: new AbortController().signal, isCurrent: () => true, now: () => 10_000,
+      fetcher: async input => {
+        requestedUrl = String(input);
+        return new Response(JSON.stringify({ ...puzzle, difficultyModel: "v5" }), {
+          status: 200, headers: { "x-tako-bako-generated-at": "10000" },
+        });
+      },
+    });
+
+    assert.equal(new URL(requestedUrl, "https://example.test").searchParams.get("difficultyModel"), "v5");
+    assert.equal(result.difficultyModel, "v5");
+    assert.ok(storage.getItem(puzzleCacheKey(v5Request.seed, v5Request.difficultyLevel, v5Request.templateId, "v5")));
+    assert.equal(storage.getItem(puzzleCacheKey(request.seed, request.difficultyLevel, request.templateId)), null);
   });
 
   it("reports the available difficulty levels when the server rejects a seed", async () => {

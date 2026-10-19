@@ -85,13 +85,13 @@ function maintainCache(storage: SessionStorageLike, now: number, excludedKey: st
 }
 
 /** Returns the stable session-cache key for one shareable puzzle variant. */
-export function puzzleCacheKey(seed: string, difficulty: number | undefined, templateId = "tournament-order-v1"): string {
-  return `${CACHE_PREFIX}:${templateId}:${seed}:${difficulty ?? "any"}`;
+export function puzzleCacheKey(seed: string, difficulty: number | undefined, templateId = "tournament-order-v1", difficultyModel?: string): string {
+  return `${CACHE_PREFIX}:${templateId}:${seed}:${difficulty ?? "any"}${difficultyModel ? `:${difficultyModel}` : ""}`;
 }
 
 /** Reads a short-lived parsed puzzle, removing entries that cannot be trusted. */
-export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, now = Date.now(), templateId = "tournament-order-v1"): T | undefined {
-  const key = puzzleCacheKey(seed, difficulty, templateId);
+export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): T | undefined {
+  const key = puzzleCacheKey(seed, difficulty, templateId, difficultyModel);
   try {
     const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Malformed cache entry");
@@ -105,10 +105,10 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
 }
 
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
-export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1"): void {
+export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): void {
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return;
   const boundedExpiresAt = Math.min(expiresAt, now + CACHE_TTL_MS);
-  const key = puzzleCacheKey(seed, difficulty, templateId);
+  const key = puzzleCacheKey(seed, difficulty, templateId, difficultyModel);
   let serialized: string;
   try {
     serialized = JSON.stringify({ createdAt: now, expiresAt: boundedExpiresAt, value } satisfies CachedPuzzle<T>);
