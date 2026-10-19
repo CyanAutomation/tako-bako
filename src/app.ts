@@ -19,7 +19,16 @@ import { trapDialogTab } from "./ui-dialog";
 import { handleGridCellKeydown, handleGridTabKeydown } from "./app-keyboard";
 import type { StatusTone } from "./ui-types";
 import { createAppGameplayActions } from "./app-gameplay";
-import { hasSubmittedPuzzleFeedback, markPuzzleFeedbackSubmitted, postPuzzleFeedback, type PuzzleFeedbackRating, type PuzzleFeedbackReason, type PuzzleFeedbackRequest } from "./feedback";
+import {
+  hasSubmittedPuzzleFeedback,
+  markPuzzleFeedbackSubmitted,
+  postPuzzleFeedback,
+  PUZZLE_FEEDBACK_RATINGS,
+  PUZZLE_FEEDBACK_REASONS,
+  type PuzzleFeedbackRating,
+  type PuzzleFeedbackReason,
+  type PuzzleFeedbackRequest,
+} from "./feedback";
 import { createOrReusePuzzleFeedbackRequest } from "./feedback-submission";
 import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
 
@@ -611,9 +620,9 @@ async function submitPuzzleFeedback(): Promise<void> {
 }
 
 function handleFeedbackClick(button: HTMLButtonElement): boolean {
-  if (button.dataset.feedbackRating && ["too_easy", "just_right", "too_hard"].includes(button.dataset.feedbackRating)) {
+  if (button.dataset.feedbackRating && (PUZZLE_FEEDBACK_RATINGS as readonly string[]).includes(button.dataset.feedbackRating)) {
     chooseFeedbackRating(button.dataset.feedbackRating as PuzzleFeedbackRating);
-  } else if (button.dataset.feedbackReason && ["difficult_to_start", "confusing_clues", "too_many_deductions", "took_too_long", "other"].includes(button.dataset.feedbackReason)) {
+  } else if (button.dataset.feedbackReason && (PUZZLE_FEEDBACK_REASONS as readonly string[]).includes(button.dataset.feedbackReason)) {
     chooseFeedbackReason(button.dataset.feedbackReason as PuzzleFeedbackReason);
   } else if (button.dataset.submitPuzzleFeedback) void submitPuzzleFeedback();
   else return false;
