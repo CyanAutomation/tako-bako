@@ -214,6 +214,7 @@ interface GenerationParameters {
   seed: string;
   templateId: string;
   difficultyLevel?: string;
+  difficultyModel?: "v4" | "v5" | "compare";
 }
 
 function invalidGenerationRequest(response: VercelResponse, startedAt: number, message: string): void {
@@ -226,6 +227,7 @@ function parseGenerationParameters(query: VercelRequest["query"], response: Verc
   const seed = typeof query.seed === "string" ? query.seed : "";
   const templateId = typeof query.templateId === "string" ? query.templateId : DEFAULT_SCENARIO_ID;
   const difficultyLevel = typeof query.difficultyLevel === "string" ? query.difficultyLevel : undefined;
+  const rawDifficultyModel = typeof query.difficultyModel === "string" ? query.difficultyModel : undefined;
   if (!isValidSeed(seed)) {
     invalidGenerationRequest(response, startedAt, "A valid puzzle seed is required");
     return;
@@ -238,12 +240,16 @@ function parseGenerationParameters(query: VercelRequest["query"], response: Verc
     invalidGenerationRequest(response, startedAt, "A difficulty level from 1 to 12 is required");
     return;
   }
-  return { seed, templateId, difficultyLevel };
+  if (rawDifficultyModel !== undefined && rawDifficultyModel !== "v4" && rawDifficultyModel !== "v5" && rawDifficultyModel !== "compare") {
+    invalidGenerationRequest(response, startedAt, "An available difficulty model is required");
+    return;
+  }
+  return { seed, templateId, difficultyLevel, ...(rawDifficultyModel ? { difficultyModel: rawDifficultyModel } : {}) };
 }
 
 async function forwardGeneratedPuzzle(parameters: GenerationParameters, response: VercelResponse, startedAt: number): Promise<void> {
   try {
-    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(parameters.templateId, parameters.seed, parameters.difficultyLevel)}`);
+    const { response: upstream, retryCount } = await fetchYokaiba(`${YOKAIBA_GENERATE_URL}?${yokaibaGenerateParams(parameters.templateId, parameters.seed, parameters.difficultyLevel, parameters.difficultyModel)}`);
     forwardUpstreamRequestId(upstream, response);
     forwardEtag(upstream, response);
     forwardRateLimitHeaders(upstream, response);

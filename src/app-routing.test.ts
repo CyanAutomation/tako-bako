@@ -13,6 +13,7 @@ describe("app route parsing", () => {
       playMode: "challenge",
       activeCourse: firstAvailableCourse([]),
       difficultyLevel: 1,
+      difficultyModel: "v5",
       templateId: "tournament-order-v2",
     });
   });
@@ -24,6 +25,16 @@ describe("app route parsing", () => {
     assert.strictEqual(route.playMode, "shared");
     assert.strictEqual(route.templateId, "open-division-v2");
     assert.strictEqual(route.difficultyLevel, 12);
+  });
+
+  it("preserves explicit models and uses v4 for old seeded URLs", () => {
+    const shared = routeFromUrl(new URL("https://example.test/?seed=shared-1&difficultyModel=v5"), []);
+    const challenge = routeFromUrl(new URL("https://example.test/?mode=challenge&difficultyModel=v5"), []);
+    const legacyShared = routeFromUrl(new URL("https://example.test/?seed=old-seed"), []);
+
+    assert.strictEqual(shared.difficultyModel, "v5");
+    assert.strictEqual(challenge.difficultyModel, "v5");
+    assert.strictEqual(legacyShared.difficultyModel, "v4");
   });
 
   it("ignores invalid seed and difficulty values", () => {
@@ -38,13 +49,14 @@ describe("app route parsing", () => {
 describe("puzzle route updates", () => {
   it("clears shared puzzle parameters when starting a challenge course", () => {
     const url = updatedPuzzleUrl(
-      "https://example.test/?seed=old&mode=shared&template=open-division-v2&difficulty=5",
+      "https://example.test/?seed=old&mode=shared&template=open-division-v2&difficulty=5&difficultyModel=v5",
       "replace",
       "challenge",
       "tournament-order-v2",
       1,
       firstAvailableCourse([]),
       "new-seed",
+      "v5",
     );
 
     assert.strictEqual(url?.searchParams.get("seed"), "new-seed");
@@ -53,5 +65,14 @@ describe("puzzle route updates", () => {
     assert.strictEqual(url?.searchParams.get("level"), "1");
     assert.strictEqual(url?.searchParams.has("template"), false);
     assert.strictEqual(url?.searchParams.has("difficulty"), false);
+    assert.strictEqual(url?.searchParams.get("difficultyModel"), "v5");
+  });
+
+  it("keeps the selected model in a replayable shared puzzle URL", () => {
+    const url = updatedPuzzleUrl("https://example.test/", "replace", "shared", "open-division-v2", 7,
+      firstAvailableCourse([]), "shared-seed", "compare");
+
+    assert.strictEqual(url?.searchParams.get("difficultyModel"), "compare");
+    assert.strictEqual(url?.searchParams.get("difficulty"), "7");
   });
 });

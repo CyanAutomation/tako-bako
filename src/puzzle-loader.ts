@@ -38,12 +38,12 @@ export function retryAfterMessage(value: string | null, now = Date.now()): strin
 }
 
 function loadCachedPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies, now: number): Puzzle | undefined {
-  const cached = loadPuzzleFromCache<unknown>(dependencies.storage, request.seed, request.difficultyLevel, now, request.templateId);
+  const cached = loadPuzzleFromCache<unknown>(dependencies.storage, request.seed, request.difficultyLevel, now, request.templateId, request.difficultyModel);
   if (!cached) return undefined;
   try {
     return parsePuzzle(cached);
   } catch {
-    dependencies.storage.removeItem(puzzleCacheKey(request.seed, request.difficultyLevel, request.templateId));
+    dependencies.storage.removeItem(puzzleCacheKey(request.seed, request.difficultyLevel, request.templateId, request.difficultyModel));
     return undefined;
   }
 }
@@ -90,6 +90,7 @@ function puzzleRequestUrl(request: PuzzleLoadRequest): string {
     seed: request.seed,
     templateId: request.templateId,
     ...(request.difficultyLevel ? { difficultyLevel: String(request.difficultyLevel) } : {}),
+    ...(request.difficultyModel ? { difficultyModel: request.difficultyModel } : {}),
   });
   return `/api/puzzle?${query}`;
 }

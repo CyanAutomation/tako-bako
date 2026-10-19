@@ -9,7 +9,7 @@ import type { Board, Puzzle } from "./puzzle";
 import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
-import { courseFor, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
+import { courseFor, defaultDifficultyModelForCourse, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
 import { resetProgress } from "./progress";
 import { loadProgress, saveProgress } from "./progress-storage";
 import { parseSharedPuzzleInput, type SharedPuzzleInput } from "./shared-puzzle";
@@ -45,6 +45,7 @@ const initialRoute = routeFromUrl(new URL(window.location.href), progress.comple
 let playMode: PlayMode = initialRoute.playMode;
 let activeCourse: Course = initialRoute.activeCourse;
 let difficultyLevel = initialRoute.difficultyLevel;
+let difficultyModel = initialRoute.difficultyModel;
 let templateId: ScenarioId = initialRoute.templateId;
 let activeGridId: string | undefined;
 let usedClueIds = new Set<string>();
@@ -129,6 +130,7 @@ function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replac
   challengeOptionsOpen = false;
   activeCourse = course;
   playMode = "challenge";
+  difficultyModel = defaultDifficultyModelForCourse(course);
   ({ templateId, difficultyLevel } = puzzleParametersForCourse(course));
   void fetchPuzzle(seed, urlMode);
 }
@@ -136,6 +138,7 @@ function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replac
 function openSharedPuzzle(input: SharedPuzzleInput): void {
   challengeOptionsOpen = false;
   playMode = "shared";
+  difficultyModel = input.difficultyModel ?? "v5";
   const course = input.tier && input.level ? courseFor(input.tier, input.level) : undefined;
   if (course) ({ templateId, difficultyLevel } = puzzleParametersForCourse(course));
   else {
@@ -149,8 +152,8 @@ function seedFromUrl(): string | undefined {
   return routeFromUrl(new URL(window.location.href), progress.completed).seed;
 }
 
-function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course): void {
-  const url = updatedPuzzleUrl(window.location.href, mode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, seed);
+function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: "v4" | "v5" | "compare" | undefined): void {
+  const url = updatedPuzzleUrl(window.location.href, mode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, seed, requestedDifficultyModel);
   if (url) window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
 
@@ -225,6 +228,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
+  const requestedDifficultyModel = difficultyModel;
   const requestedPlayMode = playMode;
   const requestedCourse = activeCourse;
   if (puzzle) recordOutcome("puzzle_abandoned");
@@ -239,11 +243,11 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   render();
   try {
     const data = await loadPuzzle(
-      { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel },
+      { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel, ...(requestedDifficultyModel ? { difficultyModel: requestedDifficultyModel } : {}) },
       { storage: sessionStorage, signal: requestController.signal, isCurrent: () => fetchId === currentFetchId },
     );
     if (fetchId !== currentFetchId) return;
-    activatePuzzle(data, requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
+    activatePuzzle(data, requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);
   } catch (error) {
     if (fetchId !== currentFetchId) return;
     puzzle = null;
@@ -259,7 +263,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   }
 }
 
-function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course): void {
+function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: "v4" | "v5" | "compare" | undefined): void {
   puzzle = data;
   clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
   puzzleLoadFailed = false;
@@ -277,7 +281,7 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   void loadClueStrategies(data);
   // Keep the requested seed in the URL: Yokaiba may derive a different
   // internal seed while searching for the chosen difficulty level.
-  setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse);
+  setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);
   setMessage("Mark each square: leave it blank, confirm a match ✓, or rule it out ×.");
 }
 
@@ -458,6 +462,7 @@ function confirmProgressReset(): void {
   saveProgress(localStorage, progress);
   activeCourse = firstAvailableCourse(progress.completed);
   ({ templateId, difficultyLevel } = puzzleParametersForCourse(activeCourse));
+  difficultyModel = defaultDifficultyModelForCourse(activeCourse);
   puzzle = null;
   board = {};
   undoStack = [];
@@ -697,6 +702,7 @@ window.addEventListener("popstate", () => {
   playMode = route.playMode;
   activeCourse = route.activeCourse;
   difficultyLevel = route.difficultyLevel;
+  difficultyModel = route.difficultyModel;
   templateId = route.templateId;
   if (route.seed) void fetchPuzzle(route.seed, "none");
   else showLandingPage();

@@ -66,6 +66,33 @@ describe("parsePuzzle", () => {
     assert.strictEqual(puzzle.puzzleToken, "signed-token");
   });
 
+  it("retains an explicitly requested v5 model from Yokaiba", () => {
+    const puzzle = parsePuzzle({
+      id: "tournament-order-v2:v5-seed", seed: "v5-seed", difficultyModel: "v5", clues: [],
+      difficulty: { level: 3, label: "Gentle", modelVersion: "yokaiba-difficulty-v5" },
+      spec: { id: "tournament-order-v2", title: "Tournament Order", baseCategory: "judoka", categories: [
+        { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+        { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+      ] },
+    });
+
+    assert.equal(puzzle.difficultyModel, "v5");
+    assert.equal(puzzle.difficulty.modelVersion, "yokaiba-difficulty-v5");
+  });
+
+  it("retains an explicit v4 model so a replay can be shared without changing calibration", () => {
+    const puzzle = parsePuzzle({
+      id: "tournament-order-v2:v4-seed", seed: "v4-seed", difficultyModel: "v4", clues: [],
+      difficulty: { level: 3, label: "Moderate", modelVersion: "yokaiba-difficulty-v4" },
+      spec: { id: "tournament-order-v2", title: "Tournament Order", baseCategory: "judoka", categories: [
+        { id: "judoka", label: "Judoka", values: ["Aki", "Ben"] },
+        { id: "club", label: "Club", values: ["Lions", "Wolves"] },
+      ] },
+    });
+
+    assert.equal(puzzle.difficultyModel, "v4");
+  });
+
   it("retains Yokaiba's requested seed and accepts a five-by-five expert puzzle", () => {
     const puzzle = parsePuzzle({
       id: "championship-circuit-v1:replay-seed", seed: "replay-seed", requestedSeed: "shared-seed", templateId: "championship-circuit-v1", clues: [{ id: "distance", text: "Gold and Tatami 2 were two places apart.", constraint: { kind: "distance" } }],
