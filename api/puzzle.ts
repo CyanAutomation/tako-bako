@@ -2,9 +2,12 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
-import { yokaibaGenerateParams, YOKAIBA_GENERATE_URL, YOKAIBA_ORIGIN } from "../src/yokaiba.js";
+import { yokaibaGenerateParams } from "../src/yokaiba.js";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
 
+const YOKAIBA_ORIGIN = yokaibaApiOrigin();
+const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;
 const YOKAIBA_VERIFY_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/verify`;
 
 const MAX_ASSIGNMENTS = 32;

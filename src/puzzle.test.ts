@@ -66,6 +66,21 @@ describe("parsePuzzle", () => {
     assert.strictEqual(puzzle.puzzleToken, "signed-token");
   });
 
+  it("retains a valid puzzle fingerprint and rejects malformed fingerprints", () => {
+    const valid = {
+      id: "fingerprinted", seed: "seed", puzzleFingerprint: "a".repeat(64), clues: [],
+      difficulty: { level: 1, label: "Easy", modelVersion: "yokaiba-difficulty-v1" },
+      spec: { id: "test", title: "Test", baseCategory: "person", categories: [
+        { id: "person", label: "Person", values: ["A", "B"] },
+        { id: "place", label: "Place", values: ["One", "Two"] },
+      ] },
+    };
+    assert.equal(parsePuzzle(valid).puzzleFingerprint, "a".repeat(64));
+    for (const fingerprint of ["", "not-a-hash", "A".repeat(64), "a".repeat(63)]) {
+      assert.throws(() => parsePuzzle({ ...valid, puzzleFingerprint: fingerprint }), /invalid puzzle response/);
+    }
+  });
+
   it("retains an explicitly requested v5 model from Yokaiba", () => {
     const puzzle = parsePuzzle({
       id: "tournament-order-v2:v5-seed", seed: "v5-seed", difficultyModel: "v5", clues: [],

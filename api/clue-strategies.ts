@@ -7,8 +7,9 @@ import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
 import { clientAddressFromForwardedFor } from "../server/client-address.js";
 import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
 import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const YOKAIBA_HINT_URL = "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint";
+const YOKAIBA_HINT_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;
 
 type StrategyResult = { strategy: ClueStrategy; confidence: number };
 
