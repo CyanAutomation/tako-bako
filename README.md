@@ -40,7 +40,8 @@ Each puzzle has several categories of clues, such as “The cat owner lives next
 2. **Undo:** Revert the last mark. Starting another puzzle or returning to the landing page clears the undo history.
 3. **Smart marking:** Turn it on in the board toolbar to rule out the other squares in a row and column when you confirm a match.
 4. **Check:** Submit a complete board. The server verifies it with Yokaiba; a correct answer advances Puzzle Challenge progress.
-5. **Share:** Copy the page URL to share the same seeded puzzle. Challenge links include tier and level; other shared links include a template and difficulty. Seeds accept 1–128 ASCII letters, digits, or hyphens; shared difficulty ranges from 1 to 12.
+5. **Rate the difficulty:** After solving, optionally choose Too easy, Just right, or Too hard. A Too hard rating can include one optional reason. While solving, open **More → Give feedback** to rate an unfinished puzzle.
+6. **Share:** Copy the page URL to share the same seeded puzzle. Challenge links include tier and level; other shared links include a template and difficulty. Seeds accept 1–128 ASCII letters, digits, or hyphens; shared difficulty ranges from 1 to 12.
 
 Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5×5), Championship Bridge (bridge to the expert board), and Championship Circuit (three expert grids). Older Tournament Order v1 links remain available; Open Division v1 and Championship Circuit v1 links open their current versions.
 
@@ -74,7 +75,7 @@ Selected test contracts and product behavior are mapped in [test traceability](d
 
 ## Deployment and API
 
-Vercel serves the Vite app and five serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, and readiness. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
+Vercel serves the Vite app and six serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, puzzle difficulty feedback, and readiness. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
 
 `GET /api/puzzle` accepts a required `seed`, an optional allow-listed `templateId`, and an optional `difficultyLevel` from 1 to 12. Verification (`POST /api/puzzle`) and hints (`POST /api/hint`) require the signed `puzzleToken` returned with a generated puzzle. These endpoints support the app's own flows.
 
@@ -94,7 +95,7 @@ If Yokaiba is unavailable, the endpoint returns HTTP 503 with `status: "degraded
 
 ## Configuration
 
-Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification requires `PUZZLE_TOKEN_SECRET` to be configured on the Yokaiba Worker. Jev's optional clue labels and hint selection require `OPENROUTER_API_KEY`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
+Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification and puzzle feedback require Yokaiba's signed puzzle token and its configured D1 feedback binding. Jev's optional clue labels and hint selection require `OPENROUTER_API_KEY`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
 
 See [operations and configuration details](docs/operations.md) for defaults, rate limits, fallback behavior, cache policy, and security notes.
 

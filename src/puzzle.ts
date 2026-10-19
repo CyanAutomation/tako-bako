@@ -20,6 +20,7 @@ export interface Puzzle {
   seed: string;
   requestedSeed: string;
   templateId: string;
+  puzzleFingerprint?: string;
   difficultyModel?: "v4" | "v5" | "compare";
   puzzleToken?: string;
   clues: Clue[];

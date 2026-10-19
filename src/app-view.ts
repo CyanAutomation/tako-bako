@@ -16,6 +16,7 @@ import { renderBadge, renderPanel, renderStatus } from "./ui-feedback";
 import { renderDialog, renderDisclosure } from "./ui-dialog";
 import { renderGridCard, renderGridCell } from "./ui-grid";
 import type { StatusTone } from "./ui-types";
+import type { PuzzleFeedbackRating, PuzzleFeedbackReason } from "./feedback";
 
 export interface AppViewState {
   mascotUrl: string;
@@ -41,6 +42,16 @@ export interface AppViewState {
   pendingNewChallenge: boolean;
   pendingProgressReset: boolean;
   pendingCelebration: boolean;
+  puzzleCompleted: boolean;
+  feedback: {
+    selectedRating?: PuzzleFeedbackRating;
+    selectedReason?: PuzzleFeedbackReason;
+    submitting: boolean;
+    status?: "success" | "error";
+  };
+  feedbackSubmitted: boolean;
+  feedbackEntryOpen: boolean;
+  actionMenuOpen: boolean;
   cluesOpen: boolean;
   clueFilter: ClueFilter;
   challengeOptionsOpen: boolean;
@@ -111,8 +122,62 @@ function renderCelebrationModal(view: AppViewState): string {
   const actions = next
     ? `${renderButton({ id: "celebration-close", label: "Return to the dojo" })}${renderButton({ id: "celebration-continue", label: `Start ${next.label}`, variant: "primary" })}`
     : renderButton({ id: "celebration-close", label: "Return to the dojo", variant: "primary" });
-  const content = renderMascotNote(view.mascotUrl, { title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" });
+  const content = `${renderMascotNote(view.mascotUrl, { title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" })}${renderFeedbackControls(view, "celebration")}`;
   return `<div class="modal-backdrop celebration-backdrop">${renderDialog({ id: "celebration", className: "celebration-dialog", eyebrow: "Solved!", title, description: copy, content, actions })}</div>`;
+}
+
+const FEEDBACK_RATING_LABELS: Record<PuzzleFeedbackRating, string> = {
+  too_easy: "😊 Too easy",
+  just_right: "🙂 Just right",
+  too_hard: "😓 Too hard",
+};
+
+const FEEDBACK_REASON_LABELS: Record<PuzzleFeedbackReason, string> = {
+  difficult_to_start: "I didn't know where to start",
+  confusing_clues: "The clues were confusing",
+  too_many_deductions: "It required too many deductions",
+  took_too_long: "It took longer than expected",
+  other: "Something else",
+};
+
+function renderFeedbackControls(view: AppViewState, scope: string): string {
+  if (!view.puzzle?.puzzleFingerprint || !view.puzzle.puzzleToken) return "";
+  if (view.feedbackSubmitted) return `<p class="feedback-status" role="status">Thanks for helping us tune these puzzles.</p>`;
+  const ratingButtons = (Object.entries(FEEDBACK_RATING_LABELS) as [PuzzleFeedbackRating, string][]).map(([rating, label]) => renderButton({
+    label,
+    variant: "secondary",
+    className: "button button--secondary feedback-choice",
+    pressed: view.feedback.selectedRating === rating,
+    disabled: view.feedback.submitting,
+    data: { feedbackRating: rating },
+  })).join("");
+  const reasons = view.feedback.selectedRating === "too_hard"
+    ? `<fieldset class="feedback-reasons"><legend>What made this puzzle difficult? <span>Optional</span></legend><div role="group" aria-label="Optional reason">${(Object.entries(FEEDBACK_REASON_LABELS) as [PuzzleFeedbackReason, string][]).map(([reason, label]) => renderButton({
+      label,
+      variant: "secondary",
+      className: "button button--secondary feedback-reason",
+      pressed: view.feedback.selectedReason === reason,
+      disabled: view.feedback.submitting,
+      data: { feedbackReason: reason },
+    })).join("")}</div><p>You can send the rating without choosing a reason.</p></fieldset>`
+    : "";
+  const status = view.feedback.status === "success"
+    ? `<p class="feedback-status" role="status">Thanks for helping us tune these puzzles.</p>`
+    : view.feedback.status === "error"
+      ? `<p class="feedback-status feedback-status--error" role="status">Feedback could not be sent. Please try again.</p>`
+      : `<p class="feedback-help">Your rating is optional and won't affect your progress.</p>`;
+  const submit = view.feedback.selectedRating
+    ? renderButton({ id: `submit-puzzle-feedback-${scope}`, label: view.feedback.submitting ? "Sending…" : "Send feedback", variant: "primary", disabled: view.feedback.submitting, data: { submitPuzzleFeedback: "true" } })
+    : "";
+  return `<section class="puzzle-feedback" aria-labelledby="feedback-title-${scope}"><h3 id="feedback-title-${scope}">How difficult did you find this puzzle?</h3><div class="feedback-options" role="group" aria-label="Puzzle difficulty rating">${ratingButtons}</div>${reasons}${status}${submit}</section>`;
+}
+
+function renderFeedbackEntry(view: AppViewState): string {
+  if (!view.puzzle || view.puzzleCompleted || !view.puzzle.puzzleFingerprint || !view.puzzle.puzzleToken) return "";
+  const content = view.feedbackSubmitted
+    ? `<p class="feedback-status" role="status">Thanks for helping us tune these puzzles.</p>`
+    : renderFeedbackControls(view, "gameplay");
+  return `<details class="feedback-entry"${view.feedbackEntryOpen ? " open" : ""}><summary>Give feedback</summary><div class="feedback-entry__content">${content}</div></details>`;
 }
 
 function renderProgressManagement(progress: ChallengeProgress): string {
@@ -170,8 +235,8 @@ function renderLandingAction(view: AppViewState): string {
 }
 
 function renderHeader(view: AppViewState): string {
-  const actionContent = `${renderButton({ id: "open-shared-puzzle", label: "Open a shared puzzle" })}${renderButton({ id: "new-puzzle", label: view.loading ? "Setting up…" : view.playMode === "challenge" ? "Restart this level" : "New shared puzzle", disabled: view.loading })}<div class="action-menu__danger">${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</div>`;
-  const actionMenu = renderDisclosure({ className: "action-menu", summary: "More", content: actionContent });
+  const actionContent = `${renderButton({ id: "open-shared-puzzle", label: "Open a shared puzzle" })}${renderButton({ id: "new-puzzle", label: view.loading ? "Setting up…" : view.playMode === "challenge" ? "Restart this level" : "New shared puzzle", disabled: view.loading })}${renderFeedbackEntry(view)}<div class="action-menu__danger">${renderButton({ id: "open-progress-reset", label: "Reset progress", variant: "danger" })}</div>`;
+  const actionMenu = renderDisclosure({ className: "action-menu", summary: "More", content: actionContent, open: view.actionMenuOpen });
   const challengeStatus = view.playMode === "challenge" ? renderBadge(courseProgressLabel(view.activeCourse, new Set(view.progress.completed)), "course-status") : "";
   const actions = `${challengeStatus}${renderButton({ id: "challenge-menu", label: "Challenge", expanded: view.challengeOptionsOpen })}${renderButton({ id: "share-puzzle", label: "Share", ariaLabel: "Share puzzle", icon: "share" })}${actionMenu}`;
   return `<header><a class="brand" href="/" aria-label="Tako Bako home"><span class="brand-mark"><img src="${view.mascotUrl}" alt="" aria-hidden="true"></span><span class="brand-lockup"><strong>Tako Bako</strong><span>Logic puzzles</span><small>Mark · Deduce · Solve</small></span></a>${view.puzzle ? `<div class="header-actions">${actions}</div>` : ""}</header>`;
