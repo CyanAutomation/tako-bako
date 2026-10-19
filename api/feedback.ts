@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { parseFeedbackPayload } from "../server/feedback-payload.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const URL = `${yokaibaApiOrigin()}/v1/feedback`;
+const FEEDBACK_PATH = "/v1/feedback";
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 function noStore(response: VercelResponse): void {
@@ -25,6 +25,7 @@ export async function handleFeedbackRequest(
   request: VercelRequest,
   response: VercelResponse,
   fetcher: typeof fetch = fetch,
+  resolveYokaibaApiOrigin: typeof yokaibaApiOrigin = yokaibaApiOrigin,
 ): Promise<void> {
   const startedAt = Date.now();
   noStore(response);
@@ -39,8 +40,16 @@ export async function handleFeedbackRequest(
     logMetric("invalid_request", 400, startedAt);
     return;
   }
+  let upstreamUrl: string;
   try {
-    const upstream = await fetcher(URL, {
+    upstreamUrl = `${resolveYokaibaApiOrigin()}${FEEDBACK_PATH}`;
+  } catch {
+    response.status(500).json({ error: "Feedback is temporarily unavailable. Please try again." });
+    logMetric("configuration_error", 500, startedAt);
+    return;
+  }
+  try {
+    const upstream = await fetcher(upstreamUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(feedback),
