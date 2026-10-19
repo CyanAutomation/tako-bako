@@ -24,6 +24,19 @@ describe("Yokaiba generation parameters", () => {
     assert.strictEqual(parameters.get("allowSeedFallback"), "true");
   });
 
+  it("forwards the model selected by the app while leaving server defaults out of generic requests", () => {
+    const defaultParameters = yokaibaGenerateParams("tournament-order-v2", "shared-seed");
+    const v5Parameters = yokaibaGenerateParams("tournament-order-v2", "shared-seed", "3", "v5");
+    const compareParameters = yokaibaGenerateParams("tournament-order-v2", "shared-seed", undefined, "compare");
+    const v4Parameters = yokaibaGenerateParams("tournament-order-v2", "shared-seed", undefined, "v4");
+
+    assert.equal(defaultParameters.has("difficultyModel"), false);
+    assert.equal(v5Parameters.get("difficultyModel"), "v5");
+    assert.equal(v5Parameters.get("allowSeedFallback"), "true");
+    assert.equal(compareParameters.get("difficultyModel"), "compare");
+    assert.equal(v4Parameters.get("difficultyModel"), "v4");
+  });
+
   it("[TB-URL-02] rewrites development puzzle requests with their selected settings", async () => {
     const loadedConfig = await loadConfigFromFile({ command: "serve", mode: "test" }, resolve("vite.config.ts"));
     assert.ok(loadedConfig);

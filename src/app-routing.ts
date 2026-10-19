@@ -1,4 +1,4 @@
-import { courseFor, firstAvailableCourse, type Course } from "./curriculum";
+import { courseFor, defaultDifficultyModelForCourse, firstAvailableCourse, type Course } from "./curriculum";
 import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 
@@ -10,6 +10,7 @@ export interface PlayRoute {
   playMode: PlayMode;
   activeCourse: Course;
   difficultyLevel: number | undefined;
+  difficultyModel?: "v4" | "v5" | "compare";
   templateId: ScenarioId;
 }
 
@@ -22,11 +23,18 @@ export function routeFromUrl(url: URL, completedCourses: readonly string[]): Pla
     : parameters.has("seed") ? "shared" : "challenge";
   const activeCourse = courseFor(parameters.get("tier") ?? undefined, Number(parameters.get("level")) || undefined)
     ?? firstAvailableCourse(completedCourses);
+  const rawDifficultyModel = parameters.get("difficultyModel");
+  const explicitDifficultyModel = rawDifficultyModel === "v4" || rawDifficultyModel === "v5" || rawDifficultyModel === "compare"
+    ? rawDifficultyModel
+    : undefined;
+  const difficultyModel = explicitDifficultyModel
+    ?? (requestedSeed !== null ? "v4" : defaultDifficultyModelForCourse(activeCourse));
   return {
     seed: requestedSeed !== null && isValidSeed(requestedSeed) ? requestedSeed : undefined,
     playMode,
     activeCourse,
     difficultyLevel: playMode === "challenge" ? activeCourse.difficultyLevel : parseDifficultyLevel(parameters.get("difficulty")),
+    difficultyModel,
     templateId: playMode === "challenge" ? activeCourse.templateId : scenarioIdFromUrl(parameters.get("template")) ?? DEFAULT_SCENARIO_ID,
   };
 }
@@ -40,6 +48,7 @@ export function updatedPuzzleUrl(
   difficultyLevel: number | undefined,
   course: Course,
   seed: string,
+  difficultyModel?: "v4" | "v5" | "compare",
 ): URL | undefined {
   if (historyMode === "none") return undefined;
   const url = new URL(currentUrl);
@@ -50,11 +59,13 @@ export function updatedPuzzleUrl(
     url.searchParams.set("level", String(course.level));
     url.searchParams.delete("template");
     url.searchParams.delete("difficulty");
+    if (difficultyModel) url.searchParams.set("difficultyModel", difficultyModel); else url.searchParams.delete("difficultyModel");
   } else {
     url.searchParams.delete("tier");
     url.searchParams.delete("level");
     if (templateId === DEFAULT_SCENARIO_ID) url.searchParams.delete("template"); else url.searchParams.set("template", templateId);
     if (difficultyLevel) url.searchParams.set("difficulty", String(difficultyLevel)); else url.searchParams.delete("difficulty");
+    if (difficultyModel) url.searchParams.set("difficultyModel", difficultyModel); else url.searchParams.delete("difficultyModel");
   }
   return url;
 }

@@ -7,6 +7,7 @@ export interface PuzzleCacheRequest {
   readonly seed: string;
   readonly difficultyLevel: number | undefined;
   readonly templateId: string;
+  readonly difficultyModel?: "v4" | "v5" | "compare";
 }
 
 /**
@@ -27,5 +28,5 @@ export function puzzleResponseExpiry(headers: Pick<Headers, "get"> | undefined, 
 /** Stores a response only while its request is current, using that request's immutable identity. */
 export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, expiresAt: number | undefined, isCurrent: boolean, now = Date.now()): void {
   if (!isCurrent || expiresAt === undefined) return;
-  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, expiresAt, now, request.templateId);
+  savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, expiresAt, now, request.templateId, request.difficultyModel);
 }
