@@ -1,6 +1,6 @@
 name: Kaseki Docs Sweep
 
-on:
+on: # zizmor: ignore[concurrency-limits] Turnstyle queues all Kaseki runs; GitHub concurrency replaces pending runs.
   schedule:
     - cron: "0 4 * * 2"
   workflow_dispatch:
@@ -9,7 +9,7 @@ run-name: >-
   Docs sweep · ${{ github.repository }}@main
 
 permissions:
-  actions: read
+  actions: read # Turnstyle needs to inspect workflow runs to coordinate its queue.
   contents: read
 
 env:
@@ -47,7 +47,7 @@ jobs:
           node-version: 24.x
 
       - name: Verify Kaseki controller and gateway
-        uses: ./.github/actions/kaseki-preflight
+        uses: $/.github/actions/kaseki-preflight
         with:
           base-url: ${{ vars.KASEKI_BASE_URL }}
           api-token: ${{ secrets.KASEKI_API_TOKEN }}
