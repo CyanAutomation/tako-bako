@@ -13,8 +13,8 @@ export interface PuzzleLoaderDependencies {
   now?: () => number;
 }
 
-const PUZZLE_SERVICE_UNAVAILABLE_MESSAGE = "The puzzle service couldn’t be reached. Please check your connection and try again.";
-const GENERIC_PUZZLE_LOAD_ERROR = "The puzzle could not be collected. Please try again.";
+const PUZZLE_SERVICE_UNAVAILABLE_MESSAGE = "We couldn’t reach the puzzle service. Check your connection and try again.";
+const GENERIC_PUZZLE_LOAD_ERROR = "We couldn’t load this puzzle. Please try again.";
 const MAX_API_ERROR_MESSAGE_LENGTH = 240;
 
 export class DifficultyUnavailableError extends Error {
