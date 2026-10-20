@@ -16,7 +16,7 @@ type WorkflowJob = {
 };
 type Workflow = {
   permissions: Record<string, unknown>;
-  concurrency: { group: string; "cancel-in-progress": boolean };
+  concurrency?: { group: string; "cancel-in-progress": boolean };
   env: Record<string, string>;
   jobs: Record<string, WorkflowJob>;
 };
@@ -92,6 +92,10 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
     });
   }
 
+  const actionlint = namedStep(readWorkflow("workflow-validation.yml"), "Download and verify actionlint").run ?? "";
+  assert.match(actionlint, /\$RUNNER_TEMP\/actionlint" -color/);
+  assert.match(actionlint, /-ignore 'specifying action .* because ref is missing'/);
+
   const action = readYaml(".github/actions/kaseki-preflight/action.yml") as {
     inputs: Record<string, { required?: boolean }>;
     runs: { steps: WorkflowStep[] };
@@ -129,13 +133,16 @@ test("[CI-KASEKI-04] all Kaseki workflow bash steps pass syntax validation", () 
   }
 });
 
-test("[CI-KASEKI-01] workflows run on main with least permissions and shared serialization", () => {
+test("[CI-KASEKI-01] workflows run on main with least permissions and a shared serial queue", () => {
   for (const { name, workflow } of workflows) {
-    assert.deepStrictEqual(workflow.permissions, { contents: "read" }, `${name} should request read-only checkout access`);
-    assert.deepStrictEqual(workflow.concurrency, {
-      group: "kaseki-${{ github.repository }}",
-      "cancel-in-progress": false,
-    });
+    assert.deepStrictEqual(workflow.permissions, { actions: "read", contents: "read" }, `${name} should request only API and checkout read access`);
+    assert.equal(workflow.concurrency, undefined, `${name} must not use GitHub's replaceable pending concurrency slot`);
+    const source = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+    assert.match(source, /actions: read\s+# Turnstyle needs to inspect workflow runs to coordinate its queue\./);
+    assert.match(source, /on: # zizmor: ignore\[concurrency-limits\] Turnstyle queues all Kaseki runs; GitHub concurrency replaces pending runs\./);
+    const queue = allWorkflowSteps(workflow).find(step => step.name === "Wait for prior Kaseki sweep");
+    assert.equal(queue?.uses, "softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4");
+    assert.deepStrictEqual(queue?.with, { "queue-name": "Kaseki" }, `${name} should share the Kaseki queue`);
     for (const [jobName, job] of Object.entries(workflow.jobs)) {
       assert.equal(job.if, "github.ref == 'refs/heads/main'", `${name} job ${jobName} should run only on main`);
     }
