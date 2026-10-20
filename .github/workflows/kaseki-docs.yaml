@@ -9,11 +9,8 @@ run-name: >-
   Docs sweep · ${{ github.repository }}@main
 
 permissions:
+  actions: read
   contents: read
-
-concurrency:
-  group: kaseki-${{ github.repository }}
-  cancel-in-progress: false
 
 env:
   REPO_URL: ${{ github.server_url }}/${{ github.repository }}
@@ -36,6 +33,11 @@ jobs:
       KASEKI_BASE_URL: ${{ vars.KASEKI_BASE_URL }}
 
     steps:
+      - name: Wait for prior Kaseki sweep
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3
+        with:
+          queue-name: Kaseki
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -45,7 +47,7 @@ jobs:
           node-version: 24.x
 
       - name: Verify Kaseki controller and gateway
-        uses: $/.github/actions/kaseki-preflight
+        uses: ./.github/actions/kaseki-preflight
         with:
           base-url: ${{ vars.KASEKI_BASE_URL }}
           api-token: ${{ secrets.KASEKI_API_TOKEN }}
