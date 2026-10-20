@@ -6,6 +6,8 @@ import { clueStrategyLabel, parseClueStrategyResults, strategyForConstraintKind 
 describe("clue strategies", () => {
   it("maps known solver constraint kinds to stable strategy labels", () => {
     assert.strictEqual(strategyForConstraintKind("matches"), "direct_match");
+    assert.strictEqual(strategyForConstraintKind("sameRow"), "direct_match");
+    assert.strictEqual(strategyForConstraintKind("same_row"), "direct_match");
     assert.strictEqual(strategyForConstraintKind("distance"), "distance");
     assert.strictEqual(strategyForConstraintKind("Adjacent"), "adjacency");
     assert.strictEqual(strategyForConstraintKind("future-kind"), undefined);

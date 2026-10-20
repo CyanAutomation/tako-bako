@@ -259,7 +259,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   loading = true;
   difficultyUnavailable = false;
   puzzleLoadFailed = false;
-  setMessage("Tako is setting the puzzle tiles…");
+  setMessage("Tako is setting up your puzzle…");
   const fetchId = ++currentFetchId;
   activePuzzleRequest?.abort();
   const requestController = new AbortController();
@@ -277,7 +277,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
     puzzle = null;
     puzzleLoadFailed = true;
     difficultyUnavailable = error instanceof DifficultyUnavailableError;
-    setMessage(error instanceof Error ? error.message : "The puzzle could not be collected. Please try again.", "error");
+    setMessage(error instanceof Error ? error.message : "We couldn’t load this puzzle. Please try again.", "error");
   } finally {
     if (fetchId === currentFetchId) {
       activePuzzleRequest = undefined;
@@ -311,7 +311,7 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   // Keep the requested seed in the URL: Yokaiba may derive a different
   // internal seed while searching for the chosen difficulty level.
   setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);
-  setMessage("Mark each square: leave it blank, confirm a match ✓, or rule it out ×.");
+  setMessage("As you solve, mark a match ✓, rule out a square ×, or leave it blank while you think.");
 }
 
 function saveCurrentBoard(next: Board): void {
@@ -335,7 +335,7 @@ function resetGrid(categoryId: string): void {
   if (Object.keys(next).length === Object.keys(board).length) return;
   saveCurrentBoard(next);
   pendingResetGridId = undefined;
-  setMessage("Grid reset. Your previous marks are available with Undo.");
+  setMessage("Grid cleared. Your previous marks are available with Undo.");
   render();
   restoreResetFocus();
 }
@@ -344,7 +344,7 @@ function resetBoard(): void {
   if (!puzzle || Object.keys(board).length === 0) return;
   saveCurrentBoard({});
   pendingBoardReset = false;
-  setMessage("Board reset. Your previous marks are available with Undo.");
+  setMessage("Board cleared. Your previous marks are available with Undo.");
   render();
   restoreResetFocus();
 }
@@ -386,7 +386,7 @@ function dismissResetDialog(): void {
 async function sharePuzzle(): Promise<void> {
   try {
     await navigator.clipboard.writeText(window.location.href);
-    setMessage("Puzzle link copied — share this exact dojo challenge.", "success");
+    setMessage("Puzzle link copied. Share this exact dojo challenge with a friend.", "success");
   } catch {
     setMessage("Copy this page’s address to share the current puzzle.");
   }
@@ -508,7 +508,7 @@ function confirmProgressReset(): void {
   challengeOptionsOpen = false;
   pendingProgressReset = false;
   window.history.pushState({}, "", window.location.pathname);
-  setMessage("Your dojo route has been reset. Beginner Level 1 is ready.");
+  setMessage("Puzzle Challenge progress reset. Beginner Level 1 is ready.");
   render();
 }
 
@@ -642,7 +642,7 @@ function handleChallengeOptionsClick(button: HTMLButtonElement): boolean {
   } else if (button.id === "smart-marking-toggle") {
     smartMarking = !smartMarking;
     localStorage.setItem(SMART_MARKING_STORAGE_KEY, smartMarking ? "on" : "off");
-    setMessage(smartMarking ? "Smart marking is on. New ✓ marks will rule out the other squares in their row and column." : "Smart marking is off. You are in full control of every mark.");
+    setMessage(smartMarking ? "Auto-mark is on. New matches will rule out the other squares in their row and column." : "Auto-mark is off. You can choose every mark yourself.");
     render();
     root.querySelector<HTMLButtonElement>("#smart-marking-toggle")?.focus();
   } else return false;

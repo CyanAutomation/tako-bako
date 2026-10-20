@@ -89,7 +89,7 @@ export function createAppGameplayActions({ state, setMessage, render, recordOutc
       return;
     }
     if (!requestedPuzzleToken) {
-      setMessage("Solution checking is temporarily unavailable for this dojo puzzle.", "error");
+      setMessage("Solution checking isn’t available for this puzzle just now.", "error");
       render();
       return;
     }
