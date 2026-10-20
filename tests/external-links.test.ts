@@ -50,6 +50,17 @@ describe("external Markdown link check", () => {
     assert.deepStrictEqual(errors, ["External link returned HTTP 404: https://example.com/missing"]);
   });
 
+  it("passes only the URL to a link fetcher", async () => {
+    const fetchArguments: unknown[][] = [];
+    const errors = await checkExternalLinks(["[available](https://example.com/ok)"], async (...args: [string, ...unknown[]]) => {
+      fetchArguments.push(args);
+      return { status: 200 } as Response;
+    });
+
+    assert.deepStrictEqual(errors, []);
+    assert.deepStrictEqual(fetchArguments, [["https://example.com/ok"]]);
+  });
+
   it("checks a repository without an optional docs directory", async () => {
     const root = await createRepository();
     await writeFile(join(root, "README.md"), "[Home](https://example.com)");
