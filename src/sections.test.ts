@@ -20,10 +20,11 @@ describe("puzzle UI sections", () => {
 
     assert.match(toolbar, /<div[^>]*role="group"[^>]*aria-label="Board actions">/);
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Undo last mark")[^>]*>[\s\S]*?<span>Undo<\/span><\/button>/);
-    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Reset all board marks")[^>]*>[\s\S]*?<span>Reset board<\/span><\/button>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Clear all board marks")[^>]*>[\s\S]*?<span>Clear board<\/span><\/button>/);
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Get a hint")[^>]*>[\s\S]*?<span>Hint<\/span><\/button>/);
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Check my solution")(?=[^>]*disabled)[^>]*>[\s\S]*?<span>Check my solution<\/span><\/button>/);
-    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Smart marking: on\.[^"]*")(?=[^>]*aria-pressed="true")[^>]*>/);
+    assert.match(toolbar, /<button\b(?=[^>]*aria-label="Auto-mark is on\.[^"]*")(?=[^>]*aria-pressed="true")[^>]*>[\s\S]*?<span>Auto-mark on<\/span><\/button>/);
+    assert.match(toolbar, /class="board-actions"[^>]*>[\s\S]*?<span>Undo<\/span>[\s\S]*?<span>Clear board<\/span>[\s\S]*?<span>Hint<\/span>[\s\S]*?<span>Auto-mark on<\/span>[\s\S]*?<span>Check my solution<\/span>/);
   });
 
   it("[TB-ACCESS-05] announces match progress and whether the solution is ready to check", () => {
@@ -47,7 +48,7 @@ describe("puzzle UI sections", () => {
   it("offers an action to mark a used clue as unused", () => {
     const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions." }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set(["one"]), clueFilter: "used" });
 
-    assert.ok((markup).includes('aria-label="Mark clue 1 as unused"'));
+    assert.ok((markup).includes('aria-label="Mark clue 1 as not reviewed"'));
   });
 
   it("labels a clue with its reasoning strategy when one is available", () => {
@@ -70,8 +71,9 @@ describe("puzzle UI sections", () => {
 
     assert.ok((markup).includes('data-clue-filter="remaining"'));
     assert.ok((markup).includes('>To review</button>'));
-    assert.ok((markup).includes('Mark clue 1 as used'));
-    assert.ok(!(markup).includes('Mark clue 2 as unused'));
+    assert.ok((markup).includes('>Reviewed</button>'));
+    assert.ok((markup).includes('Mark clue 1 as reviewed'));
+    assert.ok(!(markup).includes('Mark clue 2 as not reviewed'));
     assert.ok((markup).includes('class="clue-item clue-item--related"'));
   });
 

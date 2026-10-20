@@ -340,7 +340,7 @@ describe("answer verification navigation", () => {
     assert.deepStrictEqual(JSON.parse(app.storage.get(PROGRESS_STORAGE_KEY)!), { version: 1, completed: [] });
     assert.strictEqual(app.storage.get("tako-bako.board.saved-shared-puzzle"), savedBoard);
     assert.strictEqual(app.storage.get("tako-bako.clues.saved-shared-puzzle"), savedClues);
-    assert.match(app.root.innerHTML, /Your dojo route has been reset\. Beginner Level 1 is ready\./);
+    assert.match(app.root.innerHTML, /Puzzle Challenge progress reset\. Beginner Level 1 is ready\./);
   });
 
   it("shows verification failures as errors", async () => {
@@ -420,7 +420,7 @@ describe("puzzle loading error feedback", () => {
     await flush();
 
     assert.ok(app.root.innerHTML.includes('class="status status--error"'));
-    assert.ok(app.root.innerHTML.includes("The puzzle service couldn’t be reached. Please check your connection and try again."));
+    assert.ok(app.root.innerHTML.includes("We couldn’t reach the puzzle service. Check your connection and try again."));
   });
 
   it("shows the API's timeout message when Yokaiba is slow", async () => {

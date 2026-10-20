@@ -3,6 +3,8 @@ import type { ClueStrategy } from "./clue-strategy-catalog.js";
 const knownConstraintStrategies: Record<string, ClueStrategy> = {
   matches: "direct_match",
   match: "direct_match",
+  samerow: "direct_match",
+  same_row: "direct_match",
   distance: "distance",
   adjacent: "adjacency",
   adjacency: "adjacency",

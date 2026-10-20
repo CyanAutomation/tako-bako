@@ -75,6 +75,31 @@ test("completion modal offers optional ratings and keeps progression actions vis
   assert.match(markup, /id="celebration-close"/);
 });
 
+test("the grid identifies the event order with numbered base rows", () => {
+  const markup = renderApp(view());
+
+  assert.match(markup, /<th scope="col">Player · event order<\/th>/);
+  assert.match(markup, /<th scope="row">1\. A<\/th>/);
+  assert.match(markup, /<th scope="row">2\. B<\/th>/);
+});
+
+test("product branding and board-clearing language stay consistent", () => {
+  const landing = renderApp(view({ puzzle: undefined }));
+  assert.match(landing, /<p class="eyebrow">Tako Bako Logic Dojo<\/p>/);
+  assert.match(landing, /TAKO BAKO · Powered by Yokaiba/);
+
+  const confirm = renderApp(view({ pendingBoardReset: true }));
+  assert.match(confirm, /<p class="eyebrow">Clear board<\/p>/);
+  assert.match(confirm, /Clear all board marks\?/);
+  assert.match(confirm, /<button id="confirm-board-reset"[^>]*>Clear board<\/button>/);
+  assert.doesNotMatch(confirm, /Reset board/);
+
+  const clearGrid = renderApp(view({ pendingResetGridId: "club" }));
+  assert.match(clearGrid, /<p class="eyebrow">Clear grid<\/p>/);
+  assert.match(clearGrid, /Clear Club\?/);
+  assert.match(clearGrid, /id="confirm-grid-reset"[^>]*>Clear grid<\/button>/);
+});
+
 test("Too hard opens optional reasons while other ratings do not", () => {
   const difficult = renderApp(view({ pendingCelebration: true, puzzleCompleted: true, feedback: { selectedRating: "too_hard", submitting: false } }));
   assert.match(difficult, /What made this puzzle difficult\?/);

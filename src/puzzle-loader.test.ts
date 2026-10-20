@@ -122,7 +122,7 @@ describe("loadPuzzle", () => {
       await assert.rejects(loadPuzzle(request, {
         storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
         fetcher: async () => response,
-      }), error => error instanceof Error && error.message === "The puzzle could not be collected. Please try again.");
+      }), error => error instanceof Error && error.message === "We couldn’t load this puzzle. Please try again.");
     }
   });
 
@@ -130,7 +130,7 @@ describe("loadPuzzle", () => {
     await assert.rejects(loadPuzzle(request, {
       storage: new MemoryStorage(), signal: new AbortController().signal, isCurrent: () => true,
       fetcher: async () => { throw new TypeError("Failed to fetch"); },
-    }), /The puzzle service couldn’t be reached\. Please check your connection and try again\./);
+    }), /We couldn’t reach the puzzle service\. Check your connection and try again\./);
   });
 
   it("preserves an aborted request instead of converting it to a connection failure", async () => {
