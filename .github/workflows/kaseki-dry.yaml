@@ -1,6 +1,6 @@
 name: Kaseki DRY Sweep
 
-on:
+on: # zizmor: ignore[concurrency-limits] Turnstyle queues all Kaseki runs; GitHub concurrency replaces pending runs.
   schedule:
     - cron: "0 4 * * 0"
   workflow_dispatch:
@@ -9,12 +9,8 @@ run-name: >-
   DRY sweep · ${{ github.repository }}@main
 
 permissions:
+  actions: read # Turnstyle needs to inspect workflow runs to coordinate its queue.
   contents: read
-
-# Keep Kaseki runs serialized across both sweep workflows.
-concurrency:
-  group: kaseki-${{ github.repository }}
-  cancel-in-progress: false
 
 env:
   KASEKI_PUBLISH_MODE: pr
@@ -44,6 +40,11 @@ jobs:
       VALIDATION_COMMAND: npm run check
 
     steps:
+      - name: Wait for prior Kaseki sweep
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3
+        with:
+          queue-name: Kaseki
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
