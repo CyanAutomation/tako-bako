@@ -85,7 +85,7 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
     const setupNode = steps.find(step => step.uses?.startsWith("actions/setup-node@"));
     const preflight = steps.find(step => step.name === "Verify Kaseki controller and gateway");
     assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
-    assert.equal(preflight?.uses, "./.github/actions/kaseki-preflight");
+    assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
     assert.deepStrictEqual(preflight?.with, {
       "base-url": "${{ vars.KASEKI_BASE_URL }}",
       "api-token": "${{ secrets.KASEKI_API_TOKEN }}",
@@ -94,7 +94,7 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
 
   const actionlint = namedStep(readWorkflow("workflow-validation.yml"), "Download and verify actionlint").run ?? "";
   assert.match(actionlint, /\$RUNNER_TEMP\/actionlint" -color/);
-  assert.doesNotMatch(actionlint, /-ignore/);
+  assert.match(actionlint, /-ignore 'specifying action .* because ref is missing'/);
 
   const action = readYaml(".github/actions/kaseki-preflight/action.yml") as {
     inputs: Record<string, { required?: boolean }>;
@@ -137,6 +137,9 @@ test("[CI-KASEKI-01] workflows run on main with least permissions and a shared s
   for (const { name, workflow } of workflows) {
     assert.deepStrictEqual(workflow.permissions, { actions: "read", contents: "read" }, `${name} should request only API and checkout read access`);
     assert.equal(workflow.concurrency, undefined, `${name} must not use GitHub's replaceable pending concurrency slot`);
+    const source = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+    assert.match(source, /actions: read\s+# Turnstyle needs to inspect workflow runs to coordinate its queue\./);
+    assert.match(source, /on: # zizmor: ignore\[concurrency-limits\] Turnstyle queues all Kaseki runs; GitHub concurrency replaces pending runs\./);
     const queue = allWorkflowSteps(workflow).find(step => step.name === "Wait for prior Kaseki sweep");
     assert.equal(queue?.uses, "softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4");
     assert.deepStrictEqual(queue?.with, { "queue-name": "Kaseki" }, `${name} should share the Kaseki queue`);
