@@ -73,13 +73,13 @@ export function activeGridForPuzzle(current: Puzzle, requestedGridId: string | u
 
 function renderBoardGrid(view: AppViewState, category: Puzzle["spec"]["categories"][number], base: Puzzle["spec"]["categories"][number]): string {
   const header = category.values.map(value => `<th scope="col">${escapeHtml(value)}</th>`).join("");
-  const rows = base.values.map(row => {
+  const rows = base.values.map((row, index) => {
     const cells = category.values.map(column => {
       const key = squareKey(category.id, row, column);
       const mark = view.board[key] ?? "unknown";
       return renderGridCell({ key, row, column, mark, tabIndex: key === view.activeCellKey ? 0 : -1 });
     }).join("");
-    return `<tr><th scope="row">${escapeHtml(row)}</th>${cells}</tr>`;
+    return `<tr><th scope="row">${index + 1}. ${escapeHtml(row)}</th>${cells}</tr>`;
   }).join("");
   const hasMarks = Object.keys(view.board).some(key => key.split("|")[0] === category.id);
   return renderGridCard({
@@ -87,17 +87,17 @@ function renderBoardGrid(view: AppViewState, category: Puzzle["spec"]["categorie
     label: `${base.label} × ${category.label}`,
     active: category.id === view.activeGridId,
     locked: false,
-    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Reset ${category.label} grid`, icon: "reset", disabled: !hasMarks, data: { gridReset: category.id, actionRole: "utility" } }),
-    content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)}</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
+    controls: renderButton({ id: `grid-reset-${category.id}`, label: `Clear ${category.label} grid`, icon: "reset", disabled: !hasMarks, data: { gridReset: category.id, actionRole: "utility" } }),
+    content: `<div class="table-wrap"><table><thead><tr><th scope="col">${escapeHtml(base.label)} · event order</th>${header}</tr></thead><tbody>${rows}</tbody></table></div>`,
   });
 }
 
 function renderResetModal(view: AppViewState): string {
-  if (view.pendingBoardReset) return `<div class="modal-backdrop">${renderDialog({ id: "reset-board-dialog", eyebrow: "Reset board", title: "Clear all board marks?", description: "This clears every tick and cross in every grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-board-reset", label: "Cancel" })}${renderButton({ id: "confirm-board-reset", label: "Reset board", variant: "danger" })}` })}</div>`;
+  if (view.pendingBoardReset) return `<div class="modal-backdrop">${renderDialog({ id: "reset-board-dialog", eyebrow: "Clear board", title: "Clear all board marks?", description: "This clears every tick and cross in every grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-board-reset", label: "Cancel" })}${renderButton({ id: "confirm-board-reset", label: "Clear board", variant: "danger" })}` })}</div>`;
   if (!view.pendingResetGridId || !view.puzzle) return "";
   const category = view.puzzle.spec.categories.find(candidate => candidate.id === view.pendingResetGridId);
   if (!category) return "";
-  return `<div class="modal-backdrop">${renderDialog({ id: "reset-grid", eyebrow: "Reset grid", title: `Clear ${category.label}?`, description: "This clears every tick and cross in this grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Reset grid", variant: "danger" })}` })}</div>`;
+  return `<div class="modal-backdrop">${renderDialog({ id: "reset-grid", eyebrow: "Clear grid", title: `Clear ${category.label}?`, description: "This clears every tick and cross in this grid. You can still use Undo afterwards.", actions: `${renderButton({ id: "cancel-grid-reset", label: "Cancel" })}${renderButton({ id: "confirm-grid-reset", label: "Clear grid", variant: "danger" })}` })}</div>`;
 }
 
 function renderNewChallengeModal(open: boolean): string {
@@ -246,11 +246,11 @@ function renderLanding(view: AppViewState): string {
   const tone = view.difficultyUnavailable ? "error" : view.messageTone;
   const mascotNote = renderMascotNote(view.mascotUrl, { title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." });
   const curriculum = renderCurriculum({ completed: new Set(view.progress.completed), currentCourseId: view.activeCourse.id });
-  return `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Yokaiba Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message: view.message, tone })}${renderLandingAction(view)}${mascotNote}</section><div class="landing-route">${curriculum}${renderProgressManagement(view.progress)}</div></main>`;
+  return `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Tako Bako Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message: view.message, tone })}${renderLandingAction(view)}${mascotNote}</section><div class="landing-route">${curriculum}${renderProgressManagement(view.progress)}</div></main>`;
 }
 
 export function renderApp(view: AppViewState): string {
   const mainContent = view.puzzle ? renderPuzzle(view, view.puzzle) : renderLanding(view);
-  const footer = `<footer><span class="footer-brand"><img src="${view.markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Yokaiba logic puzzles</span></span><span>Shareable puzzles, optional assists, and solution checking.</span></footer>`;
+  const footer = `<footer><span class="footer-brand"><img src="${view.markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Powered by Yokaiba</span></span><span>Share a puzzle, use a hint when you need one, or check your solution.</span></footer>`;
   return `<div class="page-shell">${renderHeader(view)}${mainContent}${footer}</div>${renderChallengeOptions(view)}${renderSharedPuzzleModal(view.sharedPuzzleOpen)}${renderProgressResetModal(view.pendingProgressReset)}`;
 }

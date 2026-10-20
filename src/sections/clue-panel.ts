@@ -32,7 +32,7 @@ function renderFilterControls(clueFilter: ClueFilter): string {
     className: "clue-filters",
     items: (["all", "remaining", "used"] as const).map(filter => ({
       id: filter,
-      label: filter === "all" ? "All" : filter === "remaining" ? "To review" : "Used",
+      label: filter === "all" ? "All" : filter === "remaining" ? "To review" : "Reviewed",
       selected: clueFilter === filter,
       data: { clueFilter: filter },
     })),
@@ -50,7 +50,7 @@ function renderClueItem(clue: ClueItem, index: number, category: Category, usedC
     className: `clue-used${used ? " is-used" : ""}`,
     data: { clueId: clue.id },
     pressed: used,
-    ariaLabel: `Mark clue ${index + 1} as ${used ? "unused" : "used"}`,
+    ariaLabel: `Mark clue ${index + 1} as ${used ? "not reviewed" : "reviewed"}`,
   });
   return `<li class="clue-item${related ? " clue-item--related" : ""}">${button}<span class="clue-item__content"><span>${escapeHtml(clue.text)}</span>${strategy}</span></li>`;
 }
