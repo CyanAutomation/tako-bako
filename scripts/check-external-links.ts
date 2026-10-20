@@ -47,7 +47,7 @@ type LinkCheckResponse = {
   body?: { cancel(): Promise<void> } | null;
 };
 
-type LinkFetcher = (url: string, init?: RequestInit) => Promise<LinkCheckResponse>;
+type LinkFetcher = (url: string) => Promise<LinkCheckResponse>;
 
 export function extractExternalLinks(markdown: string): string[] {
   const links = new Set<string>();
@@ -186,12 +186,7 @@ export async function checkExternalLinks(markdownSources: readonly string[], fet
   const links = [...new Set(markdownSources.flatMap(extractExternalLinks))];
   const results = await Promise.all(links.map(async url => {
     try {
-      const response = await fetcher(url, {
-        method: "GET",
-        redirect: "follow",
-        headers: { accept: "text/html,application/json;q=0.9,*/*;q=0.8", "user-agent": "TakoBako-link-check/1.0" },
-        signal: globalThis.AbortSignal.timeout(10_000),
-      });
+      const response = await fetcher(url);
       await response.body?.cancel();
       return response.status >= 400
         ? `External link returned HTTP ${response.status}: ${url}`
