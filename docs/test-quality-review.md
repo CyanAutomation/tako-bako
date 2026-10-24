@@ -46,7 +46,7 @@ The earlier review intended to remove the actionlint source-string assertion bec
 | Upstream error fallback | [`returns a non-cacheable fallback for an unrecognized Yokaiba 422 response`](../tests/api/puzzle.test.ts) | 2/2/2/2/2 = **10** | Keep |
 | Tab relationships | [`renders a labelled grid selector and one keyboard-focusable active tab`](../src/ui.test.ts) | 2/2/1/2/2 = **9** | Keep |
 | Dialog naming | [`renders a dialog with an accessible title, description, and supplied actions`](../src/ui.test.ts) | 2/2/2/2/2 = **10** | Keep |
-| Invalid daily date | [`throws a RangeError when given an invalid Date`](../src/daily.test.ts) | 2/1/2/2/2 = **9** | Keep |
+| Invalid daily date | [Current test: `rejects an invalid date input`](../src/daily.test.ts) (named `throws a RangeError when given an invalid Date` at this review) | 2/1/2/2/2 = **9** | Keep |
 
 The progress-reset integration test uses mocked browser globals, so isolation scores 1 despite fixed inputs and deterministic storage. The invalid-date test remains as a documented module boundary. The elapsed-time tests now distinguish “not started” (`undefined`) from the valid Unix epoch (`0`) and protect the event contract from negative durations after a clock rollback.
 
