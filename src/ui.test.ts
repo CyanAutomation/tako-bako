@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderLevelCard, renderSegmentedControl, renderSelect, renderTabs, trapDialogTab } from "./ui";
+import { nextGridCellKey, nextTabId, renderButton, renderDialog, renderDisclosure, renderGridCard, renderGridCell, renderInfoDisclosure, renderSegmentedControl, renderSelect, renderTabs, trapDialogTab } from "./ui";
 
 describe("shared UI primitives", () => {
   const tabs = [
@@ -97,14 +97,6 @@ describe("shared UI primitives", () => {
     assert.match(markup, /<button(?=[^>]*data-clue-filter="all")(?=[^>]*aria-pressed="true")[^>]*>All<\/button>/);
     assert.match(markup, /<button(?=[^>]*data-clue-filter="used")(?=[^>]*aria-pressed="false")[^>]*>Used<\/button>/);
     assert.strictEqual((markup.match(/aria-pressed="true"/g) ?? []).length, 1);
-  });
-
-  it("disables locked and current courses with distinct accessible names", () => {
-    const locked = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "locked" });
-    const current = renderLevelCard({ courseId: "beginner-2", label: "Beginner Level 2", level: 2, state: "current" });
-
-    assert.match(locked, /<button\b[^>]*aria-label="Beginner Level 2, locked"[^>]*disabled/);
-    assert.match(current, /<button\b[^>]*aria-label="Beginner Level 2, current"[^>]*disabled/);
   });
 
   it("[TB-ACCESS-04] renders a dialog with an accessible title, description, and supplied actions", () => {

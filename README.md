@@ -37,7 +37,7 @@ If puzzle generation fails, check network access to Yokaiba and inspect the `/ap
 Each puzzle has several categories of clues, such as “The cat owner lives next door to the fish keeper” or “The Swiss plays tennis.” Use the grid to record what you know:
 
 1. **Mark or eliminate:** Click a square to cycle through blank, match (✓), and ruled out (×). The readiness meter counts confirmed matches; submit when it is full.
-2. **Undo:** Revert the last mark. Starting another puzzle or returning to the landing page clears the undo history.
+2. **Undo:** Revert the last mark. Use **Clear grid** to remove marks from one grid or **Clear board** to clear every grid; confirm before clearing. Undo can restore cleared marks. Starting another puzzle or returning to the landing page clears the undo history.
 3. **Smart marking:** Turn it on in the board toolbar to rule out the other squares in a row and column when you confirm a match.
 4. **Check:** Submit a complete board. The server verifies it with Yokaiba; a correct answer advances Puzzle Challenge progress.
 5. **Rate the difficulty:** After solving, optionally choose Too easy, Just right, or Too hard. A Too hard rating can include one optional reason. While solving, open **More → Give feedback** to rate an unfinished puzzle.
@@ -45,7 +45,7 @@ Each puzzle has several categories of clues, such as “The cat owner lives next
 
 Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5×5), Championship Bridge (bridge to the expert board), and Championship Circuit (three expert grids). Older Tournament Order v1 links remain available; Open Division v1 and Championship Circuit v1 links open their current versions.
 
-Clues can be filtered as All, To review, or Used. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. Grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
+Clues can be filtered as All, To review, or Used. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. The grid collection is a labelled region; grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
 
 ### Puzzle Challenge
 

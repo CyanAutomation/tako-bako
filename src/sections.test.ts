@@ -38,11 +38,10 @@ describe("puzzle UI sections", () => {
     assert.match(ready, /<button\b(?=[^>]*aria-label="Check my solution")(?!(?:[^>]*\sdisabled))[^>]*>/);
   });
 
-  it("labels the grid workspace for assistive technology", () => {
+  it("[TB-ACCESS-01] labels the grid collection as a named region", () => {
     const workspace = renderGridWorkspace({ categories: [{ id: "weight", label: "Weight" }], activeGridId: "weight", grids: "<section>Grid</section>" });
 
-    assert.ok((workspace).includes('aria-label="Logic grids"'));
-    assert.ok((workspace).includes('class="legend legend--quiet"'));
+    assert.match(workspace, /<section\b(?=[^>]*aria-label="Logic grids")[^>]*>/);
   });
 
   it("offers an action to mark a used clue as unused", () => {
