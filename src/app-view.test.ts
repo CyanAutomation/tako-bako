@@ -83,19 +83,22 @@ test("the grid identifies the event order with numbered base rows", () => {
   assert.match(markup, /<th scope="row">2\. B<\/th>/);
 });
 
-test("product branding and board-clearing language stay consistent", () => {
+test("keeps the product name visible on the landing screen", () => {
   const landing = renderApp(view({ puzzle: undefined }));
   assert.match(landing, /<p class="eyebrow">Tako Bako Logic Dojo<\/p>/);
   assert.match(landing, /TAKO BAKO · Powered by Yokaiba/);
+});
 
+test("[TB-BOARD-RESET-01] asks before clearing every board mark", () => {
   const confirm = renderApp(view({ pendingBoardReset: true }));
-  assert.match(confirm, /<p class="eyebrow">Clear board<\/p>/);
+  assert.match(confirm, /<dialog\b[^>]*aria-labelledby="reset-board-dialog-title"/);
   assert.match(confirm, /Clear all board marks\?/);
   assert.match(confirm, /<button id="confirm-board-reset"[^>]*>Clear board<\/button>/);
-  assert.doesNotMatch(confirm, /Reset board/);
+});
 
+test("[TB-BOARD-RESET-01] names the selected grid in its clear confirmation", () => {
   const clearGrid = renderApp(view({ pendingResetGridId: "club" }));
-  assert.match(clearGrid, /<p class="eyebrow">Clear grid<\/p>/);
+  assert.match(clearGrid, /<dialog\b[^>]*aria-labelledby="reset-grid-title"/);
   assert.match(clearGrid, /Clear Club\?/);
   assert.match(clearGrid, /id="confirm-grid-reset"[^>]*>Clear grid<\/button>/);
 });

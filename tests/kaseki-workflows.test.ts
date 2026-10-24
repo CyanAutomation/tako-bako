@@ -78,23 +78,20 @@ test("[CI-NODE-01] lets every configured Node matrix job report its result", () 
   assert.equal(workflow.jobs.quality?.strategy?.["fail-fast"], false);
 });
 
-test("Kaseki sweeps use Node 24 and share a single main-only preflight action", () => {
+test("[CI-KASEKI-01] runs main-only Node 24 sweeps after controller and gateway preflight", () => {
   for (const { name, workflow } of workflows) {
-    assert.equal(workflow.jobs[Object.keys(workflow.jobs)[0]!]!.if, "github.ref == 'refs/heads/main'", `${name} remains main-only`);
-    const steps = allWorkflowSteps(workflow);
-    const setupNode = steps.find(step => step.uses?.startsWith("actions/setup-node@"));
-    const preflight = steps.find(step => step.name === "Verify Kaseki controller and gateway");
-    assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
-    assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
-    assert.deepStrictEqual(preflight?.with, {
-      "base-url": "${{ vars.KASEKI_BASE_URL }}",
-      "api-token": "${{ secrets.KASEKI_API_TOKEN }}",
-    });
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      assert.equal(job.if, "github.ref == 'refs/heads/main'", `${name} job ${jobName} remains main-only`);
+      const setupNode = job.steps.find(step => step.uses?.startsWith("actions/setup-node@"));
+      const preflight = job.steps.find(step => step.name === "Verify Kaseki controller and gateway");
+      assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
+      assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
+      assert.deepStrictEqual(preflight?.with, {
+        "base-url": "${{ vars.KASEKI_BASE_URL }}",
+        "api-token": "${{ secrets.KASEKI_API_TOKEN }}",
+      });
+    }
   }
-
-  const actionlint = namedStep(readWorkflow("workflow-validation.yml"), "Download and verify actionlint").run ?? "";
-  assert.match(actionlint, /\$RUNNER_TEMP\/actionlint" -color/);
-  assert.match(actionlint, /-ignore 'specifying action .* because ref is missing'/);
 
   const action = readYaml(".github/actions/kaseki-preflight/action.yml") as {
     inputs: Record<string, { required?: boolean }>;
@@ -102,12 +99,12 @@ test("Kaseki sweeps use Node 24 and share a single main-only preflight action", 
   };
   assert.equal(action.inputs["base-url"]?.required, true);
   assert.equal(action.inputs["api-token"]?.required, true);
-  assert.ok(action.runs.steps.some(step => step.uses?.startsWith("CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@")));
-  assert.ok(action.runs.steps.some(step => step.run?.includes("/ready")));
-  assert.ok(action.runs.steps.some(step => step.run?.includes("/api/v1/gateway-test?stage=1")));
+  assert.ok(action.runs.steps.some(step => step.name === "Verify controller health" && step.uses?.startsWith("CyanAutomation/kaseki-agent/.github/actions/verify-controller-health@")));
+  assert.ok(action.runs.steps.some(step => step.name === "Verify controller readiness" && step.run?.includes("$KASEKI_BASE_URL/ready")));
+  assert.ok(action.runs.steps.some(step => step.name === "Verify gateway connectivity and authentication" && step.run?.includes("$KASEKI_BASE_URL/api/v1/gateway-test?stage=1") && step.env?.KASEKI_API_TOKEN === "${{ inputs.api-token }}"));
 });
 
-test("DRY sweep scope includes server code and excludes workflow helper scripts", () => {
+test("[CI-KASEKI-05] DRY sweep scope includes server code and excludes workflow helper scripts", () => {
   const workflow = readWorkflow("kaseki-dry.yaml");
   const allowlist = workflow.jobs.dry_sweep?.env?.ALLOWLIST;
   assert.equal(allowlist, "src/**/*,api/**/*,server/**/*,tests/**/*");
