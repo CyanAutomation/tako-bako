@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
-test("manual external link checks only inspect the main branch", () => {
+test("[CI-DOCS-01] manual external link checks only inspect the main branch", () => {
   const source = readFileSync(new URL("../.github/workflows/documentation-links.yml", import.meta.url), "utf8");
   const document = parseDocument(source);
   assert.deepStrictEqual(document.errors, []);

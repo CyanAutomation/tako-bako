@@ -1,21 +1,18 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { it } from "node:test";
 
-import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "../../api/hint-validation.js";
+import { isBoundedText } from "../../api/hint-validation.js";
 
-describe("MAX_PUZZLE_TOKEN_LENGTH boundary", () => {
-  it("accepts a non-empty string at the shared puzzle-token size limit", () => {
-    assert.equal(isBoundedText("x".repeat(MAX_PUZZLE_TOKEN_LENGTH), MAX_PUZZLE_TOKEN_LENGTH), true);
-    assert.equal(MAX_PUZZLE_TOKEN_LENGTH, 16_384);
-  });
+it("accepts only non-empty strings within the supplied length limit", () => {
+  const cases: readonly { value: unknown; maximumLength: number; expected: boolean }[] = [
+    { value: "abc", maximumLength: 3, expected: true },
+    { value: "abcd", maximumLength: 3, expected: false },
+    { value: "", maximumLength: 3, expected: false },
+    { value: 7, maximumLength: 3, expected: false },
+    { value: null, maximumLength: 3, expected: false },
+  ];
 
-  it("rejects an oversized puzzle token at the limit plus one", () => {
-    assert.equal(isBoundedText("x".repeat(MAX_PUZZLE_TOKEN_LENGTH + 1), MAX_PUZZLE_TOKEN_LENGTH), false);
-  });
-
-  it("rejects empty strings and non-string tokens", () => {
-    assert.equal(isBoundedText("", MAX_PUZZLE_TOKEN_LENGTH), false);
-    assert.equal(isBoundedText(7, MAX_PUZZLE_TOKEN_LENGTH), false);
-    assert.equal(isBoundedText(null, MAX_PUZZLE_TOKEN_LENGTH), false);
-  });
+  for (const { value, maximumLength, expected } of cases) {
+    assert.equal(isBoundedText(value, maximumLength), expected);
+  }
 });

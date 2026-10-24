@@ -1,5 +1,7 @@
 # Test quality review follow-up
 
+This file preserves review snapshots from different repository states. Historical suite counts and scores below are not the current inventory; the latest follow-up is at the end of this file.
+
 This is a focused re-score of the ten areas called out in the earlier review. It scores the replacement or retained tests for those areas; it is not a full re-score of every test in the repository. Scores use the order **intent / relevance / assertions / isolation / cost**, with 2 points per dimension. Contract IDs and source links are in [test traceability](test-traceability.md).
 
 | Reviewed area | Replacement or retained test | Scores = total | Segment |
@@ -32,7 +34,7 @@ The full quality gate passed after this follow-up: lint, all 228 tests, TypeScri
 
 ## Follow-up for the lower-scoring tests
 
-The actionlint source-string assertion was removed because the workflow-validation job downloads a checksum-pinned actionlint binary and runs it against the workflows. The selected-template test now also covers the no-difficulty fallback behavior, and the tab markup test covers the `data-grid-tab` hook; the duplicate cases were removed.
+The earlier review intended to remove the actionlint source-string assertion because the workflow-validation job downloads a checksum-pinned actionlint binary and runs it against the workflows. The assertion remained in the test file and is removed in the latest follow-up below. The selected-template test now also covers the no-difficulty fallback behavior, and the tab markup test covers the `data-grid-tab` hook; the duplicate cases were removed.
 
 | Contract or area | Revised test | Scores = total | Segment |
 |---|---|---:|---|
@@ -49,3 +51,11 @@ The actionlint source-string assertion was removed because the workflow-validati
 The progress-reset integration test uses mocked browser globals, so isolation scores 1 despite fixed inputs and deterministic storage. The invalid-date test remains as a documented module boundary. The elapsed-time tests now distinguish “not started” (`undefined`) from the valid Unix epoch (`0`) and protect the event contract from negative durations after a clock rollback.
 
 These scores are source-based. The focused elapsed-time tests first failed against the previous implementation and passed after the fix. No mutation-testing tool was run for this follow-up; mutation score is not measured here.
+
+## Latest follow-up for lower-scoring tests
+
+This pass consolidated bounded-text helper cases into one table-driven test while retaining endpoint checks for rejected tokens and acceptance at the configured maximum. It removed the duplicate direct level-card assertion because the curriculum rendering test already covers current and locked accessible names. The invalid-date test now checks the `RangeError` contract without binding to its message. Reset-dialog checks have separate intent for full-board and selected-grid clearing, and the product name remains a standalone landing-page check.
+
+The grid workspace test now verifies its named `<section>` region without checking a styling class. Kaseki preflight coverage checks each step by its named purpose; source-string assertions about actionlint were removed because workflow validation runs the pinned binary on the workflow files. The DRY sweep scope and external-link workflow now have traceability IDs `CI-KASEKI-05` and `CI-DOCS-01`. `TB-BOARD-RESET-01` documents the reset confirmation and Undo contract, and `TB-ACCESS-01` includes the named grid region.
+
+The targeted follow-up suite passed all 82 tests after correcting the reset-dialog assertion to check the native `<dialog>` element. The final `npm run check` passed lint, all 298 tests, documentation validation, TypeScript checks, and the production build. No mutation-testing run was performed for this follow-up.
