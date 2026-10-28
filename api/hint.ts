@@ -136,3 +136,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   const clientAddress = clientAddressFromForwardedFor(request.headers?.["x-forwarded-for"]);
   await deliverHint(parsedRequest, context, features, clientAddress, response);
 }
+
+export const config = {
+  api: { bodyParser: { sizeLimit: "2mb" } },
+};

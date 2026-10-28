@@ -119,3 +119,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (!mayRespond) return;
   response.status(200).json({ strategies: strategyResults(clues, results) });
 }
+
+export const config = {
+  api: { bodyParser: { sizeLimit: "256kb" } },
+};

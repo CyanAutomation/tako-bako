@@ -12,7 +12,7 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 | `/api/puzzle` | POST | Verify a completed board with its signed puzzle token. |
 | `/api/hint` | POST | Request a bounded solver hint, with optional Jev selection. |
 | `/api/clue-strategies` | POST | Label clue reasoning strategies; known constraint kinds use deterministic labels. |
-| `/api/events` | POST | Forward validated anonymous puzzle outcomes. |
+| `/api/events` | POST | Forward validated anonymous puzzle outcomes through a shared rate limit. |
 | `/api/feedback` | POST | Forward anonymous difficulty feedback for a signed puzzle. |
 | `/api/health` | GET | Report readiness of Tako Bako and its Yokaiba dependency. |
 
@@ -54,20 +54,20 @@ Open the Vercel dev URL, play a puzzle, and submit feedback. `YOKAIBA_API_ORIGIN
 
 The production D1 resource ID is account-specific. Create it with `npx wrangler d1 create yokaiba-puzzle-feedback`, replace the explicit placeholder in Yokaiba's `wrangler.toml`, and apply migrations with `npx wrangler d1 migrations apply yokaiba-puzzle-feedback --remote`. Do not deploy Yokaiba until the D1 binding is configured.
 
-## Optional Jev service
+## Shared rate limiting and optional Jev service
 
-Set all three variables in the Vercel project's **server-side** environment to enable Jev:
+Configure the Redis REST URL and token in the Vercel project's **server-side** environment to enable event ingestion. Jev also uses these settings for its own separate limits. Add the OpenRouter key to enable Jev:
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes, for Jev | Authenticates model decision requests. |
-| `UPSTASH_REDIS_REST_URL` | Yes, for Jev | Shared decision-rate limiter endpoint. |
-| `UPSTASH_REDIS_REST_TOKEN` | Yes, for Jev | Redis REST authentication and HMAC key. |
+| `UPSTASH_REDIS_REST_URL` | Required for events and Jev | Shared rate-limit endpoint. |
+| `UPSTASH_REDIS_REST_TOKEN` | Required for events and Jev | Redis REST authentication and HMAC key. |
 | `JEV_MODEL` | No | Model ID; defaults to `~typesafe/jev-latest`. Pin an ID for repeatable labels. |
 
 Without complete provider configuration, with an invalid key, or when either provider is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; application quotas are not a provider billing cap.
 
-The shared Redis limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. It stores an HMAC of a validated client address from Vercel's `x-forwarded-for` chain rather than the raw address. If Redis fails, Jev is disabled for that request.
+The event limiter allows at most 120 submissions per client per minute and 100,000 per UTC day across the deployment. It stores an HMAC of a validated client address from Vercel's `x-forwarded-for` chain rather than the raw address. If Redis is missing or unavailable, `/api/events` returns 503 and does not forward the event; gameplay remains available. The separate Jev limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. If Redis fails, Jev is disabled for that request.
 
 Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
 
@@ -84,6 +84,8 @@ The feedback handler logs only its operation, coarse outcome, status, and durati
 ## Response headers
 
 `vercel.json` applies these security headers to non-asset routes: Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options. Static `/assets/` files receive `Cache-Control: public, max-age=31536000, immutable`.
+
+After each production deployment, inspect the actual response headers on the site and an API route. For example, run `curl -sS -D - -o /dev/null https://<production-host>/` and `curl -sS -D - -o /dev/null https://<production-host>/api/health`; confirm the security headers above are present and the API response is not cacheable. Configure an OpenRouter spend limit and usage alert for the server-side key, then confirm both in the provider dashboard after changing Jev settings.
 
 ## Local troubleshooting
 
