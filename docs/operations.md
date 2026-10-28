@@ -12,7 +12,7 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 | `/api/puzzle` | POST | Verify a completed board with its signed puzzle token. |
 | `/api/hint` | POST | Request a bounded solver hint, with optional Jev selection. |
 | `/api/clue-strategies` | POST | Label clue reasoning strategies; known constraint kinds use deterministic labels. |
-| `/api/events` | POST | Forward validated anonymous puzzle outcomes. |
+| `/api/events` | POST | Forward validated anonymous puzzle outcomes to Yokaiba. |
 | `/api/feedback` | POST | Forward anonymous difficulty feedback for a signed puzzle. |
 | `/api/health` | GET | Report readiness of Tako Bako and its Yokaiba dependency. |
 
@@ -67,13 +67,13 @@ Set all three variables in the Vercel project's **server-side** environment to e
 
 Without complete provider configuration, with an invalid key, or when either provider is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; application quotas are not a provider billing cap.
 
-The shared Redis limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. It stores an HMAC of a validated client address from Vercel's `x-forwarded-for` chain rather than the raw address. If Redis fails, Jev is disabled for that request.
+The Jev limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. If Redis fails, Jev is disabled for that request. Event ingestion does not use this limiter: `/api/events` limits its parsed request body to 4 KB and forwards only allowlisted event fields, while Yokaiba's Worker applies its existing REST rate limit to `/v1/events`. The proxy passes Yokaiba's 429 response and rate-limit headers back to the caller.
 
 Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
 
 ## Events, privacy, and metrics
 
-Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients.
+Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients. `/api/events` applies a 4 KB body limit, validates and allowlists event input, and forwards the event to Yokaiba; the Worker bounds its JSON request body and rate-limits `/v1/events` under its existing REST policy.
 
 Difficulty feedback is stored separately from event telemetry. Its D1 record contains puzzle identity/generation metadata, rating and optional fixed reason, completion state, bounded gameplay measurements, smart-marking state, and submission time. Yokaiba retains records for up to 12 months using the documented operator-run deletion query; exports should use the read-only SQL examples in Yokaiba's operations guide.
 
@@ -84,6 +84,8 @@ The feedback handler logs only its operation, coarse outcome, status, and durati
 ## Response headers
 
 `vercel.json` applies these security headers to non-asset routes: Content-Security-Policy, Permissions-Policy, Referrer-Policy, X-Content-Type-Options, and X-Frame-Options. Static `/assets/` files receive `Cache-Control: public, max-age=31536000, immutable`.
+
+After each production deployment, inspect the actual response headers on the site and an API route. For example, run `curl -sS -D - -o /dev/null https://<production-host>/` and `curl -sS -D - -o /dev/null https://<production-host>/api/health`; confirm the security headers above are present and the API response is not cacheable. Configure an OpenRouter spend limit and usage alert for the server-side key, then confirm both in the provider dashboard after changing Jev settings.
 
 ## Local troubleshooting
 

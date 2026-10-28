@@ -309,3 +309,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
   await handleGeneration(request.query, response);
 }
+
+export const config = {
+  api: { bodyParser: { sizeLimit: "2mb" } },
+};
