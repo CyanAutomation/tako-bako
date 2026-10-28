@@ -9,7 +9,6 @@ import {
   type PlayerStateAssessment,
 } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { clientAddressFromForwardedFor } from "../server/client-address.js";
 import { chooseHintPayload, hintCandidates } from "./hint-selection.js";
 import { parseHintRequest, type ParsedHintRequest } from "./hint-input.js";
 import { parseSelectionContext, playerStateFeatures } from "./hint-context.js";
@@ -20,7 +19,7 @@ import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
 const HINT_API_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;
 
-async function classifyPlayerState(features: PlayerStateFeatures, clientAddress?: string): Promise<PlayerStateAssessment | undefined> {
+async function classifyPlayerState(features: PlayerStateFeatures): Promise<PlayerStateAssessment | undefined> {
   const startedAt = Date.now();
   const result = await requestJevDecision({
     state: serializePlayerStateFeatures(features),
@@ -37,7 +36,7 @@ async function classifyPlayerState(features: PlayerStateFeatures, clientAddress?
         },
       },
     },
-  }, clientAddress);
+  });
   const assessment = parsePlayerStateAssessment(result);
   recordJevMetric({ operation: "player_state", questionCount: 1, candidateCount: 0, durationMs: Date.now() - startedAt, outcome: assessment ? "success" : "fallback" });
   return assessment;
@@ -86,18 +85,17 @@ async function deliverWithJev(
   context: SelectionContext,
   features: PlayerStateFeatures | undefined,
   defaultKind: HintStrength | undefined,
-  clientAddress: string | undefined,
   response: VercelResponse,
 ): Promise<void> {
   // Yokaiba must accept the token before any caller-controlled state reaches Jev.
-  const assessment = features ? await classifyPlayerState(features, clientAddress) : undefined;
+  const assessment = features ? await classifyPlayerState(features) : undefined;
   const policy = assessment && features ? policyForPlayerState(assessment.state, features) : undefined;
   const hintKind = policy?.hintKind ?? defaultKind;
   const result = hintKind === defaultKind
     ? initialResult
     : await fetchPrimaryHint(request.puzzleToken, hintKind, response, request.hintIndex);
   if (!result) return;
-  const selected = await chooseHintPayload(context, result.payload, features, policy, assessment, clientAddress);
+  const selected = await chooseHintPayload(context, result.payload, features, policy, assessment);
   respondWithPayload(response, result, selected);
 }
 
@@ -105,7 +103,6 @@ async function deliverHint(
   request: ParsedHintRequest,
   context: SelectionContext | undefined,
   features: PlayerStateFeatures | undefined,
-  clientAddress: string | undefined,
   response: VercelResponse,
 ): Promise<void> {
   const defaultKind = features ? hintStrengthForProgress(features.affirmativeCount, features.totalMatches) : request.kind;
@@ -120,7 +117,7 @@ async function deliverHint(
       deliverWithoutJev(response, result, context);
       return;
     }
-    await deliverWithJev(request, result, context, features, defaultKind, clientAddress, response);
+    await deliverWithJev(request, result, context, features, defaultKind, response);
   } catch {
     response.status(502).json({ error: "Yokaiba assistance is unavailable. Please try again." });
   }
@@ -133,8 +130,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (!parsedRequest) { response.status(400).json({ error: "A valid signed hint request is required" }); return; }
   const context = parseSelectionContext(parsedRequest.body);
   const features = context ? playerStateFeatures(parsedRequest.body, context) : undefined;
-  const clientAddress = clientAddressFromForwardedFor(request.headers?.["x-forwarded-for"]);
-  await deliverHint(parsedRequest, context, features, clientAddress, response);
+  await deliverHint(parsedRequest, context, features, response);
 }
 
 export const config = {

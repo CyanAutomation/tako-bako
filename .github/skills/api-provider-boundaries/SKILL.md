@@ -10,7 +10,7 @@ Use this skill for changes at the boundary between the browser, Tako Bako's Verc
 ## Map of the implementation
 
 - `api/` contains Vercel serverless handlers. `api/puzzle.ts` generates and verifies puzzles; other handlers cover hints, clue strategies, events, feedback, and health.
-- `server/` contains shared provider-origin, payload, and client-address logic.
+- `server/` contains shared provider-origin, payload, and model-client logic.
 - `src/puzzle-input.ts`, `src/scenarios.ts`, and `src/cache-policy.ts` hold contracts shared by client and server code.
 - `docs/operations.md` documents routes, configuration, cache behavior, privacy, and troubleshooting. API boundary tests are under `tests/` and `tests/api/`.
 

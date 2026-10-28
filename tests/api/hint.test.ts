@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
-import { assertPartialMatch, configureJevForTests, isJevRateLimitRequest, jevRateLimitResponse, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
+import { assertPartialMatch, configureJevForTests, resolvedMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 
 import handler from "../../api/hint.js";
 
@@ -25,8 +25,6 @@ describe("hint proxy", () => {
   afterEach(() => {
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.JEV_MODEL;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
   });
 
   it("forwards a bounded hint request and preserves the Yokaiba request ID", async () => {
@@ -58,7 +56,6 @@ describe("hint proxy", () => {
     const fetchMock = mock.fn(async (input: string | URL | Request) => {
       const url = String(input);
       calls.push(url);
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { player_state: { type: "choice", choice: "stalled", confidence: 0.9 } } }), { status: 200 });
       }
@@ -109,7 +106,6 @@ describe("hint proxy", () => {
     const fetchMock = mock.fn(async (input: string | URL | Request) => {
       const url = String(input);
       calls.push(url);
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("yokaiba")) return new Response(JSON.stringify(solverHint), { status: 200, headers: { "content-type": "application/json" } });
       return new Response(JSON.stringify({ error: { message: "Invalid API key" } }), { status: 401 });
     });
@@ -126,7 +122,6 @@ describe("hint proxy", () => {
     assert.deepStrictEqual(result.body, solverHint);
     assert.deepStrictEqual(calls, [
       "https://yokaiba.scheimann.workers.dev/v1/puzzles/hint",
-      "https://test-db.upstash.io",
       "https://openrouter.ai/api/alpha/decisions",
     ]);
   });
@@ -212,7 +207,6 @@ describe("hint proxy", () => {
       const url = String(input);
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       calls.push({ url, body });
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_1", confidence: 0.9 } } }), { status: 200 });
       }
@@ -244,7 +238,6 @@ describe("hint proxy", () => {
       const url = String(input);
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
       calls.push({ url, body });
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { player_state: { type: "choice", choice: "stalled", confidence: 0.91 } } }), { status: 200 });
       }
@@ -293,7 +286,7 @@ describe("hint proxy", () => {
     assert.strictEqual(JSON.stringify(modelCall.body).includes("secret-signed-token"), false);
     assert.strictEqual("current_board" in (modelCall.body.state as Record<string, unknown>), false);
     assert.deepStrictEqual(result.body, { kind: "clue", clue: { id: "fresh", text: "Hana lives next to the fish keeper." } });
-    assert.strictEqual(fetchMock.mock.callCount(), 4);
+    assert.strictEqual(fetchMock.mock.callCount(), 3);
     const metric = jevMetrics.find(([, value]) => (value as { operation?: unknown }).operation === "player_state")?.[1] as Record<string, unknown> | undefined;
     assert.ok(metric);
     assert.strictEqual(metric.questionCount, 1);
@@ -309,7 +302,6 @@ describe("hint proxy", () => {
       const url = String(input);
       const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {};
       calls.push({ url, body });
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (url.includes("openrouter.ai")) {
         const response = calls.filter(call => call.url.includes("openrouter.ai")).length === 1
           ? { answers: { player_state: { type: "choice", choice: "ready_for_stronger_hint", confidence: 0.4 } } }
@@ -363,11 +355,9 @@ describe("hint proxy", () => {
 
   it("falls back to the primary Yokaiba hint when Jev returns an out-of-bounds candidate index", async () => {
     configureJevForTests();
-    const fetchMock = mock.fn(async (input: string | URL | Request) => isJevRateLimitRequest(input)
-      ? jevRateLimitResponse()
-      : String(input).includes("openrouter.ai")
-        ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_2", confidence: 1 } } }), { status: 200 })
-        : new Response(JSON.stringify({ kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } }), { status: 200, headers: { "content-type": "application/json" } }));
+    const fetchMock = mock.fn(async (input: string | URL | Request) => String(input).includes("openrouter.ai")
+      ? new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_2", confidence: 1 } } }), { status: 200 })
+      : new Response(JSON.stringify({ kind: "placement", placement: { subject: "Aki", category: "club", value: "Lions" } }), { status: 200, headers: { "content-type": "application/json" } }));
     stubGlobal("fetch", fetchMock);
     const { response, result } = responseRecorder();
 
@@ -379,7 +369,6 @@ describe("hint proxy", () => {
   it("falls back to an unused clue when Jev cannot rank candidates and the solver clue was already used", async () => {
     configureJevForTests();
     const fetchMock = mock.fn(async (input: string | URL | Request) => {
-      if (isJevRateLimitRequest(input)) return jevRateLimitResponse();
       if (String(input).includes("openrouter.ai")) {
         return new Response(JSON.stringify({ answers: { next_hint: { type: "choice", choice: "candidate_99", confidence: 1 } } }), { status: 200 });
       }
