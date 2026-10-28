@@ -12,7 +12,7 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 | `/api/puzzle` | POST | Verify a completed board with its signed puzzle token. |
 | `/api/hint` | POST | Request a bounded solver hint, with optional Jev selection. |
 | `/api/clue-strategies` | POST | Label clue reasoning strategies; known constraint kinds use deterministic labels. |
-| `/api/events` | POST | Forward validated anonymous puzzle outcomes through a shared rate limit. |
+| `/api/events` | POST | Forward validated anonymous puzzle outcomes to Yokaiba. |
 | `/api/feedback` | POST | Forward anonymous difficulty feedback for a signed puzzle. |
 | `/api/health` | GET | Report readiness of Tako Bako and its Yokaiba dependency. |
 
@@ -54,26 +54,26 @@ Open the Vercel dev URL, play a puzzle, and submit feedback. `YOKAIBA_API_ORIGIN
 
 The production D1 resource ID is account-specific. Create it with `npx wrangler d1 create yokaiba-puzzle-feedback`, replace the explicit placeholder in Yokaiba's `wrangler.toml`, and apply migrations with `npx wrangler d1 migrations apply yokaiba-puzzle-feedback --remote`. Do not deploy Yokaiba until the D1 binding is configured.
 
-## Shared rate limiting and optional Jev service
+## Optional Jev service
 
-Configure the Redis REST URL and token in the Vercel project's **server-side** environment to enable event ingestion. Jev also uses these settings for its own separate limits. Add the OpenRouter key to enable Jev:
+Set all three variables in the Vercel project's **server-side** environment to enable Jev:
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes, for Jev | Authenticates model decision requests. |
-| `UPSTASH_REDIS_REST_URL` | Required for events and Jev | Shared rate-limit endpoint. |
-| `UPSTASH_REDIS_REST_TOKEN` | Required for events and Jev | Redis REST authentication and HMAC key. |
+| `UPSTASH_REDIS_REST_URL` | Yes, for Jev | Shared decision-rate limiter endpoint. |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes, for Jev | Redis REST authentication and HMAC key. |
 | `JEV_MODEL` | No | Model ID; defaults to `~typesafe/jev-latest`. Pin an ID for repeatable labels. |
 
 Without complete provider configuration, with an invalid key, or when either provider is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; application quotas are not a provider billing cap.
 
-The event limiter allows at most 120 submissions per client per minute and 100,000 per UTC day across the deployment. It stores an HMAC of a validated client address from Vercel's `x-forwarded-for` chain rather than the raw address. If Redis is missing or unavailable, `/api/events` returns 503 and does not forward the event; gameplay remains available. The separate Jev limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. If Redis fails, Jev is disabled for that request.
+The Jev limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. If Redis fails, Jev is disabled for that request. Event ingestion does not use this limiter: `/api/events` limits its parsed request body to 4 KB and forwards only allowlisted event fields, while Yokaiba's Worker applies its existing REST rate limit to `/v1/events`. The proxy passes Yokaiba's 429 response and rate-limit headers back to the caller.
 
 Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
 
 ## Events, privacy, and metrics
 
-Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients.
+Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients. `/api/events` applies a 4 KB body limit, validates and allowlists event input, and forwards the event to Yokaiba; the Worker bounds its JSON request body and rate-limits `/v1/events` under its existing REST policy.
 
 Difficulty feedback is stored separately from event telemetry. Its D1 record contains puzzle identity/generation metadata, rating and optional fixed reason, completion state, bounded gameplay measurements, smart-marking state, and submission time. Yokaiba retains records for up to 12 months using the documented operator-run deletion query; exports should use the read-only SQL examples in Yokaiba's operations guide.
 
