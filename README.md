@@ -95,7 +95,7 @@ If Yokaiba is unavailable, the endpoint returns HTTP 503 with `status: "degraded
 
 ## Configuration
 
-Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification and puzzle feedback require Yokaiba's signed puzzle token and its configured D1 feedback binding. Jev's optional clue labels and hint selection require `OPENROUTER_API_KEY`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
+Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification and puzzle feedback require Yokaiba's signed puzzle token and its configured D1 feedback binding. Jev's optional clue labels and hint selection require `OPENROUTER_API_KEY` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
 
 See [operations and configuration details](docs/operations.md) for defaults, rate limits, fallback behavior, cache policy, and security notes.
 

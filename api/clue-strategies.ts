@@ -4,7 +4,6 @@ import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
 import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
 import { parseClueStrategyResults } from "../src/clue-strategy-results.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { clientAddressFromForwardedFor } from "../server/client-address.js";
 import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
 import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
@@ -82,7 +81,6 @@ async function classifyUnresolvedClues(
   puzzleToken: unknown,
   unresolved: readonly InputClue[],
   results: Map<string, StrategyResult>,
-  clientAddress: string | undefined,
   response: VercelResponse,
 ): Promise<boolean> {
   if (unresolved.length === 0 || !hasJevApiKey()) return true;
@@ -96,7 +94,7 @@ async function classifyUnresolvedClues(
   const evaluated = await requestJevDecision({
     state: { clues: unresolved.map(clue => ({ id: clue.id, text: clue.text, constraint_kind: clue.constraintKind ?? "unspecified" })) },
     questions,
-  }, clientAddress);
+  });
   const normalized = normalizedJevAnswers(evaluated?.answers, questionToClueId);
   const labels = parseClueStrategyResults(normalized, unresolved.map(clue => clue.id));
   for (const [clueId, strategy] of labels) {
@@ -114,8 +112,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   response.setHeader("cache-control", "no-store");
 
   const { results, unresolved } = partitionKnownStrategies(clues);
-  const clientAddress = clientAddressFromForwardedFor(request.headers?.["x-forwarded-for"]);
-  const mayRespond = await classifyUnresolvedClues(request.body.puzzleToken, unresolved, results, clientAddress, response);
+  const mayRespond = await classifyUnresolvedClues(request.body.puzzleToken, unresolved, results, response);
   if (!mayRespond) return;
   response.status(200).json({ strategies: strategyResults(clues, results) });
 }

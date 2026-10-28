@@ -113,7 +113,6 @@ async function selectCandidateWithJev(
   features: PlayerStateFeatures | undefined,
   policy: PlayerStatePolicy | undefined,
   assessment: PlayerStateAssessment | undefined,
-  clientAddress?: string,
 ): Promise<HintCandidate | undefined> {
   const startedAt = Date.now();
   const questionOptions = Object.fromEntries(candidates.map((candidate, index) => [`candidate_${index}`, `Candidate: ${candidate.type}. ${candidate.text}`]));
@@ -133,7 +132,7 @@ async function selectCandidateWithJev(
         criteria: questionOptions,
       },
     },
-  }, clientAddress);
+  });
   const selected = candidateFromJevResult(result, candidates);
   recordJevMetric({ operation: "hint_selection", questionCount: 1, candidateCount: candidates.length, durationMs: Date.now() - startedAt, outcome: selected ? "success" : "fallback" });
   return selected;
@@ -150,12 +149,11 @@ export async function chooseHintPayload(
   features: PlayerStateFeatures | undefined,
   policy: PlayerStatePolicy | undefined,
   assessment: PlayerStateAssessment | undefined,
-  clientAddress?: string,
 ): Promise<unknown> {
   const candidates = hintCandidates(payload, context);
   const boundedCandidates = candidatesForPolicy(candidates, policy);
   if (boundedCandidates.length === 0) return policy ? { error: "A suitable hint is unavailable." } : payload;
   if (boundedCandidates.length === 1) return boundedCandidates[0]!.payload;
-  const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment, clientAddress);
+  const selected = await selectCandidateWithJev(context, boundedCandidates, features, policy, assessment);
   return selected?.payload ?? fallbackHintPayload(boundedCandidates, payload);
 }

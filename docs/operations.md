@@ -56,18 +56,16 @@ The production D1 resource ID is account-specific. Create it with `npx wrangler 
 
 ## Optional Jev service
 
-Set all three variables in the Vercel project's **server-side** environment to enable Jev:
+Set `OPENROUTER_API_KEY` in the Vercel project's **server-side** environment to enable Jev:
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes, for Jev | Authenticates model decision requests. |
-| `UPSTASH_REDIS_REST_URL` | Yes, for Jev | Shared decision-rate limiter endpoint. |
-| `UPSTASH_REDIS_REST_TOKEN` | Yes, for Jev | Redis REST authentication and HMAC key. |
 | `JEV_MODEL` | No | Model ID; defaults to `~typesafe/jev-latest`. Pin an ID for repeatable labels. |
 
-Without complete provider configuration, with an invalid key, or when either provider is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; application quotas are not a provider billing cap.
+Without an OpenRouter key, with an invalid key, or when OpenRouter is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; the application does not impose per-client or daily model-call quotas.
 
-The Jev limiter allows at most 60 model decisions per client per minute and 10,000 per UTC day across the deployment. If Redis fails, Jev is disabled for that request. Event ingestion does not use this limiter: `/api/events` limits its parsed request body to 4 KB and forwards only allowlisted event fields, while Yokaiba's Worker applies its existing REST rate limit to `/v1/events`. The proxy passes Yokaiba's 429 response and rate-limit headers back to the caller.
+Event ingestion uses Yokaiba’s rate limiting: `/api/events` limits its parsed request body to 4 KB and forwards only allowlisted event fields, while Yokaiba's Worker applies its existing REST rate limit to `/v1/events`. The proxy passes Yokaiba's 429 response and rate-limit headers back to the caller.
 
 Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
 
@@ -91,5 +89,5 @@ After each production deployment, inspect the actual response headers on the sit
 
 - If puzzle generation fails in Vite, check network access to Yokaiba and inspect the browser's network response for `/api/puzzle`.
 - If deployed answer checking fails while generation works, verify `PUZZLE_TOKEN_SECRET` on the Yokaiba Worker and redeploy that Worker.
-- If optional Jev labels or selection are absent, confirm all three required provider variables are set in the Vercel server environment. The app continues using deterministic behavior when Jev is unavailable.
+- If optional Jev labels or selection are absent, confirm `OPENROUTER_API_KEY` is set in the Vercel server environment. The app continues using deterministic behavior when Jev is unavailable.
 - Use the deployed `/api/health` response to distinguish app readiness from Yokaiba availability.
