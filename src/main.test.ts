@@ -59,7 +59,9 @@ function mountTestPuzzle(
     querySelector: (selector: string) => selector === "#challenge-menu" ? challengeMenuButton : null,
   };
   const storage = new Map<string, string>(Object.entries(initialStorage));
+  const sessionStorage = new Map<string, string>();
   const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+  const sessionStorageApi = { getItem: (key: string) => sessionStorage.get(key) ?? null, setItem: (key: string, value: string) => sessionStorage.set(key, value), removeItem: (key: string) => sessionStorage.delete(key) };
   stubGlobal("document", { querySelector: () => root, activeElement: null });
   stubGlobal("window", {
     get location() { return new URL(href); },
@@ -71,7 +73,7 @@ function mountTestPuzzle(
     },
   });
   stubGlobal("localStorage", storageApi);
-  stubGlobal("sessionStorage", storageApi);
+  stubGlobal("sessionStorage", sessionStorageApi);
   stubGlobal("CSS", { escape: (value: string) => value });
   stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
   const fetchMock = mock.fn(fetchImplementation);
@@ -82,7 +84,7 @@ function mountTestPuzzle(
     target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
   } as never);
   return {
-    root, listeners, storage, fetchMock, click, historyWrites,
+    root, listeners, storage, sessionStorage, fetchMock, click, historyWrites,
     get focusedSelector() { return focusedSelector; },
   };
 }
@@ -433,6 +435,37 @@ describe("puzzle loading error feedback", () => {
 
     assert.ok(app.root.innerHTML.includes('class="status status--error"'));
     assert.ok(app.root.innerHTML.includes("Yokaiba took too long to respond. Please try again."));
+  });
+});
+
+describe("cross-tab puzzle cache", () => {
+  beforeEach(() => {
+    mock.restoreAll();
+  });
+
+  it("reuses a fresh puzzle from persistent storage in another tab", async () => {
+    const seed = "cross-tab-cache";
+    const firstTab = mountTestPuzzle(seed, async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse(seed, "signed-token")), {
+        status: 200,
+        headers: { "content-type": "application/json", "x-tako-bako-generated-at": String(Date.now()) },
+      });
+    });
+    await flush();
+
+    const cacheKey = `tako-bako.puzzle.v2:tournament-order-v2:${seed}:1:v4`;
+    assert.ok(firstTab.storage.has(cacheKey));
+    assert.equal(firstTab.sessionStorage.has(cacheKey), false);
+
+    const secondTab = mountTestPuzzle(seed, async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      throw new Error("a second tab should reuse the persistent puzzle cache");
+    }, Object.fromEntries(firstTab.storage));
+    await flush();
+
+    assert.equal(secondTab.fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 0);
+    assert.match(secondTab.root.innerHTML, /Beginner Level 1/);
   });
 });
 

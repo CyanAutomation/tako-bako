@@ -268,7 +268,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   try {
     const data = await loadPuzzle(
       { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel, ...(requestedDifficultyModel ? { difficultyModel: requestedDifficultyModel } : {}) },
-      { storage: sessionStorage, signal: requestController.signal, isCurrent: () => fetchId === currentFetchId },
+      { storage: localStorage, signal: requestController.signal, isCurrent: () => fetchId === currentFetchId },
     );
     if (fetchId !== currentFetchId) return;
     activatePuzzle(data, requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);

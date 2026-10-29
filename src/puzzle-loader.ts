@@ -1,4 +1,4 @@
-import { loadPuzzleFromCache, puzzleCacheKey, type SessionStorageLike } from "./puzzle-cache/core";
+import { loadPuzzleFromCache, puzzleCacheKey, type PuzzleStorageLike } from "./puzzle-cache/core";
 import { puzzleResponseExpiry, savePuzzleResponseToCache, type PuzzleCacheRequest } from "./puzzle-cache/response";
 import { parsePuzzle } from "./puzzle-parser";
 import type { Puzzle } from "./puzzle";
@@ -6,7 +6,7 @@ import type { Puzzle } from "./puzzle";
 export type PuzzleLoadRequest = PuzzleCacheRequest;
 
 export interface PuzzleLoaderDependencies {
-  storage: SessionStorageLike;
+  storage: PuzzleStorageLike;
   signal: AbortSignal;
   isCurrent(): boolean;
   fetcher?: typeof fetch;
@@ -128,7 +128,7 @@ async function requestPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoa
   return parseAndCachePuzzle(response, request, dependencies);
 }
 
-/** Loads and validates a puzzle, preferring the current session cache entry. */
+/** Loads and validates a puzzle, preferring the current browser cache entry. */
 export async function loadPuzzle(request: PuzzleLoadRequest, dependencies: PuzzleLoaderDependencies): Promise<Puzzle> {
   const now = dependencies.now?.() ?? Date.now();
   const cached = loadCachedPuzzle(request, dependencies, now);
