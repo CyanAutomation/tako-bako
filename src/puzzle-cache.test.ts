@@ -15,6 +15,27 @@ class MemoryStorage {
   removeItem(key: string): void { this.values.delete(key); }
 }
 
+class StorageThatGrowsDuringEnumeration extends MemoryStorage {
+  enumerationCalls = 0;
+  private armed = false;
+  private grew = false;
+
+  beginConcurrentWrite(): void {
+    this.enumerationCalls = 0;
+    this.armed = true;
+    this.grew = false;
+  }
+
+  override key(index: number): string | null {
+    this.enumerationCalls += 1;
+    if (this.armed && !this.grew) {
+      this.grew = true;
+      super.setItem("another-feature", "added by another tab");
+    }
+    return super.key(index);
+  }
+}
+
 class OneTimeQuotaFailureStorage extends MemoryStorage {
   failed = false;
 
@@ -121,6 +142,19 @@ describe("puzzle browser cache", () => {
 
     assert.strictEqual(storage.getItem(puzzleCacheKey("expired", undefined)), null);
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "fresh", undefined, expiresAt), { id: "new" });
+  });
+
+  it("bounds key enumeration to the storage length observed at the start", () => {
+    const storage = new StorageThatGrowsDuringEnumeration();
+    for (let index = 0; index < 3; index += 1) {
+      savePuzzleToCache(storage, `seed-${index}`, undefined, { index }, expiresAt + index, generatedAt + index);
+    }
+    storage.beginConcurrentWrite();
+
+    savePuzzleToCache(storage, "new", undefined, { id: "new" }, expiresAt + 10, generatedAt + 10);
+
+    assert.equal(storage.enumerationCalls, 3);
+    assert.equal(storage.getItem("another-feature"), "added by another tab");
   });
 
   it("evicts the oldest owned entry when the cache reaches its maximum size", () => {
