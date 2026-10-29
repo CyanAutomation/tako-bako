@@ -6,7 +6,7 @@ export const CACHE_TTL_MS = CACHE_FRESH_LIFETIME_SECONDS * 1_000;
 const MAX_CACHE_ENTRIES = 20;
 const OWNED_CACHE_PREFIX = `${CACHE_PREFIX}:`;
 
-export interface SessionStorageLike {
+export interface PuzzleStorageLike {
   readonly length: number;
   getItem(key: string): string | null;
   key(index: number): string | null;
@@ -25,7 +25,7 @@ interface CacheEntryMetadata {
   createdAt: number;
 }
 
-function removeCacheEntry(storage: SessionStorageLike, key: string): void {
+function removeCacheEntry(storage: PuzzleStorageLike, key: string): void {
   try {
     storage.removeItem(key);
   } catch {
@@ -33,7 +33,7 @@ function removeCacheEntry(storage: SessionStorageLike, key: string): void {
   }
 }
 
-function ownedCacheKeys(storage: SessionStorageLike): string[] {
+function ownedCacheKeys(storage: PuzzleStorageLike): string[] {
   try {
     const keys: string[] = [];
     for (let index = 0; index < storage.length; index += 1) {
@@ -51,7 +51,7 @@ function createdAtForEntry(createdAt: unknown, expiresAt: number): number {
   return typeof createdAt === "number" ? createdAt : expiresAt - CACHE_TTL_MS;
 }
 
-function inspectOwnedEntry(storage: SessionStorageLike, key: string, now: number): CacheEntryMetadata | undefined {
+function inspectOwnedEntry(storage: PuzzleStorageLike, key: string, now: number): CacheEntryMetadata | undefined {
   try {
     const parsed: unknown = JSON.parse(storage.getItem(key) ?? "null");
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new TypeError("Malformed cache entry");
@@ -67,7 +67,7 @@ function inspectOwnedEntry(storage: SessionStorageLike, key: string, now: number
   }
 }
 
-function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedKey?: string): CacheEntryMetadata[] {
+function inspectOwnedEntries(storage: PuzzleStorageLike, now: number, excludedKey?: string): CacheEntryMetadata[] {
   const entries: CacheEntryMetadata[] = [];
   for (const key of ownedCacheKeys(storage)) {
     if (key === excludedKey) continue;
@@ -77,7 +77,7 @@ function inspectOwnedEntries(storage: SessionStorageLike, now: number, excludedK
   return entries.sort((left, right) => left.createdAt - right.createdAt || left.key.localeCompare(right.key));
 }
 
-function maintainCache(storage: SessionStorageLike, now: number, excludedKey: string): CacheEntryMetadata[] {
+function maintainCache(storage: PuzzleStorageLike, now: number, excludedKey: string): CacheEntryMetadata[] {
   const entries = inspectOwnedEntries(storage, now, excludedKey);
   const excess = Math.max(0, entries.length - (MAX_CACHE_ENTRIES - 1));
   for (const entry of entries.slice(0, excess)) removeCacheEntry(storage, entry.key);
@@ -90,7 +90,7 @@ export function puzzleCacheKey(seed: string, difficulty: number | undefined, tem
 }
 
 /** Reads a short-lived parsed puzzle, removing entries that cannot be trusted. */
-export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): T | undefined {
+export function loadPuzzleFromCache<T>(storage: PuzzleStorageLike, seed: string, difficulty: number | undefined, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): T | undefined {
   const key = puzzleCacheKey(seed, difficulty, templateId, difficultyModel);
   try {
     const value: unknown = JSON.parse(storage.getItem(key) ?? "null");
@@ -105,7 +105,7 @@ export function loadPuzzleFromCache<T>(storage: SessionStorageLike, seed: string
 }
 
 /** Stores only deterministic puzzle data for the lifetime of the edge response. */
-export function savePuzzleToCache<T>(storage: SessionStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): void {
+export function savePuzzleToCache<T>(storage: PuzzleStorageLike, seed: string, difficulty: number | undefined, value: T, expiresAt: number, now = Date.now(), templateId = "tournament-order-v1", difficultyModel?: string): void {
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return;
   const boundedExpiresAt = Math.min(expiresAt, now + CACHE_TTL_MS);
   const key = puzzleCacheKey(seed, difficulty, templateId, difficultyModel);

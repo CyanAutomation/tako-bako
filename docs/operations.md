@@ -22,9 +22,23 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 
 The Yokaiba Worker must have `PUZZLE_TOKEN_SECRET` configured with `wrangler secret put PUZZLE_TOKEN_SECRET` and be redeployed. Yokaiba issues a signed token with generated puzzles; the solution itself is not sent to the browser. If the secret is absent or verification is unavailable, players can continue marking a board, but answer checking will not work.
 
-The intended maximum puzzle age is five minutes from generation. The API stamps generated responses with `X-Tako-Bako-Generated-At`; that timestamp is retained when an edge serves a stale-while-revalidate response. Browser session storage derives its expiry from the generation time rather than starting a new five-minute window when a response is received.
+The intended maximum puzzle age is five minutes from generation. The API stamps generated responses with `X-Tako-Bako-Generated-At`; that timestamp is retained when an edge serves a stale-while-revalidate response. Browser local storage derives its expiry from the generation time rather than starting a new five-minute window when a response is received. This lets another tab on the same browser reuse a fresh puzzle.
 
-Missing, malformed, expired, or implausibly future timestamps disable browser caching. A one-minute future tolerance accounts for modest clock skew, and accepted expiry is capped at five minutes from the browser's current time. The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and a 3,600-second stale-while-revalidate lifetime. The API uses `s-maxage=300` and `stale-while-revalidate=3600`; browser storage uses the same five-minute freshness duration. Cache cleanup preserves unrelated session-storage keys.
+Missing, malformed, expired, or implausibly future timestamps disable browser caching. A one-minute future tolerance accounts for modest clock skew, and accepted expiry is capped at five minutes from the browser's current time. The shared policy in `src/cache-policy.ts` sets a 300-second fresh lifetime and a 3,600-second stale-while-revalidate lifetime. The API uses `s-maxage=300` and `stale-while-revalidate=3600`; browser storage uses the same five-minute freshness duration and is bounded to 20 puzzle entries. Cache cleanup preserves unrelated local-storage keys.
+
+Yokaiba ETags are forwarded to responses, but the app does not add explicit conditional requests or manual 304 handling. Once the five-minute puzzle freshness deadline passes, a caller needs a newly generated response and signed token; reusing an expired cache body after a 304 would conflict with that policy. Keep the existing CDN behavior and only revisit app-managed conditional requests if the token protocol guarantees safe reuse.
+
+Vercel's CDN request metrics measure cache hits and misses without adding application telemetry requests. To review production cache behavior, use the Vercel CLI with the team's project scope:
+
+```sh
+vercel metrics schema vercel.request.count
+vercel metrics vercel.request.count -S <team> -p <project> --prod --group-by cache_result --since 24h
+vercel metrics vercel.request.count -S <team> -p <project> --prod --group-by request_path --since 24h
+```
+
+Use the metric schema to find the available edge-region dimension, then group by it to compare cache results across regions. Treat `HIT` and `STALE` as cache-served requests; calculate the hit rate over cacheable requests, excluding `BYPASS` and requests without a cache result. The `/api/puzzle` request path shows puzzle generation reuse. The existing `tako_bako_api_metric` generation logs count function executions that reached Yokaiba, since CDN hits do not invoke the function. These metrics require Vercel Observability access.
+
+The root HTML uses `max-age=0, must-revalidate`. Files in `/assets/` are content-hashed and cached immutably for a year. Stable public files under `/brand/` use a one-day browser lifetime with a seven-day stale-while-revalidate window; rename a file when replacing its contents so clients can refresh it promptly.
 
 The API forwards Yokaiba rate-limit headers. One transient upstream 5xx is retried; rate-limit and validation responses are not. Course requests ask for deterministic seed fallback when a requested difficulty is unavailable. Unrecognized upstream validation responses are converted to bounded, non-cacheable gateway errors.
 

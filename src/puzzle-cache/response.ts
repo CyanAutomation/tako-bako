@@ -1,4 +1,4 @@
-import { CACHE_TTL_MS, savePuzzleToCache, type SessionStorageLike } from "./core";
+import { CACHE_TTL_MS, savePuzzleToCache, type PuzzleStorageLike } from "./core";
 
 const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
 const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
@@ -26,7 +26,7 @@ export function puzzleResponseExpiry(headers: Pick<Headers, "get"> | undefined, 
 }
 
 /** Stores a response only while its request is current, using that request's immutable identity. */
-export function savePuzzleResponseToCache<T>(storage: SessionStorageLike, request: PuzzleCacheRequest, value: T, expiresAt: number | undefined, isCurrent: boolean, now = Date.now()): void {
+export function savePuzzleResponseToCache<T>(storage: PuzzleStorageLike, request: PuzzleCacheRequest, value: T, expiresAt: number | undefined, isCurrent: boolean, now = Date.now()): void {
   if (!isCurrent || expiresAt === undefined) return;
   savePuzzleToCache(storage, request.seed, request.difficultyLevel, value, expiresAt, now, request.templateId, request.difficultyModel);
 }

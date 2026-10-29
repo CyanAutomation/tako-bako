@@ -41,7 +41,7 @@ class ThrowingRemovalStorage extends MemoryStorage {
   }
 }
 
-describe("puzzle session cache", () => {
+describe("puzzle browser cache", () => {
   const generatedAt = 10_000;
   const expiresAt = generatedAt + CACHE_TTL_MS;
 
@@ -94,7 +94,7 @@ describe("puzzle session cache", () => {
     assert.strictEqual(defaultKey, "tako-bako.puzzle.v2:tournament-order-v2:shared:4");
   });
 
-  it("[TB-CACHE-01] serves session entries only before the freshness deadline", () => {
+  it("[TB-CACHE-01] serves browser entries only before the freshness deadline", () => {
     for (const [now, expected] of [
       [expiresAt - 1, { id: "puzzle-1" }],
       [expiresAt, undefined],
@@ -147,7 +147,7 @@ describe("puzzle session cache", () => {
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "new", undefined, generatedAt), { id: "new" });
   });
 
-  it("preserves unrelated session storage while maintaining the cache", () => {
+  it("preserves unrelated browser storage while maintaining the cache", () => {
     const storage = new MemoryStorage();
     storage.setItem("another-feature", "keep me");
     for (let index = 0; index < 21; index += 1) {
