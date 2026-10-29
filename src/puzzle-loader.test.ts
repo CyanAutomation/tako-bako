@@ -2,9 +2,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { loadPuzzle, DifficultyUnavailableError, retryAfterMessage, type PuzzleLoadRequest } from "./puzzle-loader";
-import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache, type SessionStorageLike } from "./puzzle-cache/core";
+import { loadPuzzleFromCache, puzzleCacheKey, savePuzzleToCache, type PuzzleStorageLike } from "./puzzle-cache/core";
 
-class MemoryStorage implements SessionStorageLike {
+class MemoryStorage implements PuzzleStorageLike {
   private readonly entries = new Map<string, string>();
   get length(): number { return this.entries.size; }
   getItem(key: string): string | null { return this.entries.get(key) ?? null; }

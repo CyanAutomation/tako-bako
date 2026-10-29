@@ -15,6 +15,27 @@ class MemoryStorage {
   removeItem(key: string): void { this.values.delete(key); }
 }
 
+class StorageThatGrowsDuringEnumeration extends MemoryStorage {
+  enumerationCalls = 0;
+  private armed = false;
+  private grew = false;
+
+  beginConcurrentWrite(): void {
+    this.enumerationCalls = 0;
+    this.armed = true;
+    this.grew = false;
+  }
+
+  override key(index: number): string | null {
+    this.enumerationCalls += 1;
+    if (this.armed && !this.grew) {
+      this.grew = true;
+      super.setItem("another-feature", "added by another tab");
+    }
+    return super.key(index);
+  }
+}
+
 class OneTimeQuotaFailureStorage extends MemoryStorage {
   failed = false;
 
@@ -41,7 +62,7 @@ class ThrowingRemovalStorage extends MemoryStorage {
   }
 }
 
-describe("puzzle session cache", () => {
+describe("puzzle browser cache", () => {
   const generatedAt = 10_000;
   const expiresAt = generatedAt + CACHE_TTL_MS;
 
@@ -94,7 +115,7 @@ describe("puzzle session cache", () => {
     assert.strictEqual(defaultKey, "tako-bako.puzzle.v2:tournament-order-v2:shared:4");
   });
 
-  it("[TB-CACHE-01] serves session entries only before the freshness deadline", () => {
+  it("[TB-CACHE-01] serves browser entries only before the freshness deadline", () => {
     for (const [now, expected] of [
       [expiresAt - 1, { id: "puzzle-1" }],
       [expiresAt, undefined],
@@ -123,6 +144,19 @@ describe("puzzle session cache", () => {
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "fresh", undefined, expiresAt), { id: "new" });
   });
 
+  it("bounds key enumeration to the storage length observed at the start", () => {
+    const storage = new StorageThatGrowsDuringEnumeration();
+    for (let index = 0; index < 3; index += 1) {
+      savePuzzleToCache(storage, `seed-${index}`, undefined, { index }, expiresAt + index, generatedAt + index);
+    }
+    storage.beginConcurrentWrite();
+
+    savePuzzleToCache(storage, "new", undefined, { id: "new" }, expiresAt + 10, generatedAt + 10);
+
+    assert.equal(storage.enumerationCalls, 3);
+    assert.equal(storage.getItem("another-feature"), "added by another tab");
+  });
+
   it("evicts the oldest owned entry when the cache reaches its maximum size", () => {
     const storage = new MemoryStorage();
     for (let index = 0; index < 21; index += 1) {
@@ -147,7 +181,7 @@ describe("puzzle session cache", () => {
     assert.deepStrictEqual(loadPuzzleFromCache(storage, "new", undefined, generatedAt), { id: "new" });
   });
 
-  it("preserves unrelated session storage while maintaining the cache", () => {
+  it("preserves unrelated browser storage while maintaining the cache", () => {
     const storage = new MemoryStorage();
     storage.setItem("another-feature", "keep me");
     for (let index = 0; index < 21; index += 1) {
