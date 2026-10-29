@@ -36,7 +36,9 @@ function removeCacheEntry(storage: PuzzleStorageLike, key: string): void {
 function ownedCacheKeys(storage: PuzzleStorageLike): string[] {
   try {
     const keys: string[] = [];
-    for (let index = 0; index < storage.length; index += 1) {
+    // Bound enumeration to the initial length; concurrent tab changes can still make cleanup best-effort.
+    const lengthAtStart = storage.length;
+    for (let index = 0; index < lengthAtStart; index += 1) {
       const key = storage.key(index);
       if (key?.startsWith(OWNED_CACHE_PREFIX)) keys.push(key);
     }

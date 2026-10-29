@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { restoreStubbedGlobals, stubGlobal } from "../test-utils.js";
 
 import { mountApp } from "./app";
+import { routeFromUrl } from "./app-routing";
+import { puzzleCacheKey } from "./puzzle-cache/core";
 import { PROGRESS_STORAGE_KEY } from "./progress-storage";
 
 afterEach(restoreStubbedGlobals);
@@ -454,7 +456,8 @@ describe("cross-tab puzzle cache", () => {
     });
     await flush();
 
-    const cacheKey = `tako-bako.puzzle.v2:tournament-order-v2:${seed}:1:v4`;
+    const route = routeFromUrl(new URL(`https://example.test/?seed=${seed}&mode=challenge&tier=beginner&level=1`), []);
+    const cacheKey = puzzleCacheKey(seed, route.difficultyLevel, route.templateId, route.difficultyModel);
     assert.ok(firstTab.storage.has(cacheKey));
     assert.equal(firstTab.sessionStorage.has(cacheKey), false);
 
