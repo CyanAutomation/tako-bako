@@ -299,6 +299,7 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   feedbackEntryOpen = false;
   actionMenuOpen = false;
   smartMarkingToolsOpen = false;
+  clueFiltersOpen = false;
   clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
   puzzleLoadFailed = false;
   puzzleStartedAt = Date.now();
