@@ -410,6 +410,24 @@ describe("answer verification navigation", () => {
     assert.match(app.root.innerHTML, /Mark clue 1 as reviewed/);
     assert.doesNotMatch(app.root.innerHTML, /Mark clue 1 as not reviewed/);
   });
+
+  it("resets the clue filter disclosure when a new puzzle is activated", async () => {
+    const app = mountTestPuzzle("filter-reset", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      const seed = new URL(String(input), "https://example.test").searchParams.get("seed")!;
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.listeners.get("toggle")!({
+      target: { open: true, classList: { contains: (name: string) => name === "clue-filter-disclosure" } },
+    } as never);
+    app.click({ id: "new-puzzle" });
+    await flush();
+
+    assert.match(app.root.innerHTML, /<details class="clue-filter-disclosure">/);
+    assert.doesNotMatch(app.root.innerHTML, /<details class="clue-filter-disclosure" open>/);
+  });
 });
 
 describe("puzzle loading error feedback", () => {
