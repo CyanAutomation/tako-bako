@@ -53,6 +53,8 @@ export interface AppViewState {
   feedbackEntryOpen: boolean;
   actionMenuOpen: boolean;
   cluesOpen: boolean;
+  clueFiltersOpen: boolean;
+  smartMarkingToolsOpen: boolean;
   clueFilter: ClueFilter;
   challengeOptionsOpen: boolean;
   sharedPuzzleOpen: boolean;
@@ -209,7 +211,7 @@ function renderPuzzle(view: AppViewState, current: Puzzle): string {
   const grids = categories.map(category => renderBoardGrid(view, category, base)).join("");
   const canCheck = Boolean(current.puzzleToken && answerFromBoard(view.board, current.spec));
   const progress = boardSolveProgress(view.board, current.spec);
-  const title = view.playMode === "challenge" ? view.activeCourse.label : current.spec.title;
+  const title = current.spec.title;
   const courseLabel = view.playMode === "challenge"
     ? `${view.activeCourse.tier[0]!.toUpperCase()}${view.activeCourse.tier.slice(1)} · Level ${view.activeCourse.level}`
     : `Shared · Level ${current.difficulty.level}`;
@@ -221,10 +223,11 @@ function renderPuzzle(view: AppViewState, current: Puzzle): string {
     checkDisabled: view.loading || !canCheck,
     hintDisabled: view.loading || !current.puzzleToken,
     smartMarking: view.smartMarking,
+    smartMarkingToolsOpen: view.smartMarkingToolsOpen,
   });
   const clueList = current.clues.map(clue => ({ ...clue, strategy: clue.strategy ?? view.clueStrategies[clue.id] }));
   const workspace = renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar, grids });
-  const clues = renderCluePanel({ clues: clueList, activeCategory, cluesOpen: view.cluesOpen, usedClueIds: view.usedClueIds, clueFilter: view.clueFilter });
+  const clues = renderCluePanel({ clues: clueList, activeCategory, cluesOpen: view.cluesOpen, usedClueIds: view.usedClueIds, clueFilter: view.clueFilter, clueFiltersOpen: view.clueFiltersOpen });
   return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message: view.message, tone: view.messageTone })}<section class="workspace">${workspace}${clues}</section></main>${renderResetModal(view)}${renderNewChallengeModal(view.pendingNewChallenge)}${renderCelebrationModal(view)}`;
 }
 
@@ -246,7 +249,8 @@ function renderLanding(view: AppViewState): string {
   const tone = view.difficultyUnavailable ? "error" : view.messageTone;
   const mascotNote = renderMascotNote(view.mascotUrl, { title: "Ready to begin?", copy: "Make one thoughtful mark. Tako will keep the notes nearby." });
   const curriculum = renderCurriculum({ completed: new Set(view.progress.completed), currentCourseId: view.activeCourse.id });
-  return `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Tako Bako Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message: view.message, tone })}${renderLandingAction(view)}${mascotNote}</section><div class="landing-route">${curriculum}${renderProgressManagement(view.progress)}</div></main>`;
+  const challengePath = `<details class="challenge-path"><summary><span>Challenge path</span><span>View all 12 levels</span></summary><div class="challenge-path__content">${curriculum}</div></details>`;
+  return `<main class="landing-state"><section class="landing-copy"><p class="eyebrow">Tako Bako Logic Dojo</p><h1>One small grid.<br>One satisfying deduction.</h1><p>Follow a clear path from your first mark to advanced, multi-grid logic.</p>${renderStatus({ message: view.message, tone })}${renderLandingAction(view)}${mascotNote}</section><div class="landing-route">${challengePath}${renderProgressManagement(view.progress)}</div></main>`;
 }
 
 export function renderApp(view: AppViewState): string {

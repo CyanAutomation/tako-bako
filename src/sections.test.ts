@@ -15,7 +15,7 @@ describe("puzzle UI sections", () => {
     assert.ok((header).includes("Level 3: Moderate"));
   });
 
-  it("[TB-ACCESS-05] gives board actions accessible names and groups them under a labelled control", () => {
+  it("[TB-ACCESS-05] keeps core board actions prominent and defers auto-mark under Tools", () => {
     const toolbar = renderBoardToolbar({ matches: 2, total: 4, undoDisabled: false, resetDisabled: false, checkDisabled: true, hintDisabled: false, smartMarking: true });
 
     assert.match(toolbar, /<div[^>]*role="group"[^>]*aria-label="Board actions">/);
@@ -24,7 +24,8 @@ describe("puzzle UI sections", () => {
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Get a hint")[^>]*>[\s\S]*?<span>Hint<\/span><\/button>/);
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Check my solution")(?=[^>]*disabled)[^>]*>[\s\S]*?<span>Check my solution<\/span><\/button>/);
     assert.match(toolbar, /<button\b(?=[^>]*aria-label="Auto-mark is on\.[^"]*")(?=[^>]*aria-pressed="true")[^>]*>[\s\S]*?<span>Auto-mark on<\/span><\/button>/);
-    assert.match(toolbar, /class="board-actions"[^>]*>[\s\S]*?<span>Undo<\/span>[\s\S]*?<span>Clear board<\/span>[\s\S]*?<span>Hint<\/span>[\s\S]*?<span>Auto-mark on<\/span>[\s\S]*?<span>Check my solution<\/span>/);
+    assert.match(toolbar, /class="board-actions"[^>]*>[\s\S]*?<span>Undo<\/span>[\s\S]*?<span>Clear board<\/span>[\s\S]*?<span>Hint<\/span>[\s\S]*?<span>Check my solution<\/span>/);
+    assert.match(toolbar, /<details class="board-tools"><summary>Tools(?:<span class="board-tools__status">Auto-mark on<\/span>)?<\/summary>[\s\S]*?<span>Auto-mark on<\/span>[\s\S]*?<\/details>/);
   });
 
   it("[TB-ACCESS-05] announces match progress and whether the solution is ready to check", () => {
@@ -50,10 +51,11 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('aria-label="Mark clue 1 as not reviewed"'));
   });
 
-  it("labels a clue with its reasoning strategy when one is available", () => {
+  it("defers reasoning strategy labels until the player opens the clue detail", () => {
     const markup = renderCluePanel({ clues: [{ id: "one", text: "Aki was associated with Lions.", strategy: "direct_match" }], activeCategory: { id: "club", label: "Club", values: ["Lions"] }, cluesOpen: true, usedClueIds: new Set() });
 
-    assert.ok((markup).includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
+    assert.ok(markup.includes('<details class="clue-strategy-disclosure"><summary>Reasoning</summary>'));
+    assert.ok(markup.includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
   });
 
   it("escapes clue and category text before rendering it as markup", () => {
@@ -74,6 +76,7 @@ describe("puzzle UI sections", () => {
     assert.ok((markup).includes('Mark clue 1 as reviewed'));
     assert.ok(!(markup).includes('Mark clue 2 as not reviewed'));
     assert.ok((markup).includes('class="clue-item clue-item--related"'));
+    assert.match(markup, /<details class="clue-filter-disclosure"><summary>Review filters<\/summary>[\s\S]*?data-clue-filter="remaining"/);
   });
 
   it("shows completed, current, and locked course states in the Puzzle Challenge path", () => {
