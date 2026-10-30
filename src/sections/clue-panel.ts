@@ -19,6 +19,7 @@ interface CluePanelOptions {
   cluesOpen: boolean;
   usedClueIds: ReadonlySet<string>;
   clueFilter?: ClueFilter;
+  clueFiltersOpen?: boolean;
 }
 
 function clueIsRelated(clue: string, category: Category): boolean {
@@ -43,7 +44,7 @@ function renderClueItem(clue: ClueItem, index: number, category: Category, usedC
   const used = usedClueIds.has(clue.id);
   const related = clueIsRelated(clue.text, category);
   const strategy = clue.strategy
-    ? `<span class="clue-strategy" title="Reasoning strategy">${escapeHtml(clueStrategyLabel(clue.strategy))}</span>`
+    ? `<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy" title="Reasoning strategy">${escapeHtml(clueStrategyLabel(clue.strategy))}</span></details>`
     : "";
   const button = renderButton({
     label: used ? "✓" : String(index + 1),
@@ -61,11 +62,11 @@ function visibleClues(clues: ClueItem[], clueFilter: ClueFilter, usedClueIds: Re
     .filter(({ clue }) => clueFilter === "all" || (clueFilter === "used" ? usedClueIds.has(clue.id) : !usedClueIds.has(clue.id)));
 }
 
-export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds, clueFilter = "all" }: CluePanelOptions): string {
+export function renderCluePanel({ clues, activeCategory, cluesOpen, usedClueIds, clueFilter = "all", clueFiltersOpen = false }: CluePanelOptions): string {
   const items = visibleClues(clues, clueFilter, usedClueIds)
     .map(({ clue, index }) => renderClueItem(clue, index, activeCategory, usedClueIds))
     .join("");
   const filterControls = renderFilterControls(clueFilter);
-  const content = `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Tako’s notes</span><strong>Clues</strong></span>${renderBadge(`${clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Tako’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint"><span class="category-chip">${escapeHtml(activeCategory.label)}</span> clues that mention this grid are highlighted.</p>${filterControls}<ol>${items}</ol></div></details>`;
+  const content = `<details class="clue-drawer" ${cluesOpen ? "open" : ""}><summary><span><span class="eyebrow">Tako’s notes</span><strong>Clues</strong></span>${renderBadge(`${clues.length} clues`, "clue-count")}</summary><div class="clue-content"><p class="eyebrow">Tako’s notes</p><h2 id="clues-title">Clues</h2><p class="clue-hint"><span class="category-chip">${escapeHtml(activeCategory.label)}</span> clues that mention this grid are highlighted.</p><details class="clue-filter-disclosure"${clueFiltersOpen ? " open" : ""}><summary>Review filters</summary>${filterControls}</details><ol>${items}</ol></div></details>`;
   return renderPanel({ tag: "aside", className: "clues", labelledBy: "clues-title", content });
 }

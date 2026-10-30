@@ -4,7 +4,7 @@ import { resolveAnswerOutcome } from "./app-answer-outcome";
 import { createHintRequestBody, type HintRequestOptions } from "./hint-request";
 import { requestAnswerVerification, requestHintResponse } from "./app-requests";
 import { clampElapsedMs, postGameEvent } from "./events";
-import { saveBoard, saveUsedClues } from "./puzzle-storage";
+import { saveBoard } from "./puzzle-storage";
 import { saveProgress } from "./progress-storage";
 import type { Board, Puzzle } from "./puzzle";
 import type { PlayMode } from "./app-routing";
@@ -111,16 +111,12 @@ export function createAppGameplayActions({ state, setMessage, render, recordOutc
     }
   }
 
-  function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousBoard: Board, previousUsedClueIds: ReadonlySet<string>): void {
+  function applyHintResponse(hint: ParsedHintResponse, puzzleId: string, previousBoard: Board): void {
     if (hint.kind === "placement") {
       state.board = { ...previousBoard, [squareKey(hint.placement.category, hint.placement.subject, hint.placement.value)]: "yes" };
       saveBoard(puzzleId, state.board);
       setMessage(`Hint: ${hint.placement.subject} matches ${hint.placement.value}.`);
       return;
-    }
-    if (hint.clue.id !== undefined) {
-      state.usedClueIds = new Set(previousUsedClueIds).add(hint.clue.id);
-      saveUsedClues(puzzleId, state.usedClueIds);
     }
     setMessage(`Hint: ${hint.clue.text}`);
   }
@@ -176,7 +172,7 @@ export function createAppGameplayActions({ state, setMessage, render, recordOutc
     try {
       const hint = await requestHintResponse(body, requestController.signal, isActiveRequest);
       if (!hint) return;
-      applyHintResponse(hint, requestedPuzzleId, requestedBoard, requestedUsedClueIds);
+      applyHintResponse(hint, requestedPuzzleId, requestedBoard);
       state.hintsUsed = requestedHintsUsed + 1;
       recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, state.hintsUsed, state.mistakes);
     } catch {

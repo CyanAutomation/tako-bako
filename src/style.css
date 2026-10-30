@@ -1851,3 +1851,103 @@ footer {
     padding: 0.7rem 0.75rem;
   }
 }
+
+/* Progressive disclosure keeps the task and the board in front. */
+.challenge-path {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--panel-radius);
+}
+.challenge-path > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: var(--navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+.challenge-path > summary::marker { color: var(--rust); }
+.challenge-path > summary span:last-child {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+.challenge-path__content { padding-top: 0.8rem; }
+.challenge-path__content .curriculum {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.challenge-path__content .curriculum-heading { display: none; }
+
+.board-tools {
+  position: relative;
+  justify-self: stretch;
+  align-self: center;
+}
+.board-tools > summary {
+  display: flex;
+  min-height: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  color: var(--muted);
+  border: 1px dashed color-mix(in srgb, var(--line) 70%, transparent);
+  border-radius: var(--control-radius);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.board-tools__status {
+  color: var(--jade);
+  font-size: 0.62rem;
+}
+.board-tools__content {
+  position: static;
+  min-width: 0;
+  padding: 0.35rem;
+  background: transparent;
+  border: 0;
+  border-radius: var(--control-radius);
+  box-shadow: none;
+}
+.board-tools__content .button {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.clues {
+  background: color-mix(in srgb, var(--paper) 58%, var(--surface));
+  border-color: color-mix(in srgb, var(--line) 68%, transparent);
+  box-shadow: none;
+}
+.clue-filter-disclosure,
+.clue-strategy-disclosure {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.clue-filter-disclosure { margin: 0 0 0.8rem; }
+.clue-filter-disclosure > summary,
+.clue-strategy-disclosure > summary {
+  width: max-content;
+  padding: 0.25rem 0;
+  color: var(--navy);
+  font-weight: 700;
+  cursor: pointer;
+}
+.clue-filter-disclosure .clue-filters { margin: 0.45rem 0 0; }
+.clue-strategy-disclosure {
+  display: inline-grid;
+  justify-items: start;
+  gap: 0.2rem;
+}
+.clue-strategy-disclosure .clue-strategy { font-size: 0.6rem; }
+
+@media (max-width: 760px) {
+  .board-tools { grid-column: 1 / -1; }
+}

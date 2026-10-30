@@ -69,6 +69,8 @@ let pendingProgressReset = false;
 let pendingCelebration = false;
 let resetReturnFocusSelector: string | undefined;
 let cluesOpen = !window.matchMedia("(max-width: 860px)").matches;
+let clueFiltersOpen = false;
+let smartMarkingToolsOpen = false;
 let clueFilter: ClueFilter = "all";
 let activeCellKey: string | undefined;
 let challengeOptionsOpen = false;
@@ -211,6 +213,8 @@ function showLandingPage(): void {
   resetReturnFocusSelector = undefined;
   activeCellKey = undefined;
   clueFilter = "all";
+  clueFiltersOpen = false;
+  smartMarkingToolsOpen = false;
   challengeOptionsOpen = false;
   sharedPuzzleOpen = false;
   puzzleStartedAt = undefined;
@@ -294,6 +298,8 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   feedbackUi = { submitting: false };
   feedbackEntryOpen = false;
   actionMenuOpen = false;
+  smartMarkingToolsOpen = false;
+  clueFiltersOpen = false;
   clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
   puzzleLoadFailed = false;
   puzzleStartedAt = Date.now();
@@ -428,6 +434,8 @@ function render(): void {
     feedbackEntryOpen,
     actionMenuOpen,
     cluesOpen,
+    clueFiltersOpen,
+    smartMarkingToolsOpen,
     clueFilter,
     challengeOptionsOpen,
     sharedPuzzleOpen,
@@ -793,6 +801,8 @@ root.addEventListener("toggle", event => {
   if (details.classList.contains("action-menu")) actionMenuOpen = details.open;
   if (details.classList.contains("feedback-entry")) feedbackEntryOpen = details.open;
   if (details.classList.contains("clue-drawer")) cluesOpen = details.open;
+  if (details.classList.contains("clue-filter-disclosure")) clueFiltersOpen = details.open;
+  if (details.classList.contains("board-tools")) smartMarkingToolsOpen = details.open;
 }, true);
 
 root.addEventListener("change", event => {

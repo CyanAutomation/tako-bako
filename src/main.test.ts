@@ -146,7 +146,7 @@ describe("answer verification navigation", () => {
 
     click({ dataset: { course: "beginner-2" } });
     await flush();
-    assert.ok((root.innerHTML).includes("Beginner Level 2"));
+    assert.ok((root.innerHTML).includes("Beginner · Level 2"));
     const newCourseUi = root.innerHTML;
 
     verification.resolve({ ok: true, json: async () => ({ correct: true }) });
@@ -202,7 +202,7 @@ describe("answer verification navigation", () => {
 
     mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
     await flush();
-    assert.ok((root.innerHTML).includes('class="clue-strategy" title="Reasoning strategy">Neighbours</span>'));
+    assert.ok((root.innerHTML).includes('<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy" title="Reasoning strategy">Neighbours</span></details>'));
 
     const click = (button: Partial<FakeButton>) => listeners.get("click")!({
       target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
@@ -222,7 +222,7 @@ describe("answer verification navigation", () => {
 
     click({ dataset: { course: "beginner-2" } });
     await flush();
-    assert.ok((root.innerHTML).includes("Beginner Level 2"));
+    assert.ok((root.innerHTML).includes("Beginner · Level 2"));
     const puzzleBUi = root.innerHTML;
 
     hint.resolve({ ok: true, json: async () => ({ kind: "clue", clue: { id: "old-clue", text: "An old hint" } }) });
@@ -392,7 +392,7 @@ describe("answer verification navigation", () => {
     assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
   });
 
-  it("applies a successful clue hint and persists the used clue ID", async () => {
+  it("shows a successful clue hint without marking the clue as reviewed", async () => {
     const app = mountTestPuzzle("hint-success", async (input) => {
       const url = String(input);
       if (url === "/api/events") return new Response("{}", { status: 202 });
@@ -406,7 +406,27 @@ describe("answer verification navigation", () => {
     await flush();
 
     assert.ok(app.root.innerHTML.includes("Hint: Start with the order clue."));
-    assert.strictEqual(app.storage.get("tako-bako.clues.hint-success"), JSON.stringify(["first"]));
+    assert.strictEqual(app.storage.get("tako-bako.clues.hint-success"), undefined);
+    assert.match(app.root.innerHTML, /Mark clue 1 as reviewed/);
+    assert.doesNotMatch(app.root.innerHTML, /Mark clue 1 as not reviewed/);
+  });
+
+  it("resets the clue filter disclosure when a new puzzle is activated", async () => {
+    const app = mountTestPuzzle("filter-reset", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      const seed = new URL(String(input), "https://example.test").searchParams.get("seed")!;
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.listeners.get("toggle")!({
+      target: { open: true, classList: { contains: (name: string) => name === "clue-filter-disclosure" } },
+    } as never);
+    app.click({ id: "new-puzzle" });
+    await flush();
+
+    assert.match(app.root.innerHTML, /<details class="clue-filter-disclosure">/);
+    assert.doesNotMatch(app.root.innerHTML, /<details class="clue-filter-disclosure" open>/);
   });
 });
 
@@ -468,7 +488,7 @@ describe("cross-tab puzzle cache", () => {
     await flush();
 
     assert.equal(secondTab.fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 0);
-    assert.match(secondTab.root.innerHTML, /Beginner Level 1/);
+    assert.match(secondTab.root.innerHTML, /Tournament Order/);
   });
 });
 

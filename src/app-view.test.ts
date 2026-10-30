@@ -56,6 +56,8 @@ function view(overrides: Partial<AppViewState> = {}): AppViewState {
     feedbackEntryOpen: false,
     actionMenuOpen: false,
     cluesOpen: true,
+    clueFiltersOpen: false,
+    smartMarkingToolsOpen: false,
     clueFilter: "all",
     challengeOptionsOpen: false,
     sharedPuzzleOpen: false,
@@ -87,6 +89,15 @@ test("keeps the product name visible on the landing screen", () => {
   const landing = renderApp(view({ puzzle: undefined }));
   assert.match(landing, /<p class="eyebrow">Tako Bako Logic Dojo<\/p>/);
   assert.match(landing, /TAKO BAKO · Powered by Yokaiba/);
+  assert.match(landing, /<details class="challenge-path"><summary>[\s\S]*?View all 12 levels/);
+  assert.ok(landing.indexOf('class="challenge-path"') < landing.indexOf('<section class="curriculum"'));
+});
+
+test("uses the puzzle title for context and the level badge for challenge progress", () => {
+  const markup = renderApp(view());
+  assert.match(markup, /<h1>Puzzle<\/h1>/);
+  assert.match(markup, /Beginner · Level 1/);
+  assert.doesNotMatch(markup, /<h1>Beginner Level 1<\/h1>/);
 });
 
 test("[TB-BOARD-RESET-01] asks before clearing every board mark", () => {
