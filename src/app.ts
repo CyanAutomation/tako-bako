@@ -94,7 +94,7 @@ function setMessage(text: string, tone: StatusTone = "neutral"): void {
 }
 
 function showSnackbar(text: string, tone: StatusTone = "neutral"): void {
-  if (messageTone !== "neutral") {
+  if (messageTone === "warning") {
     message = "";
     messageTone = "neutral";
   }
