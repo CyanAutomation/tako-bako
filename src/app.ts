@@ -31,6 +31,7 @@ import {
 } from "./feedback";
 import { createOrReusePuzzleFeedbackRequest } from "./feedback-submission";
 import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
+import { createSnackbarController } from "./snackbar";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -47,6 +48,7 @@ let board: Board = {};
 let loading = false;
 let message = "Choose your next puzzle when you are ready.";
 let messageTone: StatusTone = "neutral";
+const snackbar = createSnackbarController({ onExpire: () => render() });
 let difficultyUnavailable = false;
 let undoStack: Board[] = [];
 const SMART_MARKING_STORAGE_KEY = "tako-bako.smart-marking";
@@ -86,8 +88,17 @@ const submittedFeedbackFingerprints = new Set<string>();
 const pendingFeedbackRequests = new Map<string, PuzzleFeedbackRequest>();
 
 function setMessage(text: string, tone: StatusTone = "neutral"): void {
+  snackbar.clear();
   message = text;
   messageTone = tone;
+}
+
+function showSnackbar(text: string, tone: StatusTone = "neutral"): void {
+  if (messageTone === "warning") {
+    message = "";
+    messageTone = "neutral";
+  }
+  snackbar.show(text, tone);
 }
 
 function newSeed(): string {
@@ -331,7 +342,7 @@ function restoreBoard(): void {
   if (!puzzle || undoStack.length === 0) return;
   board = undoStack.pop()!;
   saveBoard(puzzle.id, board);
-  setMessage("Board restored.");
+  showSnackbar("Board restored.", "success");
   render();
 }
 
@@ -341,7 +352,7 @@ function resetGrid(categoryId: string): void {
   if (Object.keys(next).length === Object.keys(board).length) return;
   saveCurrentBoard(next);
   pendingResetGridId = undefined;
-  setMessage("Grid cleared. Your previous marks are available with Undo.");
+  showSnackbar("Grid cleared. Your previous marks are available with Undo.", "success");
   render();
   restoreResetFocus();
 }
@@ -350,7 +361,7 @@ function resetBoard(): void {
   if (!puzzle || Object.keys(board).length === 0) return;
   saveCurrentBoard({});
   pendingBoardReset = false;
-  setMessage("Board cleared. Your previous marks are available with Undo.");
+  showSnackbar("Board cleared. Your previous marks are available with Undo.", "success");
   render();
   restoreResetFocus();
 }
@@ -392,9 +403,9 @@ function dismissResetDialog(): void {
 async function sharePuzzle(): Promise<void> {
   try {
     await navigator.clipboard.writeText(window.location.href);
-    setMessage("Puzzle link copied. Share this exact dojo challenge with a friend.", "success");
+    showSnackbar("Puzzle link copied. Share this exact dojo challenge with a friend.", "success");
   } catch {
-    setMessage("Copy this page’s address to share the current puzzle.");
+    setMessage("Your browser blocked copying. Copy this page’s address to share the current puzzle.", "warning");
   }
   render();
 }
@@ -409,6 +420,7 @@ function render(): void {
     loading,
     message,
     messageTone,
+    snackbar: snackbar.current,
     difficultyUnavailable,
     puzzleLoadFailed,
     undoCount: undoStack.length,
@@ -440,6 +452,29 @@ function render(): void {
     challengeOptionsOpen,
     sharedPuzzleOpen,
   });
+  scheduleSnackbarPlacement();
+}
+
+function scheduleSnackbarPlacement(): void {
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(updateSnackbarPlacement);
+}
+
+function updateSnackbarPlacement(): void {
+  const element = root.querySelector<HTMLElement>(".snackbar");
+  if (!element || typeof element.getBoundingClientRect !== "function" || typeof root.querySelectorAll !== "function") return;
+  element.classList.remove("snackbar--inline");
+  const toast = element.getBoundingClientRect();
+  const blockers = root.querySelectorAll<HTMLElement>(".workspace-bar, .grid-navigation, .grid-card, .clue-drawer, .puzzle-heading, .header-actions, .landing-copy > h1, .landing-route");
+  const overlap = [...blockers].find(blocker => {
+    const rect = blocker.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0
+      && toast.left < rect.right && toast.right > rect.left
+      && toast.top < rect.bottom && toast.bottom > rect.top;
+  });
+  if (overlap) {
+    element.classList.add("snackbar--inline");
+    overlap.parentElement?.insertBefore(element, overlap);
+  }
 }
 
 function focusGridCell(key: string): void {
@@ -458,7 +493,6 @@ function selectGrid(gridId: string, focus = false): void {
   const base = puzzle.spec.categories.find(category => category.id === puzzle!.spec.baseCategory);
   const category = puzzle.spec.categories.find(candidate => candidate.id === gridId);
   activeCellKey = base && category ? squareKey(category.id, base.values[0]!, category.values[0]!) : undefined;
-  setMessage("Grid selected and ready for marking.");
   render();
   if (focus) root.querySelector<HTMLButtonElement>(`[data-grid-tab="${CSS.escape(gridId)}"]`)?.focus();
 }
@@ -516,7 +550,7 @@ function confirmProgressReset(): void {
   challengeOptionsOpen = false;
   pendingProgressReset = false;
   window.history.pushState({}, "", window.location.pathname);
-  setMessage("Puzzle Challenge progress reset. Beginner Level 1 is ready.");
+  showSnackbar("Puzzle Challenge progress reset. Beginner Level 1 is ready.", "success");
   render();
 }
 
@@ -650,7 +684,6 @@ function handleChallengeOptionsClick(button: HTMLButtonElement): boolean {
   } else if (button.id === "smart-marking-toggle") {
     smartMarking = !smartMarking;
     localStorage.setItem(SMART_MARKING_STORAGE_KEY, smartMarking ? "on" : "off");
-    setMessage(smartMarking ? "Auto-mark is on. New matches will rule out the other squares in their row and column." : "Auto-mark is off. You can choose every mark yourself.");
     render();
     root.querySelector<HTMLButtonElement>("#smart-marking-toggle")?.focus();
   } else return false;
@@ -737,7 +770,25 @@ function handleClick(event: MouseEvent): void {
   for (const handleAction of clickActions) if (handleAction(button)) return;
 }
 
+function isSnackbarTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(".snackbar"));
+}
+
 root.addEventListener("click", handleClick);
+root.addEventListener("pointerover", event => {
+  if (isSnackbarTarget(event.target)) snackbar.pause("pointer");
+});
+root.addEventListener("pointerout", event => {
+  if (isSnackbarTarget(event.target) && !isSnackbarTarget(event.relatedTarget)) snackbar.resume("pointer");
+});
+root.addEventListener("focusin", event => {
+  if (isSnackbarTarget(event.target)) snackbar.pause("focus");
+});
+root.addEventListener("focusout", event => {
+  if (isSnackbarTarget(event.target) && !isSnackbarTarget(event.relatedTarget)) snackbar.resume("focus");
+});
+window.addEventListener("scroll", scheduleSnackbarPlacement, { passive: true });
+window.addEventListener("resize", scheduleSnackbarPlacement);
 
 function activeDialogSelector(): string | undefined {
   if (challengeOptionsOpen) return "#challenge-menu-dialog";

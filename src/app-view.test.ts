@@ -100,6 +100,36 @@ test("uses the puzzle title for context and the level badge for challenge progre
   assert.doesNotMatch(markup, /<h1>Beginner Level 1<\/h1>/);
 });
 
+test("renders transient confirmations in a separate polite snackbar after the header", () => {
+  const markup = renderApp(view({
+    message: "",
+    snackbar: { id: 1, message: "Puzzle link copied.", tone: "success" },
+  }));
+
+  assert.ok(markup.indexOf("</header>") < markup.indexOf('class="snackbar '));
+  assert.ok(markup.indexOf('class="snackbar ') < markup.indexOf('<main>'));
+  assert.match(markup, /class="snackbar snackbar--success" role="status" aria-live="polite" aria-atomic="true" tabindex="0" data-snackbar-id="1">Puzzle link copied\.<\/div>/);
+  assert.doesNotMatch(markup, /class="status status--neutral"><\/p>/);
+});
+
+test("keeps substantive puzzle guidance in the persistent status instead of a snackbar", () => {
+  const markup = renderApp(view({ message: "Hint: Aki matches North.", messageTone: "neutral" }));
+
+  assert.match(markup, /class="status status--neutral" role="status">Hint: Aki matches North\.<\/p>/);
+  assert.doesNotMatch(markup, /class="snackbar/);
+});
+
+test("shows a transient confirmation without replacing persistent puzzle guidance", () => {
+  const markup = renderApp(view({
+    message: "Hint: Aki matches North.",
+    messageTone: "neutral",
+    snackbar: { id: 2, message: "Board restored.", tone: "success" },
+  }));
+
+  assert.match(markup, /class="status status--neutral" role="status">Hint: Aki matches North\.<\/p>/);
+  assert.match(markup, /class="snackbar snackbar--success"[^>]*>Board restored\.<\/div>/);
+});
+
 test("[TB-BOARD-RESET-01] asks before clearing every board mark", () => {
   const confirm = renderApp(view({ pendingBoardReset: true }));
   assert.match(confirm, /<dialog\b[^>]*aria-labelledby="reset-board-dialog-title"/);
