@@ -250,6 +250,55 @@ select,
   background: var(--jade-light);
   border-color: var(--jade);
 }
+.snackbar {
+  position: fixed;
+  z-index: 9;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(36rem, calc(100vw - 2rem));
+  padding: 0.8rem 1rem;
+  color: var(--paper);
+  background: var(--navy);
+  border: var(--border);
+  border-left: 6px solid var(--gold);
+  border-radius: var(--panel-radius);
+  box-shadow: 4px 4px 0 #17222e99;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  transform: translateX(-50%);
+  animation: snackbar-rise 0.2s ease-out both;
+}
+.snackbar--success {
+  border-left-color: var(--jade-light);
+}
+.snackbar--warning {
+  border-left-color: var(--gold);
+}
+.snackbar--error {
+  border-left-color: #f4c9bd;
+}
+.snackbar:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+.snackbar--inline {
+  position: relative;
+  inset: auto;
+  width: min(36rem, calc(100% - 2rem));
+  margin: 1rem auto;
+  transform: none;
+  animation-name: snackbar-flow-in;
+}
+@keyframes snackbar-rise {
+  from { opacity: 0; transform: translate(-50%, 0.8rem); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes snackbar-flow-in {
+  from { opacity: 0; transform: translateY(0.8rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .landing-state {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(15rem, 0.8fr);
@@ -1012,6 +1061,9 @@ footer {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .snackbar {
+    animation: none;
+  }
   *,
   *:before,
   *:after {
