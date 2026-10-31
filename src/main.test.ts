@@ -364,6 +364,11 @@ describe("answer verification navigation", () => {
     assert.ok(app.root.innerHTML.includes('class="status status--error"'));
     assert.ok(app.root.innerHTML.includes("Tako can’t check your solution just now"));
     assert.match(app.root.innerHTML, /<p[^>]*role="status"[^>]*>Tako can’t check your solution just now/);
+
+    app.click({ id: "reset-board" });
+    app.click({ id: "confirm-board-reset" });
+    assert.match(app.root.innerHTML, /class="status status--error"[^>]*>Tako can’t check your solution just now/);
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Board cleared\. Your previous marks are available with Undo\./);
   });
 
   it("resets one grid or the full board with Undo restoring the previous marks", async () => {
