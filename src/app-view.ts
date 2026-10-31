@@ -12,11 +12,12 @@ import { renderGridWorkspace } from "./sections/grid-workspace";
 import { renderPuzzleHeader } from "./sections/puzzle-header";
 import { renderButton } from "./ui-buttons";
 import { escapeHtml } from "./ui-escape";
-import { renderBadge, renderPanel, renderStatus } from "./ui-feedback";
+import { renderBadge, renderPanel, renderSnackbar, renderStatus } from "./ui-feedback";
 import { renderDialog, renderDisclosure } from "./ui-dialog";
 import { renderGridCard, renderGridCell } from "./ui-grid";
 import type { StatusTone } from "./ui-types";
 import type { PuzzleFeedbackRating, PuzzleFeedbackReason } from "./feedback";
+import type { SnackbarMessage } from "./snackbar";
 
 export interface AppViewState {
   mascotUrl: string;
@@ -26,6 +27,7 @@ export interface AppViewState {
   loading: boolean;
   message: string;
   messageTone: StatusTone;
+  snackbar?: SnackbarMessage;
   difficultyUnavailable: boolean;
   puzzleLoadFailed: boolean;
   undoCount: number;
@@ -256,5 +258,5 @@ function renderLanding(view: AppViewState): string {
 export function renderApp(view: AppViewState): string {
   const mainContent = view.puzzle ? renderPuzzle(view, view.puzzle) : renderLanding(view);
   const footer = `<footer><span class="footer-brand"><img src="${view.markUrl}" alt="" aria-hidden="true"><span>TAKO BAKO · Powered by Yokaiba</span></span><span>Share a puzzle, use a hint when you need one, or check your solution.</span></footer>`;
-  return `<div class="page-shell">${renderHeader(view)}${mainContent}${footer}</div>${renderChallengeOptions(view)}${renderSharedPuzzleModal(view.sharedPuzzleOpen)}${renderProgressResetModal(view.pendingProgressReset)}`;
+  return `<div class="page-shell">${renderHeader(view)}${renderSnackbar(view.snackbar)}${mainContent}${footer}</div>${renderChallengeOptions(view)}${renderSharedPuzzleModal(view.sharedPuzzleOpen)}${renderProgressResetModal(view.pendingProgressReset)}`;
 }
