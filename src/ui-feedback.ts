@@ -1,10 +1,18 @@
 import type { LevelCardOptions, PanelOptions, StatusOptions } from "./ui-types";
 import { renderButton } from "./ui-buttons";
 import { escapeHtml } from "./ui-escape";
+import type { SnackbarMessage } from "./snackbar";
 
 /** A consistent live message banner for loading, progress, and error feedback. */
 export function renderStatus({ message, tone = "neutral" }: StatusOptions): string {
+  if (!message) return "";
   return `<p class="status status--${tone}" role="status">${escapeHtml(message)}</p>`;
+}
+
+/** A transient, non-modal confirmation with a polite live announcement. */
+export function renderSnackbar(snackbar: SnackbarMessage | undefined): string {
+  if (!snackbar) return "";
+  return `<div class="snackbar snackbar--${snackbar.tone}" role="status" aria-live="polite" aria-atomic="true" tabindex="0" data-snackbar-id="${snackbar.id}">${escapeHtml(snackbar.message)}</div>`;
 }
 
 /** A semantic panel shell shared by supporting content such as clues. */

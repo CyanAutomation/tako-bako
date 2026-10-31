@@ -382,14 +382,47 @@ describe("answer verification navigation", () => {
     app.click({ id: "confirm-grid-reset" });
 
     assert.deepStrictEqual(savedBoard(), { "weight|Aki|light": "yes" });
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Grid cleared\. Your previous marks are available with Undo\./);
     app.click({ id: "undo" });
     assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Board restored\.<\/div>/);
 
     app.click({ id: "reset-board" });
     app.click({ id: "confirm-board-reset" });
     assert.deepStrictEqual(savedBoard(), {});
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Board cleared\. Your previous marks are available with Undo\./);
     app.click({ id: "undo" });
     assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
+  });
+
+  it("confirms a copied puzzle link in a snackbar and dismisses it after the display interval", async context => {
+    context.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+    const app = mountTestPuzzle("share-snackbar", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify(puzzleResponse("share-snackbar", "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+    stubGlobal("navigator", { clipboard: { writeText: async () => undefined } });
+
+    app.click({ id: "share-puzzle" });
+    await flush();
+
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Puzzle link copied\./);
+    assert.doesNotMatch(app.root.innerHTML, /class="status status--success"/);
+    context.mock.timers.tick(5500);
+    assert.doesNotMatch(app.root.innerHTML, /class="snackbar/);
+
+    stubGlobal("navigator", { clipboard: { writeText: async () => { throw new Error("clipboard blocked"); } } });
+    app.click({ id: "share-puzzle" });
+    await flush();
+    assert.match(app.root.innerHTML, /class="status status--warning"[^>]*>Your browser blocked copying\./);
+    assert.doesNotMatch(app.root.innerHTML, /class="snackbar/);
+
+    stubGlobal("navigator", { clipboard: { writeText: async () => undefined } });
+    app.click({ id: "share-puzzle" });
+    await flush();
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Puzzle link copied\./);
+    assert.doesNotMatch(app.root.innerHTML, /class="status status--warning"/);
   });
 
   it("shows a successful clue hint without marking the clue as reviewed", async () => {
@@ -409,6 +442,11 @@ describe("answer verification navigation", () => {
     assert.strictEqual(app.storage.get("tako-bako.clues.hint-success"), undefined);
     assert.match(app.root.innerHTML, /Mark clue 1 as reviewed/);
     assert.doesNotMatch(app.root.innerHTML, /Mark clue 1 as not reviewed/);
+
+    app.click({ dataset: { square: "club|Aki|Lions" } });
+    app.click({ id: "undo" });
+    assert.match(app.root.innerHTML, /Hint: Start with the order clue\./);
+    assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Board restored\.<\/div>/);
   });
 
   it("resets the clue filter disclosure when a new puzzle is activated", async () => {
