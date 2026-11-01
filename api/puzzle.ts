@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
-import { DIFFICULTY_LEVEL_PATTERN, isValidSeed } from "../src/puzzle-input.js";
+import { DIFFICULTY_LEVEL_PATTERN, isValidSeed, parseDifficultyModel, type DifficultyModel } from "../src/puzzle-input.js";
 import { yokaibaGenerateParams } from "../src/yokaiba.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
@@ -217,7 +217,7 @@ interface GenerationParameters {
   seed: string;
   templateId: string;
   difficultyLevel?: string;
-  difficultyModel?: "v4" | "v5" | "compare";
+  difficultyModel?: DifficultyModel;
 }
 
 function invalidGenerationRequest(response: VercelResponse, startedAt: number, message: string): void {
@@ -243,11 +243,12 @@ function parseGenerationParameters(query: VercelRequest["query"], response: Verc
     invalidGenerationRequest(response, startedAt, "A difficulty level from 1 to 12 is required");
     return;
   }
-  if (rawDifficultyModel !== undefined && rawDifficultyModel !== "v4" && rawDifficultyModel !== "v5" && rawDifficultyModel !== "compare") {
+  const difficultyModel = parseDifficultyModel(rawDifficultyModel);
+  if (rawDifficultyModel !== undefined && difficultyModel === undefined) {
     invalidGenerationRequest(response, startedAt, "An available difficulty model is required");
     return;
   }
-  return { seed, templateId, difficultyLevel, ...(rawDifficultyModel ? { difficultyModel: rawDifficultyModel } : {}) };
+  return { seed, templateId, difficultyLevel, ...(difficultyModel ? { difficultyModel } : {}) };
 }
 
 async function forwardGeneratedPuzzle(parameters: GenerationParameters, response: VercelResponse, startedAt: number): Promise<void> {

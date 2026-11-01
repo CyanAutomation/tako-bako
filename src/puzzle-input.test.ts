@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
+import { isValidSeed, parseDifficultyLevel, parseDifficultyModel } from "./puzzle-input";
 
 describe("puzzle seed validation", () => {
   it("[TB-INPUT-01] accepts the smallest and largest allowed codes", () => {
@@ -26,5 +26,20 @@ describe("puzzle difficulty parsing", () => {
   it("[TB-INPUT-01] rejects difficulty levels 0 and 13", () => {
     assert.strictEqual(parseDifficultyLevel("0"), undefined);
     assert.strictEqual(parseDifficultyLevel("13"), undefined);
+  });
+});
+
+describe("puzzle difficulty model parsing", () => {
+  it("[TB-INPUT-01] accepts the v4, v5, and compare models", () => {
+    assert.strictEqual(parseDifficultyModel("v4"), "v4");
+    assert.strictEqual(parseDifficultyModel("v5"), "v5");
+    assert.strictEqual(parseDifficultyModel("compare"), "compare");
+  });
+
+  it("[TB-INPUT-01] rejects unknown, blank, and missing models", () => {
+    assert.strictEqual(parseDifficultyModel("v6"), undefined);
+    assert.strictEqual(parseDifficultyModel(""), undefined);
+    assert.strictEqual(parseDifficultyModel(null), undefined);
+    assert.strictEqual(parseDifficultyModel(undefined), undefined);
   });
 });
