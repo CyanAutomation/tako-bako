@@ -1,5 +1,5 @@
 import { courseFor, defaultDifficultyModelForCourse, firstAvailableCourse, type Course } from "./curriculum";
-import { isValidSeed, parseDifficultyLevel } from "./puzzle-input";
+import { isValidSeed, parseDifficultyLevel, parseDifficultyModel, type DifficultyModel } from "./puzzle-input";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 
 export type PlayMode = "challenge" | "shared";
@@ -10,7 +10,7 @@ export interface PlayRoute {
   playMode: PlayMode;
   activeCourse: Course;
   difficultyLevel: number | undefined;
-  difficultyModel?: "v4" | "v5" | "compare";
+  difficultyModel?: DifficultyModel;
   templateId: ScenarioId;
 }
 
@@ -24,9 +24,7 @@ export function routeFromUrl(url: URL, completedCourses: readonly string[]): Pla
   const activeCourse = courseFor(parameters.get("tier") ?? undefined, Number(parameters.get("level")) || undefined)
     ?? firstAvailableCourse(completedCourses);
   const rawDifficultyModel = parameters.get("difficultyModel");
-  const explicitDifficultyModel = rawDifficultyModel === "v4" || rawDifficultyModel === "v5" || rawDifficultyModel === "compare"
-    ? rawDifficultyModel
-    : undefined;
+  const explicitDifficultyModel = parseDifficultyModel(rawDifficultyModel);
   const difficultyModel = explicitDifficultyModel
     ?? (requestedSeed !== null ? "v4" : defaultDifficultyModelForCourse(activeCourse));
   return {
@@ -48,7 +46,7 @@ export function updatedPuzzleUrl(
   difficultyLevel: number | undefined,
   course: Course,
   seed: string,
-  difficultyModel?: "v4" | "v5" | "compare",
+  difficultyModel?: DifficultyModel,
 ): URL | undefined {
   if (historyMode === "none") return undefined;
   const url = new URL(currentUrl);
