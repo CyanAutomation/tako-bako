@@ -7,6 +7,7 @@ import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
 import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
+import { type DifficultyModel } from "./puzzle-input";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
 import { courseFor, defaultDifficultyModelForCourse, firstAvailableCourse, nextCourse, puzzleParametersForCourse, type Course } from "./curriculum";
@@ -184,7 +185,7 @@ function seedFromUrl(): string | undefined {
   return routeFromUrl(new URL(window.location.href), progress.completed).seed;
 }
 
-function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: "v4" | "v5" | "compare" | undefined): void {
+function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: DifficultyModel | undefined): void {
   const url = updatedPuzzleUrl(window.location.href, mode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, seed, requestedDifficultyModel);
   if (url) window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
@@ -302,7 +303,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   }
 }
 
-function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: "v4" | "v5" | "compare" | undefined): void {
+function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: DifficultyModel | undefined): void {
   puzzle = data;
   pendingFeedbackRequests.clear();
   puzzleCompleted = false;
