@@ -1,4 +1,5 @@
 import type { ClueStrategy } from "./clue-strategy-catalog";
+import { type DifficultyModel } from "./puzzle-input";
 
 export type Mark = "unknown" | "yes" | "no";
 
@@ -21,7 +22,7 @@ export interface Puzzle {
   requestedSeed: string;
   templateId: string;
   puzzleFingerprint?: string;
-  difficultyModel?: "v4" | "v5" | "compare";
+  difficultyModel?: DifficultyModel;
   puzzleToken?: string;
   clues: Clue[];
   difficulty: { level: number; label: string; modelVersion: string };

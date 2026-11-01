@@ -1,4 +1,5 @@
 import { CACHE_TTL_MS, savePuzzleToCache, type PuzzleStorageLike } from "./core";
+import { type DifficultyModel } from "../puzzle-input";
 
 const MAX_GENERATED_AT_CLOCK_SKEW_MS = 60 * 1_000;
 const PUZZLE_GENERATED_AT_HEADER = "x-tako-bako-generated-at";
@@ -7,7 +8,7 @@ export interface PuzzleCacheRequest {
   readonly seed: string;
   readonly difficultyLevel: number | undefined;
   readonly templateId: string;
-  readonly difficultyModel?: "v4" | "v5" | "compare";
+  readonly difficultyModel?: DifficultyModel;
 }
 
 /**
