@@ -15,5 +15,5 @@ These repository skills capture implementation details that are easy to miss whe
 - A change crossing browser state and API contracts can use both **Gameplay state and routing** and **API and provider boundaries**.
 - UI changes should use **Accessible gameplay UI**; use **Test and contract maintenance** as well when behavior or documented contracts change.
 - Workflow changes should use **GitHub Actions operations** and preserve the assertions in `tests/kaseki-workflows.test.ts`.
-- For repository-wide changes, the project quality gate is `npm run check` (Node.js `^24.0.0`).
+- For repository-wide changes, the project quality gate is `npm run check` (Node.js `^26.0.0`).
 
