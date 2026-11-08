@@ -9,7 +9,7 @@ Use this skill to keep implementation behavior, focused tests, and repository do
 
 ## Test setup
 
-- The project targets Node.js `^24.0.0`, uses TypeScript/ES modules, and runs tests with Node's built-in test runner through `tsx`.
+- The project targets Node.js `^26.0.0`, uses TypeScript/ES modules, and runs tests with Node's built-in test runner through `tsx`.
 - `npm test` runs `scripts/run-tests.ts`, which discovers `*.test.ts` files in `src/` and `tests/` and runs them in sorted order.
 - Most pure browser logic has colocated tests in `src/`; Vercel route and cross-module tests are under `tests/` and `tests/api/`.
 - `docs/test-traceability.md` maps stable contract IDs to product or operations documentation and test files. `docs/test-quality-review.md` records review history and known coverage limitations.

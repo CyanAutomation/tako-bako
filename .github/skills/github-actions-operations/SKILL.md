@@ -9,7 +9,7 @@ Use this skill for changes to repository automation, especially the scheduled Ka
 
 ## Map of the implementation
 
-- `.github/workflows/ci.yml` runs the Node 24 quality gate on pull requests and pushes to `main`.
+- `.github/workflows/ci.yml` runs the Node 26 quality gate on pull requests and pushes to `main`.
 - `.github/workflows/workflow-validation.yml` runs `actionlint` and `zizmor` with read-only permissions.
 - `.github/workflows/kaseki-docs.yaml` runs the documentation-only sweep. `.github/workflows/kaseki-dry.yaml` runs the bounded DRY review.
 - `.github/actions/kaseki-preflight/` validates controller and gateway readiness.

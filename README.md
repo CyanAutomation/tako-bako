@@ -21,7 +21,7 @@ A browser-based logic grid game for puzzle fans. Solve zebra and Einstein-style 
 
 ## Quick start
 
-**Prerequisite:** Node.js `^24.0.0`.
+**Prerequisite:** Node.js `^26.0.0`.
 
 ```sh
 npm ci
