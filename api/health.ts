@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const YOKAIBA_HEALTH_URL = "https://yokaiba.scheimann.workers.dev/healthz";
+const YOKAIBA_HEALTH_URL = () => `${yokaibaApiOrigin()}/healthz`;
 const TIMEOUT_MS = 3_000;
 
 /** Readiness check for Tako Bako and its required puzzle service. */
@@ -12,7 +13,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
   const startedAt = Date.now();
   try {
-    const upstream = await fetch(YOKAIBA_HEALTH_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    const upstream = await fetch(YOKAIBA_HEALTH_URL(), { signal: AbortSignal.timeout(TIMEOUT_MS) });
     const ready = upstream.ok;
     response.setHeader("cache-control", "no-store");
     response.status(ready ? 200 : 503).json({ status: ready ? "ok" : "degraded", dependencies: { yokaiba: ready ? "ok" : "unavailable" } });
