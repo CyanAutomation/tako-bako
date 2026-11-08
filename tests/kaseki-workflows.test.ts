@@ -53,13 +53,14 @@ function namedStep(workflow: Workflow, name: string): WorkflowStep {
   return step;
 }
 
-test("[CI-NODE-01] derives the CI runtime matrix from the package engine range", () => {
+test("[CI-NODE-01] requires Node 26 and derives the CI runtime matrix from the package engine range", () => {
   const workflow = readWorkflow("ci.yml");
   const strategy = workflow.jobs.quality?.strategy;
 
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
     engines: { node: string };
   };
+  assert.equal(packageJson.engines.node, "^26.0.0");
   const nodeMajor = /^\^?(\d+)\.\d+\.\d+$/.exec(packageJson.engines.node)?.[1];
   assert.ok(nodeMajor, "package.json should declare a Node engine version");
   assert.deepStrictEqual(strategy?.matrix?.["node-version"], [`${nodeMajor}.x`]);
@@ -78,13 +79,13 @@ test("[CI-NODE-01] lets every configured Node matrix job report its result", () 
   assert.equal(workflow.jobs.quality?.strategy?.["fail-fast"], false);
 });
 
-test("[CI-KASEKI-01] runs main-only Node 24 sweeps after controller and gateway preflight", () => {
+test("[CI-KASEKI-01] runs main-only Node 26 sweeps after controller and gateway preflight", () => {
   for (const { name, workflow } of workflows) {
     for (const [jobName, job] of Object.entries(workflow.jobs)) {
       assert.equal(job.if, "github.ref == 'refs/heads/main'", `${name} job ${jobName} remains main-only`);
       const setupNode = job.steps.find(step => step.uses?.startsWith("actions/setup-node@"));
       const preflight = job.steps.find(step => step.name === "Verify Kaseki controller and gateway");
-      assert.equal(setupNode?.with?.["node-version"], "24.x", `${name} uses Node 24`);
+      assert.equal(setupNode?.with?.["node-version"], "26.x", `${name} uses Node 26`);
       assert.equal(preflight?.uses, "$/.github/actions/kaseki-preflight");
       assert.deepStrictEqual(preflight?.with, {
         "base-url": "${{ vars.KASEKI_BASE_URL }}",
@@ -146,7 +147,7 @@ test("[CI-KASEKI-01] workflows run on main with least permissions and a shared s
   }
 });
 
-test("[CI-KASEKI-01] workflows check out helpers without persisting credentials and select Node 24", () => {
+test("[CI-KASEKI-01] workflows check out helpers without persisting credentials and select Node 26", () => {
   for (const { name, workflow } of workflows) {
     const steps = allWorkflowSteps(workflow);
     const checkout = steps.find(step => step.uses?.startsWith("actions/checkout@"));
@@ -155,7 +156,7 @@ test("[CI-KASEKI-01] workflows check out helpers without persisting credentials 
     assert.ok(checkout, `${name} should check out the helper scripts`);
     assert.equal(checkout.with?.["persist-credentials"], false);
     assert.ok(setupNode, `${name} should select a supported Node runtime`);
-    assert.equal(setupNode.with?.["node-version"], "24.x");
+    assert.equal(setupNode.with?.["node-version"], "26.x");
   }
 });
 

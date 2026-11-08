@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Wait for prior Kaseki sweep
-        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3
+        uses: softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4 # v3.3.3
         with:
           queue-name: Kaseki
 
@@ -51,7 +51,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.x
+          node-version: 26.x
 
       - name: Verify Kaseki controller and gateway
         uses: $/.github/actions/kaseki-preflight
