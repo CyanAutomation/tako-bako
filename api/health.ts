@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
-const YOKAIBA_HEALTH_URL = "https://yokaiba.scheimann.workers.dev/healthz";
+const YOKAIBA_HEALTH_URL = `${yokaibaApiOrigin()}/healthz`;
 const TIMEOUT_MS = 3_000;
 
 /** Readiness check for Tako Bako and its required puzzle service. */
