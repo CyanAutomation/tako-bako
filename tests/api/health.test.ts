@@ -54,7 +54,19 @@ describe("health readiness", () => {
     assert.ok(typeof fields.durationMs === "number" && Number.isFinite(fields.durationMs) && fields.durationMs >= 0);
   });
 
-  it("[TB-OBS-01] reports degraded readiness and logs a valid failure metric", async () => {
+  it("[TB-HEALTH-02] requests the shared Yokaiba origin for readiness", async () => {
+    const { yokaibaApiOrigin } = await import("../../server/yokaiba-origin.js");
+    const fetchMock = resolvedMock(new Response(JSON.stringify({ status: "ok" }), { status: 200 }));
+    stubGlobal("fetch", fetchMock);
+    mock.method(console, "info", () => undefined);
+    const { response } = responseRecorder();
+
+    await handler({ method: "GET" } as never, response as never);
+
+    assert.strictEqual(fetchMock.mock.calls[0]?.arguments[0], `${yokaibaApiOrigin()}/healthz`);
+  });
+
+  it("[TB-OBS-02] reports degraded readiness and logs a valid failure metric", async () => {
     stubGlobal("fetch", rejectedMock(new Error("offline")));
     const timestamps = [1_000, 900];
     mock.method(Date, "now", () => timestamps.shift() ?? 900);
