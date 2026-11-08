@@ -66,7 +66,7 @@ describe("health readiness", () => {
     assert.strictEqual(fetchMock.mock.calls[0]?.arguments[0], `${yokaibaApiOrigin()}/healthz`);
   });
 
-  it("[TB-OBS-01] reports degraded readiness and logs a valid failure metric", async () => {
+  it("[TB-OBS-02] reports degraded readiness and logs a valid failure metric", async () => {
     stubGlobal("fetch", rejectedMock(new Error("offline")));
     const timestamps = [1_000, 900];
     mock.method(Date, "now", () => timestamps.shift() ?? 900);
