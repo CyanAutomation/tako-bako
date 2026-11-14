@@ -52,6 +52,10 @@ The progress-reset integration test uses mocked browser globals, so isolation sc
 
 These scores are source-based. The focused elapsed-time tests first failed against the previous implementation and passed after the fix. No mutation-testing tool was run for this follow-up; mutation score is not measured here.
 
+## Latest follow-up for CI workflow checks and browser smoke
+
+Workflow configuration tests were added first and reproduced missing merge-queue triggers, dependency review, and browser-smoke coverage. The Kaseki workflows retain GitHub's `$/.github/...` self-repository action syntax; actionlint 1.7.12 requires a targeted ignore for that syntax, and zizmor 1.30.1 recognizes it. A Playwright smoke test now starts a mocked Beginner puzzle in Chromium and changes a grid cell. `npm run check` passed lint, all 313 Node tests, documentation validation, and the production build; `npm run test:e2e` passed the browser smoke. The workspace blocked Playwright's browser download with HTTP 403, so local browser verification used the installed system Chromium. CI installs Playwright's Chromium build. This smoke test covers one core flow; it does not measure responsive layouts or full accessibility behavior.
+
 ## Latest follow-up for lower-scoring tests
 
 This pass consolidated bounded-text helper cases into one table-driven test while retaining endpoint checks for rejected tokens and acceptance at the configured maximum. It removed the duplicate direct level-card assertion because the curriculum rendering test already covers current and locked accessible names. The invalid-date test now checks the `RangeError` contract without binding to its message. Reset-dialog checks have separate intent for full-board and selected-grid clearing, and the product name remains a standalone landing-page check.

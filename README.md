@@ -59,6 +59,7 @@ Useful commands:
 |---|---|
 | `npm run check` | Lint, run tests, check README links and paths, and build the app and API |
 | `npm run test` | Run the test suite |
+| `npm run test:e2e` | Run the Chromium smoke test against the production preview (requires a Playwright browser install) |
 | `npm run test:coverage` | Write V8 coverage under `coverage/v8` |
 | `npm run lint` | Lint source files |
 | `npm run build` | Type-check and build the app and API |
@@ -67,7 +68,7 @@ Useful commands:
 
 The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinned tool command `npx --yes fallow@3.33.1 health --coverage coverage/v8`; it downloads the CLI without adding it to project dependencies. TypeScript checks run separately for the app (`tsconfig.app.json`), API (`tsconfig.api.json`), and Node tooling (`tsconfig.node.json`).
 
-External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
+The pull-request gate also runs a Chromium smoke test against the production build. Install the browser with `npx playwright install chromium` before running `npm run test:e2e` locally. External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
 
 For deployed route behavior and the health endpoint, see [Deployment and API](#deployment-and-api) and the [operations guide](docs/operations.md#deployment). Local and deployed service issues are covered in [operations troubleshooting](docs/operations.md#local-troubleshooting).
 
