@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractMarkdownDestinations, markdownFiles } from "./markdown-documents.ts";
+import { checkSkillsIndex } from "./check-skills.ts";
 import { runMarkdownCheck } from "./run-markdown-check.ts";
 
 type ProjectTreeDirectory = { indentation: number; path: string };
@@ -157,7 +158,7 @@ export async function checkReadme(root: string, readmeRelativePath = "README.md"
 export async function checkDocumentation(root: string): Promise<string[]> {
   const markdownPaths = ["README.md", ...(await markdownFiles(join(root, "docs"))).map(path => relative(root, path))];
   const checked = await Promise.all(markdownPaths.map(readmePath => checkReadme(root, readmePath)));
-  return checked.flat();
+  return [...checked.flat(), ...await checkSkillsIndex(root)];
 }
 
 const scriptPath = fileURLToPath(import.meta.url);

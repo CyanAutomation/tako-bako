@@ -13,6 +13,7 @@ Use this skill for changes to repository automation, especially the scheduled Ka
 - `.github/workflows/ci.yml` also runs a Chromium smoke test of the built app.
 - `.github/workflows/workflow-validation.yml` runs `actionlint` and `zizmor` with read-only permissions.
 - `.github/workflows/dependency-review.yml` checks pull requests for introduced vulnerable dependencies.
+- `.github/workflows/deployment-smoke.yml` checks the deployed `/api/health` endpoint on a schedule or manual dispatch; it does not deploy the app.
 - `.github/workflows/kaseki-docs.yaml` runs the documentation-only sweep. `.github/workflows/kaseki-dry.yaml` runs the bounded DRY review.
 - `.github/actions/kaseki-preflight/` validates controller and gateway readiness.
 - `scripts/kaseki/idempotency-key.ts` and `scripts/kaseki/wait-for-run.ts` implement stable run IDs and polling. Their behavior is tested with workflow structure in `tests/kaseki-workflows.test.ts`.
@@ -37,5 +38,6 @@ Use this skill for changes to repository automation, especially the scheduled Ka
 ## Related skills
 
 - [Test and contract maintenance](../test-contract-maintenance/SKILL.md) for workflow tests and traceability.
+- [Deployment and runtime operations](../deployment-runtime-operations/SKILL.md) for Vercel runtime configuration and post-deployment verification.
 - [API and provider boundaries](../api-provider-boundaries/SKILL.md) if automation changes server-facing contracts.
 
