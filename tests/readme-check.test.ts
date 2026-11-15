@@ -6,6 +6,12 @@ import test from "node:test";
 
 import { checkDocumentation, checkReadme } from "../scripts/check-readme.ts";
 
+async function addEmptySkillsIndex(root: string): Promise<void> {
+  const directory = join(root, ".github", "skills");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, "README.md"), "# Skills\n\n| Skill | Use it for |\n|---|---|\n");
+}
+
 test("README documentation check accepts existing relative links and project paths", async () => {
   const root = await mkdtemp(join(tmpdir(), "tako-bako-readme-check-"));
   try {
@@ -31,6 +37,7 @@ test("README documentation check accepts existing relative links and project pat
 test("README documentation check reports broken relative links and project paths", async () => {
   const root = await mkdtemp(join(tmpdir(), "tako-bako-readme-check-"));
   try {
+    await addEmptySkillsIndex(root);
     await writeFile(join(root, "README.md"), [
       "[Missing guide](docs/missing.md)",
       "## Project Structure",
@@ -51,6 +58,7 @@ test("README documentation check reports broken relative links and project paths
 test("README documentation check validates relative links in docs Markdown files", async () => {
   const root = await mkdtemp(join(tmpdir(), "tako-bako-docs-check-"));
   try {
+    await addEmptySkillsIndex(root);
     await mkdir(join(root, "docs"));
     await writeFile(join(root, "README.md"), "# Project\n");
     await writeFile(join(root, "docs", "operations.md"), "[Missing guide](missing-guide.md)\n");

@@ -35,5 +35,6 @@ Tako Bako renders a custom DOM interface from TypeScript template strings; it is
 ## Related skills
 
 - [Gameplay state and routing](../gameplay-state-routing/SKILL.md) for modes and state that the UI presents.
+- [Hint and clue strategy pipeline](../hint-clue-strategy/SKILL.md) for the source and validation of hint or clue strategy content shown in the UI.
 - [Test and contract maintenance](../test-contract-maintenance/SKILL.md) for updating behavior contracts and running the quality gate.
 
