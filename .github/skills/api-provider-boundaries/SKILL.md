@@ -36,5 +36,7 @@ Relevant tests include `tests/api/puzzle.test.ts`, `tests/api/hint*.test.ts`, `t
 ## Related skills
 
 - [Gameplay state and routing](../gameplay-state-routing/SKILL.md) for browser state and URL contracts.
+- [Hint and clue strategy pipeline](../hint-clue-strategy/SKILL.md) for the client-to-server hint flow, solver-backed candidates, and deterministic Jev fallbacks.
+- [Deployment and runtime operations](../deployment-runtime-operations/SKILL.md) for Vercel runtime configuration, deployed headers, and production health checks.
 - [Test and contract maintenance](../test-contract-maintenance/SKILL.md) for test, traceability, and operations-doc updates.
 
