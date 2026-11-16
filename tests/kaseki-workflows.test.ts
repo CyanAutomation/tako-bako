@@ -139,7 +139,7 @@ test("[CI-KASEKI-01] workflows run on main with least permissions and a shared s
     assert.match(source, /actions: read\s+# Turnstyle needs to inspect workflow runs to coordinate its queue\./);
     assert.match(source, /on: # zizmor: ignore\[concurrency-limits\] Turnstyle queues all Kaseki runs; GitHub concurrency replaces pending runs\./);
     const queue = allWorkflowSteps(workflow).find(step => step.name === "Wait for prior Kaseki sweep");
-    assert.equal(queue?.uses, "softprops/turnstyle@3805450be63b8c80577dc253e8c17e9132036df4");
+    assert.equal(queue?.uses, "softprops/turnstyle@ec9869921df7799d5afea364f4026770f3760342");
     assert.deepStrictEqual(queue?.with, { "queue-name": "Kaseki" }, `${name} should share the Kaseki queue`);
     for (const [jobName, job] of Object.entries(workflow.jobs)) {
       assert.equal(job.if, "github.ref == 'refs/heads/main'", `${name} job ${jobName} should run only on main`);
