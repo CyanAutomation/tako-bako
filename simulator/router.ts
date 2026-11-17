@@ -338,7 +338,7 @@ export function createSimulator(fixtures: SimulatorFixture[] = loadFixtures()): 
 
   return {
     async handle(request: Request): Promise<Response> {
-      if (new TextEncoder().encode(await request.clone().text()).byteLength > MAX_REQUEST_BODY_BYTES) {
+      if ((await request.clone().arrayBuffer()).byteLength > MAX_REQUEST_BODY_BYTES) {
         return errorResponse(413, "payload_too_large", "Request body is too large");
       }
       const pathname = new URL(request.url).pathname;

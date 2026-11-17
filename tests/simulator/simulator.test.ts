@@ -5,6 +5,7 @@ import { createSimulator } from "../../simulator/router.js";
 import { loadFixtures } from "../../simulator/fixture-loader.js";
 
 const fixtures = loadFixtures();
+const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
 
 function fixtureFor(templateId: string) {
   const fixture = fixtures.find(candidate => candidate.publicPuzzle.templateId === templateId);
@@ -104,6 +105,22 @@ test("generation rejects unavailable templates, levels, and difficulty models", 
     "http://simulator.test/v1/puzzles/generate?templateId=tournament-order-v2&seed=first&seed=second",
   ));
   assert.equal(duplicateSeed.status, 400);
+});
+
+test("simulator request body limit counts raw bytes before UTF-8 decoding", async () => {
+  const simulator = createSimulator();
+  const oversizedBody = new ArrayBuffer(MAX_REQUEST_BODY_BYTES + 1);
+  new Uint8Array(oversizedBody).set([0xef, 0xbb, 0xbf]);
+  const response = await simulator.handle(new Request("http://simulator.test/api/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: oversizedBody,
+  }));
+
+  assert.equal(response.status, 413);
+  assert.deepEqual(await jsonResponse(response), {
+    error: { code: "payload_too_large", message: "Request body is too large" },
+  });
 });
 
 test("published Yokaiba generation, verification, and hint routes accept their REST request shapes", async () => {
