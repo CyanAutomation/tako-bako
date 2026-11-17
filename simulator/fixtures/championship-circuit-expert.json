@@ -1,0 +1,323 @@
+{
+  "fixtureId": "championship-circuit-expert",
+  "source": {
+    "repository": "https://github.com/CyanAutomation/yokaiba",
+    "commit": "b19dc34",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "seed": "tako-bako-phase1-championship-circuit"
+  },
+  "publicPuzzle": {
+    "id": "championship-circuit-v2:tako-bako-phase1-championship-circuit:yokaiba-difficulty-v5",
+    "requestedSeed": "tako-bako-phase1-championship-circuit",
+    "seed": "tako-bako-phase1-championship-circuit",
+    "templateId": "championship-circuit-v2",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "difficultyModel": "v5",
+    "requestedDifficultyLevel": 9,
+    "puzzleFingerprint": "65e22261f76cc3f6d03f868ef16edb12d2e2802a93c96e0bd25000484b5747af",
+    "puzzleToken": "simulator-fixture:championship-circuit-expert",
+    "spec": {
+      "id": "championship-circuit-v2",
+      "title": "Championship Circuit",
+      "baseCategory": "judoka",
+      "categories": [
+        {
+          "id": "judoka",
+          "label": "Judoka",
+          "values": [
+            "Aki",
+            "Hana",
+            "Kenji",
+            "Mika",
+            "Sora"
+          ]
+        },
+        {
+          "id": "weight",
+          "label": "Weight division",
+          "values": [
+            "-60 kg",
+            "-66 kg",
+            "-73 kg",
+            "-81 kg",
+            "-90 kg"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "tatami",
+          "label": "Tatami",
+          "values": [
+            "Tatami 1",
+            "Tatami 2",
+            "Tatami 3",
+            "Tatami 4",
+            "Tatami 5"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "medal",
+          "label": "Result",
+          "values": [
+            "Gold",
+            "Silver",
+            "Bronze",
+            "Finalist",
+            "Quarter-finalist"
+          ],
+          "ordered": true
+        }
+      ]
+    },
+    "clues": [
+      {
+        "id": "distance-weight-tatami-1-3",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 5"
+          },
+          "distance": 2
+        },
+        "text": "In the event order, the -60 kg competitor and the competitor on Tatami 5 were exactly two positions apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-0-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-66 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 4"
+          },
+          "distance": 4
+        },
+        "text": "The -66 kg competitor and the competitor on Tatami 4 were exactly four positions apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-0-2",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-66 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 1"
+          },
+          "distance": 2
+        },
+        "text": "In the event order, the -66 kg competitor and the competitor on Tatami 1 were exactly two positions apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-medal-1-2",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Bronze"
+          },
+          "distance": 1
+        },
+        "text": "The -60 kg competitor and the bronze medallist were exactly one position apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-medal-2-3",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-73 kg"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Gold"
+          },
+          "distance": 1
+        },
+        "text": "In the event order, the -73 kg competitor and the gold medallist were exactly one position apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-medal-0-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-66 kg"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Silver"
+          },
+          "distance": 4
+        },
+        "text": "The -66 kg competitor and the silver medallist were exactly four positions apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-3-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-81 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 4"
+          },
+          "distance": 1
+        },
+        "text": "In the event order, the -81 kg competitor and the competitor on Tatami 4 were exactly one position apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-medal-2-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-73 kg"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Silver"
+          },
+          "distance": 2
+        },
+        "text": "The -73 kg competitor and the silver medallist were exactly two positions apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-tatami-medal-0-2",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "tatami",
+            "value": "Tatami 3"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Bronze"
+          },
+          "distance": 2
+        },
+        "text": "In the event order, the competitor on Tatami 3 and the bronze medallist were exactly two positions apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-tatami-medal-0-1",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "tatami",
+            "value": "Tatami 3"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Finalist"
+          },
+          "distance": 1
+        },
+        "text": "The competitor on Tatami 3 and the finalist were exactly one position apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "before-medal-0-3",
+        "constraint": {
+          "kind": "before",
+          "left": {
+            "category": "medal",
+            "value": "Quarter-finalist"
+          },
+          "right": {
+            "category": "medal",
+            "value": "Gold"
+          }
+        },
+        "text": "The quarter-finalist appeared before the gold medallist in the event order.",
+        "phraseVariant": "before-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      }
+    ],
+    "difficulty": {
+      "level": 9,
+      "label": "Very hard",
+      "modelVersion": "yokaiba-difficulty-v5",
+      "evidence": {
+        "score": 74,
+        "humanSolve": {
+          "solved": true,
+          "totalCost": 107.75,
+          "hardestStep": 5,
+          "deductionPasses": 28
+        },
+        "clueStructure": {
+          "directClues": 0,
+          "relationalClues": 11,
+          "crossCategoryClues": 10
+        },
+        "solver": {
+          "nodesVisited": 17880,
+          "constraintChecks": 25092
+        }
+      }
+    }
+  },
+  "solution": {
+    "assignments": {
+      "weight": [
+        "-66 kg",
+        "-60 kg",
+        "-73 kg",
+        "-81 kg",
+        "-90 kg"
+      ],
+      "tatami": [
+        "Tatami 3",
+        "Tatami 2",
+        "Tatami 1",
+        "Tatami 5",
+        "Tatami 4"
+      ],
+      "medal": [
+        "Quarter-finalist",
+        "Finalist",
+        "Bronze",
+        "Gold",
+        "Silver"
+      ]
+    }
+  }
+}

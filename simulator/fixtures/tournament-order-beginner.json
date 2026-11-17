@@ -1,0 +1,227 @@
+{
+  "fixtureId": "tournament-order-beginner",
+  "source": {
+    "repository": "https://github.com/CyanAutomation/yokaiba",
+    "commit": "b19dc34",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "seed": "tako-bako-phase1-tournament-order"
+  },
+  "publicPuzzle": {
+    "id": "tournament-order-v2:tako-bako-phase1-tournament-order:yokaiba-difficulty-v5",
+    "requestedSeed": "tako-bako-phase1-tournament-order",
+    "seed": "tako-bako-phase1-tournament-order",
+    "templateId": "tournament-order-v2",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "difficultyModel": "v5",
+    "requestedDifficultyLevel": 1,
+    "puzzleFingerprint": "f66d2cb013be30532b0accedb5c975fe70d2560a162d362bfda736f7d2ff3d09",
+    "puzzleToken": "simulator-fixture:tournament-order-beginner",
+    "spec": {
+      "id": "tournament-order-v2",
+      "title": "Tournament Order",
+      "baseCategory": "judoka",
+      "categories": [
+        {
+          "id": "judoka",
+          "label": "Judoka",
+          "values": [
+            "Aki",
+            "Hana",
+            "Kenji",
+            "Sora"
+          ]
+        },
+        {
+          "id": "weight",
+          "label": "Weight division",
+          "values": [
+            "-60 kg",
+            "-66 kg",
+            "-73 kg",
+            "-81 kg"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "tatami",
+          "label": "Tatami",
+          "values": [
+            "Tatami 1",
+            "Tatami 2",
+            "Tatami 3",
+            "Tatami 4"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "placing",
+          "label": "Placing",
+          "values": [
+            "1st",
+            "2nd",
+            "3rd",
+            "4th"
+          ],
+          "ordered": true
+        }
+      ]
+    },
+    "clues": [
+      {
+        "id": "matches-tatami-2",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Kenji",
+          "category": "tatami",
+          "value": "Tatami 3"
+        },
+        "text": "Kenji competed on Tatami 3.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-weight-3",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Sora",
+          "category": "weight",
+          "value": "-60 kg"
+        },
+        "text": "Sora fought in the -60 kg division.",
+        "phraseVariant": "matches-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-tatami-3",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Sora",
+          "category": "tatami",
+          "value": "Tatami 4"
+        },
+        "text": "Sora competed on Tatami 4.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-placing-1",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Hana",
+          "category": "placing",
+          "value": "4th"
+        },
+        "text": "Hana finished in 4th place.",
+        "phraseVariant": "matches-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-tatami-1",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Hana",
+          "category": "tatami",
+          "value": "Tatami 1"
+        },
+        "text": "Hana competed on Tatami 1.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-placing-2",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Kenji",
+          "category": "placing",
+          "value": "1st"
+        },
+        "text": "Kenji finished in 1st place.",
+        "phraseVariant": "matches-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-placing-0",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Aki",
+          "category": "placing",
+          "value": "3rd"
+        },
+        "text": "Aki finished in 3rd place.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-weight-1",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Hana",
+          "category": "weight",
+          "value": "-66 kg"
+        },
+        "text": "Hana fought in the -66 kg division.",
+        "phraseVariant": "matches-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-weight-0",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Aki",
+          "category": "weight",
+          "value": "-81 kg"
+        },
+        "text": "Aki fought in the -81 kg division.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      }
+    ],
+    "difficulty": {
+      "level": 1,
+      "label": "Very easy",
+      "modelVersion": "yokaiba-difficulty-v5",
+      "evidence": {
+        "score": 15,
+        "humanSolve": {
+          "solved": true,
+          "totalCost": 24.75,
+          "hardestStep": 1.75,
+          "deductionPasses": 18
+        },
+        "clueStructure": {
+          "directClues": 9,
+          "relationalClues": 0,
+          "crossCategoryClues": 0
+        },
+        "solver": {
+          "nodesVisited": 72,
+          "constraintChecks": 96
+        }
+      }
+    }
+  },
+  "solution": {
+    "assignments": {
+      "weight": [
+        "-81 kg",
+        "-66 kg",
+        "-73 kg",
+        "-60 kg"
+      ],
+      "tatami": [
+        "Tatami 2",
+        "Tatami 1",
+        "Tatami 3",
+        "Tatami 4"
+      ],
+      "placing": [
+        "3rd",
+        "4th",
+        "1st",
+        "2nd"
+      ]
+    }
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "fixtureId": "open-division-intermediate",
+  "source": {
+    "repository": "https://github.com/CyanAutomation/yokaiba",
+    "commit": "b19dc34",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "seed": "tako-bako-phase1-open-division"
+  },
+  "publicPuzzle": {
+    "id": "open-division-v2:tako-bako-phase1-open-division:yokaiba-difficulty-v5",
+    "requestedSeed": "tako-bako-phase1-open-division",
+    "seed": "tako-bako-phase1-open-division",
+    "templateId": "open-division-v2",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "difficultyModel": "v5",
+    "requestedDifficultyLevel": 5,
+    "puzzleFingerprint": "eb1a1cfd595e9c4a24890095322a02c6d5ba2622cd9d0a3af6ab564ff32323d9",
+    "puzzleToken": "simulator-fixture:open-division-intermediate",
+    "spec": {
+      "id": "open-division-v2",
+      "title": "Open Division",
+      "baseCategory": "judoka",
+      "categories": [
+        {
+          "id": "judoka",
+          "label": "Judoka",
+          "values": [
+            "Aki",
+            "Hana",
+            "Kenji",
+            "Mika",
+            "Sora"
+          ]
+        },
+        {
+          "id": "weight",
+          "label": "Weight division",
+          "values": [
+            "-60 kg",
+            "-66 kg",
+            "-73 kg",
+            "-81 kg",
+            "-90 kg"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "tatami",
+          "label": "Tatami",
+          "values": [
+            "Tatami 1",
+            "Tatami 2",
+            "Tatami 3",
+            "Tatami 4",
+            "Tatami 5"
+          ],
+          "ordered": true
+        }
+      ]
+    },
+    "clues": [
+      {
+        "id": "matches-tatami-1",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Hana",
+          "category": "tatami",
+          "value": "Tatami 4"
+        },
+        "text": "Hana competed on Tatami 4.",
+        "phraseVariant": "matches-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "matches-weight-1",
+        "constraint": {
+          "kind": "matches",
+          "subject": "Hana",
+          "category": "weight",
+          "value": "-66 kg"
+        },
+        "text": "Hana fought in the -66 kg division.",
+        "phraseVariant": "matches-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-tatami-2",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-81 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 2"
+          }
+        },
+        "text": "The -81 kg competitor competed on Tatami 2.",
+        "phraseVariant": "sameRow-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-tatami-3",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-90 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 1"
+          }
+        },
+        "text": "The -90 kg competitor was scheduled on Tatami 1.",
+        "phraseVariant": "sameRow-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-0-1",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 4"
+          },
+          "distance": 1
+        },
+        "text": "In the event order, the -60 kg competitor and the competitor on Tatami 4 were exactly one position apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-2-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-81 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 3"
+          },
+          "distance": 2
+        },
+        "text": "The -81 kg competitor and the competitor on Tatami 3 were exactly two positions apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-0-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 3"
+          },
+          "distance": 4
+        },
+        "text": "In the event order, the -60 kg competitor and the competitor on Tatami 3 were exactly four positions apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      }
+    ],
+    "difficulty": {
+      "level": 5,
+      "label": "Moderate",
+      "modelVersion": "yokaiba-difficulty-v5",
+      "evidence": {
+        "score": 57,
+        "humanSolve": {
+          "solved": true,
+          "totalCost": 43.5,
+          "hardestStep": 4.5,
+          "deductionPasses": 16
+        },
+        "clueStructure": {
+          "directClues": 2,
+          "relationalClues": 5,
+          "crossCategoryClues": 5
+        },
+        "solver": {
+          "nodesVisited": 3000,
+          "constraintChecks": 3800
+        }
+      }
+    }
+  },
+  "solution": {
+    "assignments": {
+      "weight": [
+        "-60 kg",
+        "-66 kg",
+        "-81 kg",
+        "-90 kg",
+        "-73 kg"
+      ],
+      "tatami": [
+        "Tatami 5",
+        "Tatami 4",
+        "Tatami 2",
+        "Tatami 1",
+        "Tatami 3"
+      ]
+    }
+  }
+}

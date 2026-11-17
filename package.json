@@ -8,10 +8,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:sim": "node --import tsx scripts/dev-simulator.ts",
     "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.api.json && tsc -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "test": "node scripts/run-tests.ts",
+    "test:sim": "node --import tsx --test tests/simulator/*.test.ts",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:sim": "playwright test --config playwright.sim.config.ts",
     "test:coverage": "node scripts/run-tests.ts --coverage",
     "lint": "eslint --flag unstable_native_nodejs_ts_config .",
     "check:external-links": "node scripts/check-external-links.ts",

@@ -53,4 +53,23 @@ describe("Yokaiba generation parameters", () => {
     assert.strictEqual(url.searchParams.get("difficultyLevel"), "8");
     assert.strictEqual(url.searchParams.get("allowSeedFallback"), "true");
   });
+
+  it("[TB-SIM-02] opts into a local all-API proxy only in simulator mode", async () => {
+    const originalPort = process.env.TAKO_BAKO_SIMULATOR_PORT;
+    process.env.TAKO_BAKO_SIMULATOR_PORT = "4174";
+    try {
+      const loadedConfig = await loadConfigFromFile({ command: "serve", mode: "simulator" }, resolve("vite.config.ts"));
+      assert.ok(loadedConfig);
+      const proxy = loadedConfig.config.server?.proxy;
+      assert.ok(proxy && typeof proxy !== "string");
+      const simulatorProxy = proxy["/api"];
+      assert.ok(simulatorProxy && typeof simulatorProxy !== "string");
+      assert.strictEqual(simulatorProxy.target, "http://127.0.0.1:4174");
+      assert.strictEqual(simulatorProxy.changeOrigin, false);
+      assert.strictEqual(proxy["/api/puzzle"], undefined);
+    } finally {
+      if (originalPort === undefined) delete process.env.TAKO_BAKO_SIMULATOR_PORT;
+      else process.env.TAKO_BAKO_SIMULATOR_PORT = originalPort;
+    }
+  });
 });
