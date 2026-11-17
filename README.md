@@ -28,9 +28,9 @@ npm ci
 npm run dev
 ```
 
-Open <http://localhost:5173>. The Vite development server proxies puzzle generation to Yokaiba and requires network access. It does not run Vercel's serverless handlers, so answer checking and server-assisted hints and clue labels are available in the deployed app. Local play and puzzle generation need no provider credentials; optional model-assisted features require server-side configuration when deployed.
+Open <http://localhost:5173>. Normal `npm run dev` keeps the existing Vite behavior: puzzle generation proxies to hosted Yokaiba and requires network access. To exercise generation, answer checking, hints, events, and feedback without the hosted service, run `npm run dev:sim` instead. That explicit development command starts Vite and the local fixture simulator together; see [local simulator development](docs/operations.md#local-simulator-development).
 
-If puzzle generation fails, check network access to Yokaiba and inspect the `/api/puzzle` response in your browser's developer tools. See [operations troubleshooting](docs/operations.md#local-troubleshooting) for more help.
+If puzzle generation fails during normal development, check network access to Yokaiba and inspect the `/api/puzzle` response in your browser's developer tools. For simulated development, see [simulator troubleshooting](docs/operations.md#switching-modes-and-troubleshooting).
 
 ## How to play
 
@@ -59,7 +59,10 @@ Useful commands:
 |---|---|
 | `npm run check` | Lint, run tests, check README links and paths, and build the app and API |
 | `npm run test` | Run the test suite |
+| `npm run test:sim` | Run deterministic local simulator contract tests |
 | `npm run test:e2e` | Run the Chromium smoke test against the production preview (requires a Playwright browser install) |
+| `npm run test:e2e:sim` | Start local app and simulator, then run simulator gameplay tests |
+| `npm run dev:sim` | Start Vite and the local Yokaiba simulator for fully local gameplay |
 | `npm run test:coverage` | Write V8 coverage under `coverage/v8` |
 | `npm run lint` | Lint source files |
 | `npm run build` | Type-check and build the app and API |
@@ -113,7 +116,9 @@ src/                       Browser application
   sections/                Board, clue, curriculum, and grid views
 api/                       Vercel serverless handlers
 server/                    Shared API and provider modules
+simulator/                 Development-only local HTTP simulator and private fixtures
 tests/api/                 API handler tests
+tests/simulator/           Local simulator contract tests
 docs/                      Operations and test documentation
   images/                  README gameplay screenshot
 scripts/                   Test runner and documentation checks

@@ -1,0 +1,299 @@
+{
+  "fixtureId": "championship-bridge-transition",
+  "source": {
+    "repository": "https://github.com/CyanAutomation/yokaiba",
+    "commit": "b19dc34",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "seed": "tako-bako-phase1-championship-bridge"
+  },
+  "publicPuzzle": {
+    "id": "championship-bridge-v1:tako-bako-phase1-championship-bridge:yokaiba-difficulty-v5",
+    "requestedSeed": "tako-bako-phase1-championship-bridge",
+    "seed": "tako-bako-phase1-championship-bridge",
+    "templateId": "championship-bridge-v1",
+    "generatorVersion": "yokaiba-generator-v6",
+    "solverVersion": "yokaiba-exhaustive-v1",
+    "difficultyModel": "v5",
+    "requestedDifficultyLevel": 8,
+    "puzzleFingerprint": "8878b5388ae9998f4b8c6aa7aef5b115453f10423632c8f6f3fbf59bb2e62e6a",
+    "puzzleToken": "simulator-fixture:championship-bridge-transition",
+    "spec": {
+      "id": "championship-bridge-v1",
+      "title": "Championship Bridge",
+      "baseCategory": "judoka",
+      "categories": [
+        {
+          "id": "judoka",
+          "label": "Judoka",
+          "values": [
+            "Aki",
+            "Hana",
+            "Kenji",
+            "Mika",
+            "Sora"
+          ]
+        },
+        {
+          "id": "weight",
+          "label": "Weight division",
+          "values": [
+            "-60 kg",
+            "-66 kg",
+            "-73 kg",
+            "-81 kg",
+            "-90 kg"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "tatami",
+          "label": "Tatami",
+          "values": [
+            "Tatami 1",
+            "Tatami 2",
+            "Tatami 3",
+            "Tatami 4",
+            "Tatami 5"
+          ],
+          "ordered": true
+        },
+        {
+          "id": "result",
+          "label": "Result",
+          "values": [
+            "1st",
+            "2nd",
+            "3rd",
+            "4th",
+            "5th"
+          ],
+          "ordered": true
+        }
+      ]
+    },
+    "clues": [
+      {
+        "id": "same-row-weight-tatami-1",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-73 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 5"
+          }
+        },
+        "text": "The -73 kg competitor competed on Tatami 5.",
+        "phraseVariant": "sameRow-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-result-4",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-66 kg"
+          },
+          "right": {
+            "category": "result",
+            "value": "2nd"
+          }
+        },
+        "text": "The -66 kg competitor had 2nd.",
+        "phraseVariant": "sameRow-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-tatami-3",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-90 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 4"
+          }
+        },
+        "text": "The -90 kg competitor competed on Tatami 4.",
+        "phraseVariant": "sameRow-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-result-2",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "result",
+            "value": "3rd"
+          }
+        },
+        "text": "The -60 kg competitor had 3rd.",
+        "phraseVariant": "sameRow-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-tatami-result-0",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "tatami",
+            "value": "Tatami 2"
+          },
+          "right": {
+            "category": "result",
+            "value": "4th"
+          }
+        },
+        "text": "The competitor on Tatami 2 finished in 4th place.",
+        "phraseVariant": "sameRow-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "same-row-weight-result-3",
+        "constraint": {
+          "kind": "sameRow",
+          "left": {
+            "category": "weight",
+            "value": "-90 kg"
+          },
+          "right": {
+            "category": "result",
+            "value": "5th"
+          }
+        },
+        "text": "The -90 kg competitor had 5th.",
+        "phraseVariant": "sameRow-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-result-3-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-90 kg"
+          },
+          "right": {
+            "category": "result",
+            "value": "2nd"
+          },
+          "distance": 1
+        },
+        "text": "In the event order, the -90 kg competitor and the competitor who finished 2nd were exactly one position apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-tatami-2-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-60 kg"
+          },
+          "right": {
+            "category": "tatami",
+            "value": "Tatami 3"
+          },
+          "distance": 2
+        },
+        "text": "The -60 kg competitor and the competitor on Tatami 3 were exactly two positions apart in the event order.",
+        "phraseVariant": "distance-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "distance-weight-result-0-4",
+        "constraint": {
+          "kind": "distance",
+          "left": {
+            "category": "weight",
+            "value": "-81 kg"
+          },
+          "right": {
+            "category": "result",
+            "value": "2nd"
+          },
+          "distance": 4
+        },
+        "text": "In the event order, the -81 kg competitor and the competitor who finished 2nd were exactly four positions apart.",
+        "phraseVariant": "distance-0",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      },
+      {
+        "id": "before-result-1-4",
+        "constraint": {
+          "kind": "before",
+          "left": {
+            "category": "result",
+            "value": "1st"
+          },
+          "right": {
+            "category": "result",
+            "value": "2nd"
+          }
+        },
+        "text": "The competitor who finished 1st appeared before the competitor who finished 2nd in the event order.",
+        "phraseVariant": "before-1",
+        "languageVersion": "yokaiba-clue-prose-v11"
+      }
+    ],
+    "difficulty": {
+      "level": 8,
+      "label": "Hard",
+      "modelVersion": "yokaiba-difficulty-v5",
+      "evidence": {
+        "score": 72,
+        "humanSolve": {
+          "solved": true,
+          "totalCost": 87,
+          "hardestStep": 5,
+          "deductionPasses": 25
+        },
+        "clueStructure": {
+          "directClues": 0,
+          "relationalClues": 10,
+          "crossCategoryClues": 9
+        },
+        "solver": {
+          "nodesVisited": 15000,
+          "constraintChecks": 18948
+        }
+      }
+    }
+  },
+  "solution": {
+    "assignments": {
+      "weight": [
+        "-81 kg",
+        "-73 kg",
+        "-60 kg",
+        "-90 kg",
+        "-66 kg"
+      ],
+      "tatami": [
+        "Tatami 2",
+        "Tatami 5",
+        "Tatami 1",
+        "Tatami 4",
+        "Tatami 3"
+      ],
+      "result": [
+        "4th",
+        "1st",
+        "3rd",
+        "5th",
+        "2nd"
+      ]
+    }
+  }
+}

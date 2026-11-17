@@ -18,6 +18,28 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 
 `/api/health` returns HTTP 200 when Yokaiba is reachable and HTTP 503 when it is unavailable. It does not require credentials.
 
+## Local simulator development
+
+`npm run dev:sim` explicitly starts the Vite app and an HTTP simulator on loopback. Open the app at <http://127.0.0.1:5173>; the simulator listens at <http://127.0.0.1:4174>. The Vite proxy sends `/api/*` requests to that local process, which adapts the app's generation, verification, hint, clue-strategy, health, event, and feedback routes. Responses include `X-Tako-Bako-Simulator: true`. Startup fails if the simulator cannot bind or become ready; it never falls back to hosted Yokaiba. Ctrl+C stops both processes.
+
+The simulator uses four deterministic fixtures generated from the current Yokaiba source: Tournament Order v2 at Level 1, Open Division v2 at Level 5, Championship Bridge v1 at Level 8, and Championship Circuit v2 at Level 9. One fixture is selected by `templateId`; the request seed is echoed as `requestedSeed`, while `seed` records the seed used to generate the fixture. The requested seed does not alter fixture content. A requested difficulty must exactly match the fixture level, otherwise generation returns `422` with the available level. `allowSeedFallback` is accepted for request compatibility but does not select another fixture or level. `difficultyModel` is accepted and reflected in response metadata but does not rerun Yokaiba's model.
+
+Fixture responses keep the expected assignments in local private fixture definitions and omit them from HTTP responses. The simulator checks complete assignment permutations against those expected values, and placement hints come from the same fixture solution. Event submissions are accepted in memory only. Feedback idempotency lasts only for the simulator process lifetime. No simulator route makes outbound HTTP requests, uses production credentials, or writes to persistent storage.
+
+Run simulator tests with `npm run test:sim` and browser gameplay against the actual local routes with `npm run test:e2e:sim`. The E2E command starts the local app and simulator automatically. Install dependencies and Chromium first; after that, these commands do not need external services. `npm run test` includes the simulator contract tests, and `npm run check` runs the full lint, test, documentation, and build checks.
+
+To add or refresh a fixture, generate a representative puzzle from the current Yokaiba default branch and retain its public response data and expected solution in the private fixture definition under `simulator/fixtures/`. Keep the solution out of any HTTP response, preserve clue constraints and difficulty evidence, and update the fixture coverage tests and this level list. Do not implement Yokaiba's generator, solver, calibration logic, or signed-token format in Tako Bako.
+
+The simulator deliberately does not reproduce seed-based generation, the full difficulty catalogue, solver behavior, calibration, signed-token authentication, rate limiting, persistence, Jev decisions, or production caching and failure modes. A successful simulated game is not evidence of compatibility with the hosted Yokaiba REST API; use Yokaiba's published OpenAPI contract and the real local integration flow below for that.
+
+### Switching modes and troubleshooting
+
+- `npm run dev` returns to normal development. It keeps the existing hosted generation proxy and does not run Vercel's `/api/*` handlers.
+- For a real local integration, start a local Yokaiba Worker and use `npx vercel dev` as described in [Local feedback flow](#local-feedback-flow). That path uses the actual Yokaiba contract and local-only token and storage configuration.
+- If startup reports that a port is in use, set `TAKO_BAKO_SIMULATOR_PORT` and/or `TAKO_BAKO_SIMULATOR_APP_PORT` to free loopback ports before running `npm run dev:sim`.
+- If generation returns `422`, check the fixture levels above. Other levels are intentionally unavailable in Phase 1.
+- If `/api/*` requests fail to connect, check that both startup messages appeared and restart with `npm run dev:sim`; the simulator does not retry against hosted Yokaiba.
+
 ## Puzzle verification and cache policy
 
 The Yokaiba Worker must have `PUZZLE_TOKEN_SECRET` configured with `wrangler secret put PUZZLE_TOKEN_SECRET` and be redeployed. Yokaiba issues a signed token with generated puzzles; the solution itself is not sent to the browser. If the secret is absent or verification is unavailable, players can continue marking a board, but answer checking will not work.
