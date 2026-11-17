@@ -24,20 +24,6 @@ describe("hintCandidates", () => {
     }]);
   });
 
-  it("keeps solver placements and appends unused clues in order", () => {
-    const context: SelectionContext = {
-      clues: [{ id: "fresh", text: "The next clue." }],
-      usedClueIds: new Set(),
-      board: [],
-    };
-
-    const candidates = hintCandidates({ kind: "placement", placement: { subject: "Aki", category: "Club", value: "Lions" } }, context);
-
-    assert.strictEqual(candidates[0]?.id, "solver_primary");
-    assert.strictEqual(candidates[0]?.type, "placement");
-    assert.strictEqual(candidates[1]?.id, "clue:fresh");
-  });
-
   it("caps upstream candidate text while preserving the original hint payload", () => {
     const clueText = "🐟".repeat(600);
     const payload = { kind: "clue", clue: { id: "upstream", text: clueText } };

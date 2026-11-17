@@ -18,6 +18,20 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 
 `/api/health` returns HTTP 200 when Yokaiba is reachable and HTTP 503 when it is unavailable. It does not require credentials.
 
+### Request body limits
+
+Vercel's JSON body parser rejects requests that exceed these endpoint limits before the handler runs:
+
+| Route | Limit |
+|---|---:|
+| `/api/puzzle` | 2 MB |
+| `/api/hint` | 2 MB |
+| `/api/clue-strategies` | 256 KB |
+| `/api/events` | 4 KB |
+| `/api/feedback` | 4 KB |
+
+The smaller telemetry and feedback budgets reflect their bounded, allow-listed payloads. Hint and puzzle requests retain the larger parser budget for signed tokens and solver request data; the handlers still validate their individual fields and lengths.
+
 ## Local simulator development
 
 `npm run dev:sim` explicitly starts the Vite app and an HTTP simulator on loopback. Open the app at <http://127.0.0.1:5173>; the simulator listens at <http://127.0.0.1:4174>. The Vite proxy sends `/api/*` requests to that local process, which adapts the app's generation, verification, hint, clue-strategy, health, event, and feedback routes. Responses include `X-Tako-Bako-Simulator: true`. Startup fails if the simulator cannot bind or become ready; it never falls back to hosted Yokaiba. Ctrl+C stops both processes.

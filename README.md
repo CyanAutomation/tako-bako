@@ -41,11 +41,11 @@ Each puzzle has several categories of clues, such as “The cat owner lives next
 3. **Smart marking:** Turn it on in the board toolbar to rule out the other squares in a row and column when you confirm a match.
 4. **Check:** Submit a complete board. The server verifies it with Yokaiba; a correct answer advances Puzzle Challenge progress.
 5. **Rate the difficulty:** After solving, optionally choose Too easy, Just right, or Too hard. A Too hard rating can include one optional reason. While solving, open **More → Give feedback** to rate an unfinished puzzle.
-6. **Share:** Copy the page URL to share the same seeded puzzle. Challenge links include tier and level; other shared links include a template, difficulty, and difficulty model. Seeds accept 1–128 ASCII letters, digits, or hyphens; shared difficulty ranges from 1 to 12.
+6. **Share:** Copy the page URL to share the same seeded puzzle. Challenge links include tier and level; other shared links include a template, difficulty, and difficulty model. Seeds accept 1–128 ASCII letters, digits, or hyphens; shared difficulty ranges from 1 to 12. Starting a challenge from the landing page adds it to browser history, so Back returns to that landing page.
 
 Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5×5), Championship Bridge (bridge to the expert board), and Championship Circuit (three expert grids). Older Tournament Order v1 links remain available; Open Division v1 and Championship Circuit v1 links open their current versions.
 
-Clues can be filtered as All, To review, or Used. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. The grid collection is a labelled region; grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
+Clues can be filtered as All, To review, or Used. Starting a new puzzle closes the clue-filter disclosure. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. The grid collection is a labelled region; grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
 
 ### Puzzle Challenge
 

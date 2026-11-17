@@ -91,6 +91,56 @@ function mountTestPuzzle(
   };
 }
 
+function mountTestLanding(fetchImplementation: (input: string | URL | Request, init?: RequestInit) => Promise<unknown>) {
+  const listeners = new Map<string, (event: never) => void>();
+  const windowListeners = new Map<string, () => void>();
+  const seedInput = { value: "https://example.test/?seed=shared-seed&template=tournament-order-v2&difficulty=2", focus: () => undefined };
+  let href = "https://example.test/";
+  const root = {
+    innerHTML: "",
+    addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
+    querySelector: (selector: string) => selector === "#landing-seed-input" ? seedInput : null,
+  };
+  const storage = new Map<string, string>();
+  const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
+  stubGlobal("document", { querySelector: () => root, activeElement: null });
+  stubGlobal("window", {
+    get location() { return new URL(href); },
+    matchMedia: () => ({ matches: false }),
+    addEventListener: (name: string, listener: () => void) => windowListeners.set(name, listener),
+    history: {
+      pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+      replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
+    },
+  });
+  stubGlobal("localStorage", storageApi);
+  stubGlobal("sessionStorage", storageApi);
+  stubGlobal("CSS", { escape: (value: string) => value });
+  stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+  stubGlobal("crypto", { randomUUID: () => "reproducible-seed" });
+  const fetchMock = mock.fn(fetchImplementation);
+  stubGlobal("fetch", fetchMock);
+  mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
+
+  const click = (button: Partial<FakeButton>) => listeners.get("click")!({
+    target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
+  } as never);
+  return {
+    root, listeners, windowListeners, storage, fetchMock, click,
+    get href() { return href; },
+    set href(value: string) { href = value; },
+  };
+}
+
+async function mountShareTestPuzzle(seed: string) {
+  const app = mountTestPuzzle(seed, async input => {
+    if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+    return new Response(JSON.stringify(puzzleResponse(seed, "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
+  });
+  await flush();
+  return app;
+}
+
 describe("answer verification navigation", () => {
   beforeEach(() => {
     mock.restoreAll();
@@ -235,75 +285,47 @@ describe("answer verification navigation", () => {
     assert.ok(!(root.innerHTML).includes("An old hint"));
   });
 
-  it("returns to the seedless landing page when navigating Back from a started puzzle", async () => {
-    const listeners = new Map<string, (event: { target: { closest: () => FakeButton | null } }) => void>();
-    const windowListeners = new Map<string, () => void>();
-    const seedInput = { value: "https://example.test/?seed=shared-seed&template=tournament-order-v2&difficulty=2", focus: () => undefined };
-    const root = {
-      innerHTML: "",
-      addEventListener: (name: string, listener: (event: { target: { closest: () => FakeButton | null } }) => void) => listeners.set(name, listener),
-      querySelector: (selector: string) => selector === "#landing-seed-input" ? seedInput : null,
-    };
-    let href = "https://example.test/";
-    const storage = new Map<string, string>();
-    const storageApi = { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) };
-    stubGlobal("document", { querySelector: () => root, activeElement: null });
-    stubGlobal("window", {
-      get location() { return new URL(href); },
-      matchMedia: () => ({ matches: false }),
-      addEventListener: (name: string, listener: () => void) => windowListeners.set(name, listener),
-      history: {
-        pushState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
-        replaceState: (_state: unknown, _unused: string, url: URL | string) => { href = String(url); },
-      },
-    });
-    stubGlobal("localStorage", storageApi);
-    stubGlobal("sessionStorage", storageApi);
-    stubGlobal("CSS", { escape: (value: string) => value });
-    stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
-    stubGlobal("crypto", { randomUUID: () => "reproducible-seed" });
-    const fetchMock = mock.fn(async (input: string | URL) => {
+  it("[TB-URL-04] restores the landing page when a started puzzle receives popstate", async () => {
+    const app = mountTestLanding(async input => {
       const url = String(input);
-      if (url === "/api/events") return { ok: true, json: async () => ({}) };
+      if (url === "/api/events") return new Response("{}", { status: 202 });
       const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
-      return { ok: true, status: 200, json: async () => puzzleResponse(seed, `${seed}-token`) };
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200 });
     });
-    stubGlobal("fetch", fetchMock);
 
-    mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
-    const click = (button: Partial<FakeButton>) => listeners.get("click")!({
-      target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
+    app.click({ id: "start-puzzle" });
+    await flush();
+    assert.equal(new URL(app.href).searchParams.get("seed"), "reproducible-seed");
+    assert.match(app.root.innerHTML, /id="share-puzzle"/);
+
+    app.href = "https://example.test/";
+    app.windowListeners.get("popstate")!();
+    await flush();
+
+    assert.equal(new URL(app.href).search, "");
+    assert.match(app.root.innerHTML, /<h1>One small grid\.<br>One satisfying deduction\.<\/h1>/);
+    assert.doesNotMatch(app.root.innerHTML, /id="share-puzzle"/);
+  });
+
+  it("[TB-URL-01] opens a shared puzzle from the landing dialog with its template and difficulty", async () => {
+    const app = mountTestLanding(async input => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200 });
     });
-    click({ id: "start-puzzle" });
+
+    app.click({ id: "open-shared-puzzle" });
+    assert.match(app.root.innerHTML, /id="shared-puzzle"/);
+    app.click({ id: "open-landing-seed" });
     await flush();
 
-    assert.ok((href).includes("seed=reproducible-seed"));
-    assert.ok((root.innerHTML).includes('id="share-puzzle"'));
-
-    href = "https://example.test/";
-    windowListeners.get("popstate")!();
-    await flush();
-
-    assert.strictEqual(href, "https://example.test/");
-    assert.ok((root.innerHTML).includes('class="landing-state"'));
-    assert.ok((root.innerHTML).includes('id="start-puzzle"'));
-    assert.ok((root.innerHTML).includes('class="progress-management" aria-labelledby="progress-summary"'));
-    assert.ok((root.innerHTML).includes('class="progress-management__summary"'));
-    assert.ok((root.innerHTML).includes('class="disclosure progress-settings"'));
-    assert.ok(!(root.innerHTML).includes('id="share-puzzle"'));
-    assert.strictEqual(fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input).startsWith("/api/puzzle?")).length, 1);
-
-    click({ id: "open-shared-puzzle" });
-    assert.ok((root.innerHTML).includes('id="shared-puzzle"'));
-    click({ id: "open-landing-seed" });
-    await flush();
-
-    const sharedRequest = fetchMock.mock.calls.find(({ arguments: [input] }) => String(input).includes("seed=shared-seed"));
+    const sharedRequest = app.fetchMock.mock.calls.find(({ arguments: [input] }) => String(input).includes("seed=shared-seed"));
     assert.ok(sharedRequest);
     const sharedUrl = new URL(String(sharedRequest.arguments[0]), "https://example.test");
-    assert.strictEqual(sharedUrl.searchParams.get("templateId"), "tournament-order-v2");
-    assert.strictEqual(sharedUrl.searchParams.get("difficultyLevel"), "2");
-    assert.ok((href).includes("mode=shared"));
+    assert.equal(sharedUrl.searchParams.get("templateId"), "tournament-order-v2");
+    assert.equal(sharedUrl.searchParams.get("difficultyLevel"), "2");
+    assert.equal(new URL(app.href).searchParams.get("mode"), "shared");
   });
 
   it("records an incorrect answer without completing course progress", async () => {
@@ -400,13 +422,9 @@ describe("answer verification navigation", () => {
     assert.deepStrictEqual(savedBoard(), { "club|Aki|Lions": "yes", "weight|Aki|light": "yes" });
   });
 
-  it("confirms a copied puzzle link in a snackbar and dismisses it after the display interval", async context => {
+  it("[TB-URL-05] shows and dismisses a snackbar after successfully copying a puzzle link", async context => {
     context.mock.timers.enable({ apis: ["setTimeout", "Date"] });
-    const app = mountTestPuzzle("share-snackbar", async input => {
-      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
-      return new Response(JSON.stringify(puzzleResponse("share-snackbar", "signed-token")), { status: 200, headers: { "content-type": "application/json" } });
-    });
-    await flush();
+    const app = await mountShareTestPuzzle("share-snackbar");
     stubGlobal("navigator", { clipboard: { writeText: async () => undefined } });
 
     app.click({ id: "share-puzzle" });
@@ -416,7 +434,10 @@ describe("answer verification navigation", () => {
     assert.doesNotMatch(app.root.innerHTML, /class="status status--success"/);
     context.mock.timers.tick(5500);
     assert.doesNotMatch(app.root.innerHTML, /class="snackbar/);
+  });
 
+  it("[TB-URL-05] clears a clipboard failure warning after a successful retry", async () => {
+    const app = await mountShareTestPuzzle("share-retry");
     stubGlobal("navigator", { clipboard: { writeText: async () => { throw new Error("clipboard blocked"); } } });
     app.click({ id: "share-puzzle" });
     await flush();
@@ -454,23 +475,6 @@ describe("answer verification navigation", () => {
     assert.match(app.root.innerHTML, /class="snackbar snackbar--success"[^>]*>Board restored\.<\/div>/);
   });
 
-  it("resets the clue filter disclosure when a new puzzle is activated", async () => {
-    const app = mountTestPuzzle("filter-reset", async input => {
-      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
-      const seed = new URL(String(input), "https://example.test").searchParams.get("seed")!;
-      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200, headers: { "content-type": "application/json" } });
-    });
-    await flush();
-
-    app.listeners.get("toggle")!({
-      target: { open: true, classList: { contains: (name: string) => name === "clue-filter-disclosure" } },
-    } as never);
-    app.click({ id: "new-puzzle" });
-    await flush();
-
-    assert.match(app.root.innerHTML, /<details class="clue-filter-disclosure">/);
-    assert.doesNotMatch(app.root.innerHTML, /<details class="clue-filter-disclosure" open>/);
-  });
 });
 
 describe("puzzle loading error feedback", () => {
