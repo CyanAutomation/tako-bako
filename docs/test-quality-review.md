@@ -63,3 +63,23 @@ This pass consolidated bounded-text helper cases into one table-driven test whil
 The grid workspace test now verifies its named `<section>` region without checking a styling class. Kaseki preflight coverage checks each step by its named purpose; source-string assertions about actionlint were removed because workflow validation runs the pinned binary on the workflow files. The DRY sweep scope and external-link workflow now have traceability IDs `CI-KASEKI-05` and `CI-DOCS-01`. `TB-BOARD-RESET-01` documents the reset confirmation and Undo contract, and `TB-ACCESS-01` includes the named grid region.
 
 The targeted follow-up suite passed all 82 tests after correcting the reset-dialog assertion to check the native `<dialog>` element. The final `npm run check` passed lint, all 308 tests, documentation validation, TypeScript checks, and the production build. No mutation-testing run was performed for this follow-up.
+
+## Follow-up for the lower-scoring tests
+
+The mock-only link-fetcher argument test and the helper-only missing-documents-directory test were removed; the repository-level checker test still exercises the optional `docs` directory. The duplicate hint-candidate ordering test was removed because the endpoint test asserts both the candidates sent to Jev and the selected player-facing hint. The empty-grid keyboard helper test was removed because accepted puzzles require non-empty category values.
+
+The mocked navigation test now covers only `popstate` restoration, while a Playwright test exercises browser Back. Shared-link dialog behavior has its own test. Clipboard success/dismissal and retry after a clipboard failure are separate tests. The keyboard handler test now verifies that disabled cells and non-arrow keys are left alone. The clue-filter reset check moved from a fake `toggle` event to a browser assertion on the native `<details>.open` property.
+
+API body-parser budgets are documented in [operations](operations.md#request-body-limits) and traced by `TB-API-INPUT-01`. The raw actionlint command-string assertion was removed; the workflow validation job still runs the checksum-pinned actionlint binary against the workflow files.
+
+| Revised test | Scores = total | Segment |
+|---|---:|---|
+| [`browser Back returns to the landing page after starting a challenge`](../tests/e2e/app-smoke.spec.ts) (`TB-URL-04`) | 2/2/2/2/1 = **9** | Keep |
+| [`restarting a challenge closes the open clue filters disclosure`](../tests/e2e/app-smoke.spec.ts) (`TB-CLUE-02`) | 2/2/2/2/1 = **9** | Keep |
+| [`opens a shared puzzle from the landing dialog with its template and difficulty`](../src/main.test.ts) (`TB-URL-01`) | 2/2/2/1/2 = **9** | Keep |
+| [`applies the documented parser budget to every JSON endpoint`](../tests/api/body-limits.test.ts) (`TB-API-INPUT-01`) | 2/2/2/2/2 = **10** | Keep |
+| [`grid cell keyboard handler leaves disabled cells and non-arrow keys alone`](../src/app-keyboard.test.ts) (`TB-ACCESS-01`) | 2/2/2/2/1 = **9** | Keep |
+| [`shows and dismisses a snackbar after successfully copying a puzzle link`](../src/main.test.ts) (`TB-URL-05`) | 2/2/2/1/2 = **9** | Keep |
+| [`clears a clipboard failure warning after a successful retry`](../src/main.test.ts) (`TB-URL-05`) | 2/2/2/1/2 = **9** | Keep |
+
+The full quality gate passed: lint, all 323 Node tests, documentation validation, TypeScript checks, and the production build. All three Playwright browser smoke tests passed with system Chromium. No mutation-testing run was performed, so mutation coverage remains an estimate from assertion review.

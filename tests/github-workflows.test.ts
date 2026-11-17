@@ -56,7 +56,4 @@ test("[CI-KASEKI-01] Kaseki workflows use GitHub's self-repository action syntax
     const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
     assert.ok(steps.some(step => step.uses === "$/.github/actions/kaseki-preflight"), path);
   }
-
-  const validation = readFileSync(new URL("../.github/workflows/workflow-validation.yml", import.meta.url), "utf8");
-  assert.ok(validation.includes(String.raw`-ignore 'specifying action "\$/.github/actions/kaseki-preflight" in invalid format because ref is missing'`));
 });
