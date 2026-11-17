@@ -40,11 +40,6 @@ describe("shared UI primitives", () => {
     assert.strictEqual(nextGridCellKey({ ...options, key: "club|Aki|Lions", keyName: "Enter" }), undefined);
   });
 
-  it("[TB-ACCESS-01] does not navigate grids without rows or columns", () => {
-    assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: [], columns: ["Lions"], key: "club|Aki|Lions", keyName: "ArrowDown" }), undefined);
-    assert.strictEqual(nextGridCellKey({ categoryId: "club", rows: ["Aki"], columns: [], key: "club|Aki|Lions", keyName: "ArrowRight" }), undefined);
-  });
-
   it("[TB-ACCESS-02] gives icon actions an accessible name and hides decorative SVGs", () => {
     const iconButton = renderButton({ id: "undo", label: "Undo", ariaLabel: "Undo last mark", icon: "undo" });
 

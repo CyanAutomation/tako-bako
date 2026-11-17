@@ -6,12 +6,22 @@ import { config as clueStrategiesConfig } from "../../api/clue-strategies.js";
 import { config as eventsConfig } from "../../api/events.js";
 import { config as feedbackConfig } from "../../api/feedback.js";
 
-describe("API body parser limits", () => {
-  it("caps parsed JSON bodies close to each endpoint's bounded input contract", () => {
-    assert.strictEqual(puzzleConfig.api.bodyParser.sizeLimit, "2mb");
-    assert.strictEqual(hintConfig.api.bodyParser.sizeLimit, "2mb");
-    assert.strictEqual(clueStrategiesConfig.api.bodyParser.sizeLimit, "256kb");
-    assert.strictEqual(eventsConfig.api.bodyParser.sizeLimit, "4kb");
-    assert.strictEqual(feedbackConfig.api.bodyParser.sizeLimit, "4kb");
+describe("API request body limits", () => {
+  it("[TB-API-INPUT-01] applies the documented parser budget to every JSON endpoint", () => {
+    const configuredLimits = {
+      puzzle: puzzleConfig.api.bodyParser.sizeLimit,
+      hint: hintConfig.api.bodyParser.sizeLimit,
+      clueStrategies: clueStrategiesConfig.api.bodyParser.sizeLimit,
+      events: eventsConfig.api.bodyParser.sizeLimit,
+      feedback: feedbackConfig.api.bodyParser.sizeLimit,
+    };
+
+    assert.deepStrictEqual(configuredLimits, {
+      puzzle: "2mb",
+      hint: "2mb",
+      clueStrategies: "256kb",
+      events: "4kb",
+      feedback: "4kb",
+    });
   });
 });

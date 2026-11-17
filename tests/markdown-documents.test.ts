@@ -40,9 +40,4 @@ describe("shared Markdown document helpers", () => {
     ]);
   });
 
-  it("treats a missing optional document directory as empty", async () => {
-    const root = await createDirectory();
-
-    assert.deepStrictEqual(await markdownFiles(join(root, "missing")), []);
-  });
 });

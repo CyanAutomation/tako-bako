@@ -23,7 +23,7 @@ function keyboardEvent(key: string, target: object): { event: KeyboardEvent; was
   };
 }
 
-test("grid cell keyboard handler moves focus only for a valid arrow destination", () => {
+test("grid cell keyboard handler moves focus to the adjacent cell on ArrowRight", () => {
   const cell = { disabled: false, dataset: { square: "club|Aki|Lions" } };
   const { event, wasPrevented } = keyboardEvent("ArrowRight", { closest: () => cell });
   const focused: string[] = [];
@@ -31,6 +31,19 @@ test("grid cell keyboard handler moves focus only for a valid arrow destination"
   assert.equal(handleGridCellKeydown(event, puzzle, key => focused.push(key)), true);
   assert.deepStrictEqual(focused, ["club|Aki|Wolves"]);
   assert.equal(wasPrevented(), true);
+});
+
+test("grid cell keyboard handler leaves disabled cells and non-arrow keys alone", () => {
+  const disabledCell = { disabled: true, dataset: { square: "club|Aki|Lions" } };
+  const disabled = keyboardEvent("ArrowRight", { closest: () => disabledCell });
+  const unsupported = keyboardEvent("Enter", { closest: () => ({ disabled: false, dataset: { square: "club|Aki|Lions" } }) });
+  const focused: string[] = [];
+
+  assert.equal(handleGridCellKeydown(disabled.event, puzzle, key => focused.push(key)), false);
+  assert.equal(disabled.wasPrevented(), false);
+  assert.equal(handleGridCellKeydown(unsupported.event, puzzle, key => focused.push(key)), false);
+  assert.equal(unsupported.wasPrevented(), false);
+  assert.deepStrictEqual(focused, []);
 });
 
 test("grid tab keyboard handler selects the next tab and requests focus", () => {
