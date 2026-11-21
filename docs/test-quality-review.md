@@ -16,7 +16,7 @@ This is a focused re-score of the ten areas called out in the earlier review. It
 | Curriculum mapping | [`maps all twelve player-facing courses to their calibrated Yokaiba parameters`](../src/curriculum.test.ts) | 2/2/2/2/2 = **10** | Keep |
 | Cross-layer input boundaries | [`accepts documented seed and difficulty boundaries`](../tests/api/puzzle.test.ts) and [`rejects invalid API seed and difficulty boundaries`](../tests/api/puzzle.test.ts) | 2/2/2/2/2 = **10** each | Keep |
 | Daily rollover | [`uses one explicit UTC rollover for every player`](../src/daily.test.ts) | 2/2/2/2/2 = **10** | Keep |
-| Kaseki workflow contracts and polling | [Structured workflow checks and direct helper tests](../tests/kaseki-workflows.test.ts) | 2/2/2/2/2 = **10** | Keep |
+| Soyuz workflow contracts and validation boundaries | [Workflow structure plus URL and run-ID validation tests](../tests/soyuz-workflows.test.ts) | 2/2/2/2/2 = **10** | Keep |
 
 The origin-derivation and query-order tests were removed after request-level and development-proxy coverage took their place. The incomplete `Intl` parts test was removed and its helper made private; the UTC rollover contract remains tested. The Kaseki source-text checks were replaced with YAML configuration checks and tests of the idempotency and polling helpers.
 
@@ -83,3 +83,9 @@ API body-parser budgets are documented in [operations](operations.md#request-bod
 | [`clears a clipboard failure warning after a successful retry`](../src/main.test.ts) (`TB-URL-05`) | 2/2/2/1/2 = **9** | Keep |
 
 The full quality gate passed: lint, all 323 Node tests, documentation validation, TypeScript checks, and the production build. All three Playwright browser smoke tests passed with system Chromium. No mutation-testing run was performed, so mutation coverage remains an estimate from assertion review.
+
+## Follow-up for the Soyuz submission migration
+
+The workflow contract tests were rewritten first and failed against the original Kaseki endpoint, permissions, environment, and run polling. After the workflow changes, the focused Soyuz workflow suite passed. The old controller preflight and polling helpers are no longer used and were removed; URL origin and UUIDv7 response validation now have focused tests. The workflows continue to run their existing repository-specific schedules, prompts, allowlists, and validation commands. The workflow traceability IDs are now `CI-SOYUZ-01` through `CI-SOYUZ-05`.
+
+The final `npm run check` passed lint, all 315 Node tests, documentation checks, TypeScript checks, and the production build. The pinned actionlint 1.7.12 binary also passed. Local `npm ci` reported the declared Node 26 engine mismatch because this environment runs Node 24; the workflows themselves select Node 26.
