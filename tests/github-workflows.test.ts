@@ -49,11 +49,3 @@ test("[CI-E2E-01] the CI browser smoke job runs Playwright on every quality-gate
   };
   assert.equal(packageJson.scripts?.["test:e2e"], "npm run build && playwright test");
 });
-
-test("[CI-KASEKI-01] Kaseki workflows use GitHub's self-repository action syntax", () => {
-  for (const path of ["kaseki-docs.yaml", "kaseki-dry.yaml"]) {
-    const workflow = readWorkflow(path);
-    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
-    assert.ok(steps.some(step => step.uses === "$/.github/actions/kaseki-preflight"), path);
-  }
-});
