@@ -97,7 +97,7 @@ test("[CI-SOYUZ-01] Soyuz sweeps stay on main with least permissions and indepen
   }
 });
 
-test("[CI-SOYUZ-01] Soyuz sweeps use Node 26 and credential-free pinned checkouts", () => {
+test("[CI-SOYUZ-06] Soyuz sweeps use Node 26 and credential-free pinned checkouts", () => {
   for (const { name, workflow } of workflows) {
     const steps = allWorkflowSteps(workflow);
     const checkout = steps.find(step => step.uses?.startsWith("actions/checkout@"));
@@ -199,7 +199,7 @@ test("[CI-SOYUZ-05] DRY submissions stay within source, API, server, and test co
   assert.match(prompt, /A no-change result is successful/);
 });
 
-test("[CI-SOYUZ-01] Soyuz URL validation accepts only the configured canonical service origin", async () => {
+test("[CI-SOYUZ-07] Soyuz URL validation accepts only the configured canonical service origin", async () => {
   const { validateSoyuzBaseUrl } = await import("../scripts/soyuz/validate-soyuz-url.ts");
   const origin = "https://soyuz.scheimann.workers.dev";
   assert.equal(validateSoyuzBaseUrl(origin), origin);
@@ -221,7 +221,7 @@ test("[CI-SOYUZ-01] Soyuz URL validation accepts only the configured canonical s
   }
 });
 
-test("[CI-SOYUZ-01] URL validator normalizes the GitHub environment value without logging it", () => {
+test("[CI-SOYUZ-08] URL validator normalizes the GitHub environment value without logging it", () => {
   const directory = mkdtempSync(join(tmpdir(), "soyuz-url-test-"));
   try {
     const githubEnvPath = join(directory, "github-env");

@@ -86,6 +86,6 @@ The full quality gate passed: lint, all 323 Node tests, documentation validation
 
 ## Follow-up for the Soyuz submission migration
 
-The workflow contract tests were rewritten first and failed against the original Kaseki endpoint, permissions, environment, and run polling. After the workflow changes, the focused Soyuz workflow suite passed. The old controller preflight and polling helpers are no longer used and were removed; URL origin and UUIDv7 response validation now have focused tests. The workflows continue to run their existing repository-specific schedules, prompts, allowlists, and validation commands. The workflow traceability IDs are now `CI-SOYUZ-01` through `CI-SOYUZ-05`.
+The workflow contract tests were rewritten first and failed against the original Kaseki endpoint, permissions, environment, and run polling. After the workflow changes, the focused Soyuz workflow suite passed. The old controller preflight and polling helpers are no longer used and were removed; URL origin and UUIDv7 response validation now have focused tests. The workflows continue to run their existing repository-specific schedules, prompts, allowlists, and validation commands. The workflow traceability IDs are now `CI-SOYUZ-01` through `CI-SOYUZ-08`.
 
 The final `npm run check` passed lint, all 315 Node tests, documentation checks, TypeScript checks, and the production build. The pinned actionlint 1.7.12 binary also passed. Local `npm ci` reported the declared Node 26 engine mismatch because this environment runs Node 24; the workflows themselves select Node 26.
