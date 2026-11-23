@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../src/cache-policy.js";
 import { DEFAULT_SCENARIO_ID, isScenarioId } from "../src/scenarios.js";
 import { DIFFICULTY_LEVEL_PATTERN, isValidSeed, parseDifficultyModel, type DifficultyModel } from "../src/puzzle-input.js";
+import { parsePuzzle } from "../src/puzzle-parser.js";
 import { yokaibaGenerateParams } from "../src/yokaiba.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
@@ -276,7 +277,21 @@ async function forwardGeneratedPuzzle(parameters: GenerationParameters, response
       logMetric("generate", "invalid_upstream_response", 502, startedAt, { upstreamStatus: upstream.status });
       return;
     }
-    const body: unknown = await upstream.json();
+    let puzzle: ReturnType<typeof parsePuzzle>;
+    try {
+      // The client parser is also the public response projection. It retains
+      // only playable puzzle fields and drops internal solver traces, which
+      // contain enough placements/eliminations to reconstruct the answer.
+      puzzle = parsePuzzle(await upstream.json());
+    } catch {
+      preventCaching(response);
+      response.status(502).json({ error: "Invalid response from Yokaiba." });
+      logMetric("generate", "invalid_upstream_response", 502, startedAt, {
+        upstreamStatus: upstream.status,
+        retryCount,
+      });
+      return;
+    }
     response.setHeader(PUZZLE_GENERATED_AT_HEADER, String(Date.now()));
     response.setHeader("cache-control", PUZZLE_CACHE_CONTROL);
     response.setHeader("cdn-cache-control", PUZZLE_CACHE_CONTROL);
@@ -284,7 +299,7 @@ async function forwardGeneratedPuzzle(parameters: GenerationParameters, response
     response.setHeader("x-tako-bako-cache-policy", PUZZLE_CACHE_POLICY);
     response.setHeader("server-timing", `yokaiba;dur=${Date.now() - startedAt}`);
     response.setHeader("content-type", "application/json");
-    response.status(200).json(body);
+    response.status(200).json(puzzle);
     logMetric("generate", "success", 200, startedAt, { retryCount });
   } catch (error) {
     upstreamFailure(response, "generate", error, startedAt);

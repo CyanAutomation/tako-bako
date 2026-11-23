@@ -44,3 +44,120 @@ jobs:
             echo
             echo "GET \`$HEALTH_URL\` returned HTTP \`$http_status\`."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  generation:
+    name: Check Level ${{ matrix.difficultyLevel }} generation
+    needs: health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - difficultyLevel: 1
+            templateId: tournament-order-v2
+            difficultyModel: v5
+            seed: deployment-smoke-beginner-1
+          - difficultyLevel: 2
+            templateId: tournament-order-v2
+            difficultyModel: v5
+            seed: deployment-smoke-beginner-2
+          - difficultyLevel: 3
+            templateId: tournament-order-v2
+            difficultyModel: v5
+            seed: deployment-smoke-beginner-3
+          - difficultyLevel: 4
+            templateId: tournament-order-v2
+            difficultyModel: v5
+            seed: deployment-smoke-beginner-4
+          - difficultyLevel: 5
+            templateId: open-division-v2
+            difficultyModel: v5
+            seed: deployment-smoke-intermediate-1
+          - difficultyLevel: 6
+            templateId: open-division-v2
+            difficultyModel: v5
+            seed: deployment-smoke-intermediate-2
+          - difficultyLevel: 7
+            templateId: open-division-v2
+            difficultyModel: v5
+            seed: difficulty-v5-audit-target-open-division-v2-7-0
+          - difficultyLevel: 8
+            templateId: championship-bridge-v1
+            difficultyModel: v5
+            seed: CodexAuditLevel8Alt
+          - difficultyLevel: 9
+            templateId: championship-bridge-v1
+            difficultyModel: v5
+            seed: deployment-smoke-advanced-1
+          - difficultyLevel: 10
+            templateId: championship-circuit-v2
+            difficultyModel: v5
+            seed: deployment-smoke-advanced-2
+          - difficultyLevel: 11
+            templateId: championship-circuit-v2
+            difficultyModel: v4
+            seed: deployment-smoke-advanced-3
+          - difficultyLevel: 12
+            templateId: championship-circuit-v2
+            difficultyModel: v4
+            seed: deployment-smoke-advanced-4
+    steps:
+      - name: Verify the requested course puzzle and public response
+        shell: bash
+        env:
+          API_URL: https://tako-bako.vercel.app/api/puzzle
+          DIFFICULTY_LEVEL: ${{ matrix.difficultyLevel }}
+          TEMPLATE_ID: ${{ matrix.templateId }}
+          DIFFICULTY_MODEL: ${{ matrix.difficultyModel }}
+          SEED: ${{ matrix.seed }}
+        run: |
+          set -euo pipefail
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          http_status="$(
+            curl --silent --show-error \
+              --retry 2 --retry-delay 2 --retry-max-time 30 \
+              --connect-timeout 10 --max-time 20 \
+              --get \
+              --data-urlencode "seed=$SEED" \
+              --data-urlencode "templateId=$TEMPLATE_ID" \
+              --data-urlencode "difficultyLevel=$DIFFICULTY_LEVEL" \
+              --data-urlencode "difficultyModel=$DIFFICULTY_MODEL" \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              "$API_URL"
+          )"
+
+          if [[ "$http_status" != "200" ]]; then
+            echo "::error title=Course puzzle smoke test failed::Level $DIFFICULTY_LEVEL returned HTTP $http_status"
+            echo "Puzzle response body omitted from logs."
+            exit 1
+          fi
+
+          if ! jq -e \
+            --arg template "$TEMPLATE_ID" \
+            --arg model "$DIFFICULTY_MODEL" \
+            --argjson level "$DIFFICULTY_LEVEL" \
+            '(.templateId == $template)
+              and (.difficultyModel == $model)
+              and (.difficulty.level == $level)
+              and ((.puzzleToken | type) == "string")
+              and ((.clues | type) == "array" and (.clues | length) > 0)
+              and ((.spec.categories | type) == "array" and (.spec.categories | length) >= 2)
+              and (([.. | objects | keys[] | select(
+                . == "difficultyProfile" or . == "trace" or . == "solution" or . == "answer"
+                or . == "placements" or . == "eliminatedPossibilities"
+              )] | length) == 0)' \
+            "$response_file" >/dev/null; then
+            echo "::error title=Course puzzle contract failed::Level $DIFFICULTY_LEVEL returned an unexpected or unsafe puzzle payload"
+            echo "Puzzle response body omitted from logs."
+            exit 1
+          fi
+
+          {
+            echo "## Course puzzle smoke test"
+            echo
+            echo "Level `$DIFFICULTY_LEVEL` (`$TEMPLATE_ID`, `$DIFFICULTY_MODEL`) returned HTTP `$http_status` with the requested difficulty and public response shape."
+          } >> "$GITHUB_STEP_SUMMARY"

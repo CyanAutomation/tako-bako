@@ -32,9 +32,9 @@ describe("Puzzle Challenge curriculum", () => {
     assert.strictEqual(nextCourse(courseFor("advanced", 4)!), undefined);
   });
 
-  it("defaults supported challenge targets to v5 and keeps known gaps on v4", () => {
+  it("uses v5 for audited targets and keeps the remaining target gaps on v4", () => {
     assert.equal(defaultDifficultyModelForCourse(courseFor("beginner", 1)!), "v5");
-    assert.equal(defaultDifficultyModelForCourse(courseFor("intermediate", 3)!), "v4");
+    assert.equal(defaultDifficultyModelForCourse(courseFor("intermediate", 3)!), "v5");
     assert.equal(defaultDifficultyModelForCourse(courseFor("advanced", 2)!), "v5");
     assert.equal(defaultDifficultyModelForCourse(courseFor("advanced", 3)!), "v4");
     assert.equal(defaultDifficultyModelForCourse(courseFor("advanced", 4)!), "v4");

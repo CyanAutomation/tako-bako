@@ -73,13 +73,13 @@ The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinn
 
 The pull-request gate also runs a Chromium smoke test against the production build. Install the browser with `npx playwright install chromium` before running `npm run test:e2e` locally. External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
 
-For deployed route behavior and the health endpoint, see [Deployment and API](#deployment-and-api) and the [operations guide](docs/operations.md#deployment). Local and deployed service issues are covered in [operations troubleshooting](docs/operations.md#local-troubleshooting).
+For deployed route behavior and the scheduled generation smoke checks, see [Deployment and API](#deployment-and-api) and the [operations guide](docs/operations.md#deployment). Local and deployed service issues are covered in [operations troubleshooting](docs/operations.md#local-troubleshooting).
 
 Selected test contracts and product behavior are mapped in [test traceability](docs/test-traceability.md). The focused test review and verification notes are in [test quality review](docs/test-quality-review.md).
 
 ## Deployment and API
 
-Vercel serves the Vite app and six serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, puzzle difficulty feedback, and readiness. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
+Vercel serves the Vite app and six serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, puzzle difficulty feedback, and readiness. The scheduled deployment smoke test checks health and requests one seeded puzzle for each Challenge level. The public puzzle response contains only validated player fields; it does not include solver traces or answer data. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
 
 `GET /api/puzzle` accepts a required `seed`, an optional allow-listed `templateId`, an optional `difficultyLevel` from 1 to 12, and an optional `difficultyModel` from `v4`, `v5`, or `compare`. Verification (`POST /api/puzzle`) and hints (`POST /api/hint`) require the signed `puzzleToken` returned with a generated puzzle. These endpoints support the app's own flows.
 

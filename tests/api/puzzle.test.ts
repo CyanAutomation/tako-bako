@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { assertPartialMatch, rejectedMock, resolvedMock, resolvedSequenceMock, restoreStubbedGlobals, stubGlobal } from "../../test-utils.js";
 import { CACHE_FRESH_LIFETIME_SECONDS, CACHE_STALE_WHILE_REVALIDATE_LIFETIME_SECONDS } from "../../src/cache-policy.js";
 import { parseSharedPuzzleInput } from "../../src/shared-puzzle.js";
+import { parsePuzzle } from "../../src/puzzle-parser.js";
 
 import handler from "../../api/puzzle.js";
 
@@ -18,6 +19,40 @@ function responseRecorder() {
     }),
   };
   return { response, result };
+}
+
+function generatedPuzzle(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "puzzle-1",
+    requestedSeed: "seed-1",
+    seed: "seed-1",
+    templateId: "tournament-order-v2",
+    difficultyModel: "v5",
+    clues: [{ id: "clue-1", text: "Aki finished in 2nd place.", constraint: { kind: "matches", subject: "Aki", category: "placing", value: "2nd" }, languageVersion: "test" }],
+    difficulty: { level: 1, label: "Warm-up", modelVersion: "yokaiba-difficulty-v5", evidence: { score: 15 } },
+    spec: {
+      id: "tournament-order-v2",
+      title: "Tournament Order",
+      baseCategory: "judoka",
+      categories: [
+        { id: "judoka", label: "Judoka", values: ["Aki", "Hana"] },
+        { id: "placing", label: "Placing", values: ["1st", "2nd"] },
+      ],
+      metadata: { internal: "discard this" },
+    },
+    puzzleToken: "signed-puzzle-token",
+    difficultyProfile: {
+      logical: {
+        trace: {
+          status: "solved",
+          steps: [{ placements: [{ category: "placing", row: 0, value: "2nd" }], eliminatedPossibilities: [{ category: "placing", row: 1, value: "2nd" }] }],
+        },
+      },
+    },
+    solution: { assignments: { placing: ["2nd", "1st"] } },
+    answer: { assignments: { placing: ["2nd", "1st"] } },
+    ...overrides,
+  };
 }
 
 describe("puzzle proxy", () => {
@@ -158,7 +193,7 @@ describe("puzzle proxy", () => {
   it("caches deterministic generated puzzles at the CDN", async () => {
     const generatedAt = 1_800_000_000_000;
     mock.method(Date, "now", () => generatedAt);
-    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "dojo-day" }), {
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify(generatedPuzzle({ id: "dojo-day" })), {
       status: 200, headers: { "content-type": "application/json", "x-request-id": "yokaiba-generate-123", etag: '"yokaiba-v1-cached"' },
     })));
     const { response, result } = responseRecorder();
@@ -186,10 +221,39 @@ describe("puzzle proxy", () => {
     assert.strictEqual(result.headers.get("etag"), '"yokaiba-v1-cached"');
   });
 
+  it("returns only the validated player puzzle fields, never the solver trace or solution", async () => {
+    const upstreamPuzzle = generatedPuzzle();
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify(upstreamPuzzle), {
+      status: 200, headers: { "content-type": "application/json" },
+    })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "seed-1", difficultyLevel: "1" } } as never, response as never);
+
+    assert.strictEqual(result.statusCode, 200);
+    assert.deepStrictEqual(result.body, parsePuzzle(upstreamPuzzle));
+    assert.strictEqual(Object.hasOwn(result.body, "difficultyProfile"), false);
+    assert.strictEqual(Object.hasOwn(result.body, "solution"), false);
+    assert.strictEqual(Object.hasOwn(result.body, "answer"), false);
+    assert.strictEqual((result.body as { puzzleToken: string }).puzzleToken, "signed-puzzle-token");
+  });
+
+  it("fails closed without caching when the upstream puzzle is not valid", async () => {
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "broken", solution: { answer: true } }), {
+      status: 200, headers: { "content-type": "application/json" },
+    })));
+    const { response, result } = responseRecorder();
+
+    await handler({ method: "GET", query: { seed: "seed-1" } } as never, response as never);
+
+    assertPartialMatch(result, { statusCode: 502, body: { error: "Invalid response from Yokaiba." } });
+    assert.strictEqual(result.headers.get("cache-control"), "no-store");
+  });
+
   it("[TB-INPUT-01] accepts documented seed and difficulty boundaries in shared links and API requests", async () => {
     const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
       void args;
-      return new Response(JSON.stringify({ id: "boundary-puzzle" }), {
+      return new Response(JSON.stringify(generatedPuzzle({ id: "boundary-puzzle" })), {
         status: 200, headers: { "content-type": "application/json" },
       });
     });
@@ -240,7 +304,7 @@ describe("puzzle proxy", () => {
   it("accepts and forwards v5 and comparison model selection", async () => {
     const upstream = mock.fn(async (...args: Parameters<typeof fetch>) => {
       void args;
-      return new Response(JSON.stringify({ id: "model-puzzle" }), {
+      return new Response(JSON.stringify(generatedPuzzle({ id: "model-puzzle" })), {
         status: 200, headers: { "content-type": "application/json" },
       });
     });
@@ -258,7 +322,7 @@ describe("puzzle proxy", () => {
   it("retries one transient upstream generation failure before surfacing an error", async () => {
     const upstream = resolvedSequenceMock(
       new Response("error code: 1102", { status: 503, headers: { "content-type": "text/plain" } }),
-      new Response(JSON.stringify({ id: "recovered" }), { status: 200, headers: { "content-type": "application/json" } }),
+      new Response(JSON.stringify(generatedPuzzle({ id: "recovered" })), { status: 200, headers: { "content-type": "application/json" } }),
     );
     stubGlobal("fetch", upstream);
     const { response, result } = responseRecorder();
@@ -286,7 +350,7 @@ describe("puzzle proxy", () => {
   });
 
   it("[TB-URL-01] forwards an allowlisted expanded template to Yokaiba", async () => {
-    const upstream = resolvedMock(new Response(JSON.stringify({ id: "champion" }), {
+    const upstream = resolvedMock(new Response(JSON.stringify(generatedPuzzle({ id: "champion" })), {
       status: 200, headers: { "content-type": "application/json" },
     }));
     stubGlobal("fetch", upstream);
@@ -321,7 +385,7 @@ describe("puzzle proxy", () => {
   });
 
   it("[TB-OBS-01] logs required fields for a successful generation metric", async () => {
-    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify({ id: "dojo-day" }), { status: 200, headers: { "content-type": "application/json" } })));
+    stubGlobal("fetch", resolvedMock(new Response(JSON.stringify(generatedPuzzle({ id: "dojo-day" })), { status: 200, headers: { "content-type": "application/json" } })));
     const { response } = responseRecorder();
 
     await handler({ method: "GET", query: { seed: "dojo-day" } } as never, response as never);

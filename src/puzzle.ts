@@ -1,5 +1,5 @@
-import type { ClueStrategy } from "./clue-strategy-catalog";
-import { type DifficultyModel } from "./puzzle-input";
+import type { ClueStrategy } from "./clue-strategy-catalog.js";
+import { type DifficultyModel } from "./puzzle-input.js";
 
 export type Mark = "unknown" | "yes" | "no";
 
