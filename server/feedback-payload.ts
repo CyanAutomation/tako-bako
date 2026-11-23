@@ -19,33 +19,71 @@ function boundedInteger(value: unknown, minimum: number, maximum: number): value
   return typeof value === "number" && Number.isSafeInteger(value) && value >= minimum && value <= maximum;
 }
 
-/** Strips unknown fields and validates the small browser-to-Yokaiba contract. */
-export function parseFeedbackPayload(value: unknown): PuzzleFeedbackRequest | undefined {
-  if (!isRecord(value)) return undefined;
+function isWithinBodyLimit(value: Record<string, unknown>): boolean {
   try {
-    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_FEEDBACK_BODY_BYTES) return undefined;
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength <= MAX_FEEDBACK_BODY_BYTES;
   } catch {
-    return undefined;
+    return false;
   }
-  if (Object.keys(value).some(key => !ALLOWED_FIELDS.has(key))) return undefined;
-  if (typeof value.puzzleToken !== "string" || value.puzzleToken.trim().length === 0 || value.puzzleToken.length > MAX_PUZZLE_TOKEN_LENGTH) return undefined;
+}
+
+function hasOnlyAllowedFields(value: Record<string, unknown>): boolean {
+  return Object.keys(value).every(key => ALLOWED_FIELDS.has(key));
+}
+
+function parsePuzzleToken(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > MAX_PUZZLE_TOKEN_LENGTH) return undefined;
+  return value;
+}
+
+function parseFeedbackChoice(value: Record<string, unknown>): Pick<PuzzleFeedbackRequest, "rating" | "reason"> | undefined {
   if (typeof value.rating !== "string" || !PUZZLE_FEEDBACK_RATINGS.includes(value.rating as PuzzleFeedbackRequest["rating"])) return undefined;
-  if (value.reason !== undefined && (typeof value.reason !== "string" || !PUZZLE_FEEDBACK_REASONS.includes(value.reason as NonNullable<PuzzleFeedbackRequest["reason"]>))) return undefined;
-  if (value.rating !== "too_hard" && value.reason !== undefined) return undefined;
+  const rating = value.rating as PuzzleFeedbackRequest["rating"];
+  if (value.reason === undefined) return { rating };
+  if (typeof value.reason !== "string" || !PUZZLE_FEEDBACK_REASONS.includes(value.reason as NonNullable<PuzzleFeedbackRequest["reason"]>)) return undefined;
+  if (rating !== "too_hard") return undefined;
+  return { rating, reason: value.reason as NonNullable<PuzzleFeedbackRequest["reason"]> };
+}
+
+function parseFeedbackProgress(value: Record<string, unknown>): Pick<PuzzleFeedbackRequest, "outcome" | "hintsUsed" | "mistakes" | "elapsedMs"> | undefined {
   if (value.outcome !== "completed" && value.outcome !== "in_progress") return undefined;
   if (!boundedInteger(value.hintsUsed, 0, 100) || !boundedInteger(value.mistakes, 0, 100)) return undefined;
   if (value.elapsedMs !== undefined && !boundedInteger(value.elapsedMs, 0, 86_400_000)) return undefined;
-  if (typeof value.smartMarkingEnabled !== "boolean") return undefined;
-  if (typeof value.idempotencyKey !== "string" || !IDEMPOTENCY_KEY_PATTERN.test(value.idempotencyKey)) return undefined;
   return {
-    puzzleToken: value.puzzleToken,
-    rating: value.rating as PuzzleFeedbackRequest["rating"],
-    ...(typeof value.reason === "string" ? { reason: value.reason as PuzzleFeedbackRequest["reason"] } : {}),
     outcome: value.outcome,
     hintsUsed: value.hintsUsed,
     mistakes: value.mistakes,
     ...(typeof value.elapsedMs === "number" ? { elapsedMs: value.elapsedMs } : {}),
-    smartMarkingEnabled: value.smartMarkingEnabled,
-    idempotencyKey: value.idempotencyKey,
   };
+}
+
+function parseFeedbackMetadata(value: Record<string, unknown>): Pick<PuzzleFeedbackRequest, "smartMarkingEnabled" | "idempotencyKey"> | undefined {
+  if (typeof value.smartMarkingEnabled !== "boolean") return undefined;
+  if (typeof value.idempotencyKey !== "string" || !IDEMPOTENCY_KEY_PATTERN.test(value.idempotencyKey)) return undefined;
+  return { smartMarkingEnabled: value.smartMarkingEnabled, idempotencyKey: value.idempotencyKey };
+}
+
+function parseValidatedFeedbackPayload(value: Record<string, unknown>): PuzzleFeedbackRequest | undefined {
+  const puzzleToken = parsePuzzleToken(value.puzzleToken);
+  if (puzzleToken === undefined) return undefined;
+  const choice = parseFeedbackChoice(value);
+  if (!choice) return undefined;
+  const progress = parseFeedbackProgress(value);
+  if (!progress) return undefined;
+  const metadata = parseFeedbackMetadata(value);
+  if (!metadata) return undefined;
+
+  return {
+    puzzleToken,
+    ...choice,
+    ...progress,
+    ...metadata,
+  };
+}
+
+/** Validates the small browser-to-Yokaiba feedback contract. */
+export function parseFeedbackPayload(value: unknown): PuzzleFeedbackRequest | undefined {
+  if (!isRecord(value)) return undefined;
+  if (!isWithinBodyLimit(value) || !hasOnlyAllowedFields(value)) return undefined;
+  return parseValidatedFeedbackPayload(value);
 }

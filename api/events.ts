@@ -11,7 +11,7 @@ const RATE_LIMIT_HEADERS = [
   "retry-after",
 ] as const;
 
-export async function handleEventsRequest(
+async function handleEventsRequest(
   request: VercelRequest,
   response: VercelResponse,
   fetcher: typeof fetch = fetch,

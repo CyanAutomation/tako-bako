@@ -242,6 +242,24 @@ test("clue and placement hints are deterministic and consistent with the fixture
   assert.equal(invalidToken.status, 400);
 });
 
+test("hint routes enforce methods, route-specific fields, indices, and board context", async () => {
+  const fixture = fixtureFor("tournament-order-v2");
+  const simulator = createSimulator();
+  const cases: Array<[string, Request, number]> = [
+    ["method", new Request("http://simulator.test/api/hint"), 405],
+    ["unknown REST field", post("/v1/puzzles/hint", { puzzleToken: fixture.publicPuzzle.puzzleToken, kind: "clue", hintIndex: 0, extra: true }), 400],
+    ["REST placement hint", post("/v1/puzzles/hint", { puzzleToken: fixture.publicPuzzle.puzzleToken, kind: "placement", hintIndex: 0 }), 400],
+    ["out-of-range app index", post("/api/hint", { puzzleToken: fixture.publicPuzzle.puzzleToken, kind: "clue", hintsUsed: 101 }), 400],
+    ["invalid placement board", post("/api/hint", { puzzleToken: fixture.publicPuzzle.puzzleToken, kind: "placement", hintsUsed: 0, board: "not-a-board" }), 400],
+  ];
+
+  for (const [label, request, expectedStatus] of cases) {
+    const response = await simulator.handle(request);
+    assert.equal(response.status, expectedStatus, label);
+    if (label === "method") assert.equal(response.headers.get("allow"), "POST");
+  }
+});
+
 test("simulated events, feedback, and health remain local and accept bounded requests", async () => {
   const simulator = createSimulator();
   const event = await simulator.handle(post("/api/events", {

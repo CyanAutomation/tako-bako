@@ -507,6 +507,50 @@ describe("puzzle loading error feedback", () => {
   });
 });
 
+describe("puzzle difficulty feedback submission", () => {
+  beforeEach(() => {
+    mock.restoreAll();
+    stubGlobal("crypto", { randomUUID: () => "123e4567-e89b-42d3-a456-426614174000" });
+  });
+
+  it("retries with the same snapshot and idempotency key, then confirms success", async () => {
+    const submissions: Record<string, unknown>[] = [];
+    const app = mountTestPuzzle("feedback-submit", async (input, init) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/feedback") {
+        submissions.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return submissions.length === 1
+          ? new Response(JSON.stringify({ error: "private upstream detail" }), { status: 503 })
+          : new Response(JSON.stringify({ accepted: true, duplicate: false }), { status: 202 });
+      }
+      if (url === "/api/clue-strategies") return new Response(JSON.stringify({ strategies: [] }), { status: 200 });
+      return new Response(JSON.stringify({
+        ...puzzleResponse("feedback-submit", "signed-token"),
+        puzzleFingerprint: "a".repeat(64),
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ dataset: { feedbackRating: "too_hard" } });
+    app.click({ dataset: { feedbackReason: "confusing_clues" } });
+    app.click({ dataset: { submitPuzzleFeedback: "true" } });
+    await flush();
+    assert.match(app.root.innerHTML, /Feedback could not be sent\. Please try again\./);
+
+    app.click({ dataset: { submitPuzzleFeedback: "true" } });
+    await flush();
+
+    assert.equal(submissions.length, 2);
+    assert.deepEqual(submissions[1], submissions[0]);
+    assert.equal(submissions[0]?.rating, "too_hard");
+    assert.equal(submissions[0]?.reason, "confusing_clues");
+    assert.equal(submissions[0]?.puzzleToken, "signed-token");
+    assert.equal(submissions[0]?.idempotencyKey, "123e4567-e89b-42d3-a456-426614174000");
+    assert.match(app.root.innerHTML, /Thanks for helping us tune these puzzles\./);
+  });
+});
+
 describe("cross-tab puzzle cache", () => {
   beforeEach(() => {
     mock.restoreAll();

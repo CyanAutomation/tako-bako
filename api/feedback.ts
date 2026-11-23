@@ -21,6 +21,96 @@ function sanitizedError(status: number): { error: string } {
   return { error: "Feedback could not be sent. Please try again." };
 }
 
+type ForwardedHeader = [name: string, value: string];
+
+interface FeedbackProxyResult {
+  status: number;
+  body: Record<string, unknown>;
+  metricOutcome: string;
+  metricStatus: number;
+  headers: ForwardedHeader[];
+}
+
+function feedbackProxyResult(
+  status: number,
+  body: Record<string, unknown>,
+  metricOutcome: string,
+  metricStatus = status,
+  headers: ForwardedHeader[] = [],
+): FeedbackProxyResult {
+  return { status, body, metricOutcome, metricStatus, headers };
+}
+
+function forwardedHeaders(upstream: Response): ForwardedHeader[] {
+  const headers: ForwardedHeader[] = [];
+  const requestId = upstream.headers.get("x-request-id");
+  if (requestId) headers.push(["x-yokaiba-request-id", requestId]);
+  for (const name of ["ratelimit-limit", "ratelimit-policy", "ratelimit-remaining", "ratelimit-reset", "retry-after"]) {
+    const value = upstream.headers.get(name);
+    if (value) headers.push([name, value]);
+  }
+  return headers;
+}
+
+function applyForwardedHeaders(response: VercelResponse, headers: ForwardedHeader[]): void {
+  for (const [name, value] of headers) response.setHeader(name, value);
+}
+
+function isTimeout(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "TimeoutError";
+}
+
+function isAcceptedResponse(body: unknown): body is Record<string, unknown> {
+  return typeof body === "object" && body !== null && "accepted" in body && body.accepted === true;
+}
+
+async function readUpstreamResponse(upstream: Response): Promise<FeedbackProxyResult> {
+  const headers = forwardedHeaders(upstream);
+  if (!upstream.ok) {
+    const status = [400, 409, 429, 503].includes(upstream.status) ? upstream.status : 502;
+    return feedbackProxyResult(status, sanitizedError(status), status === 429 ? "rate_limited" : "upstream_error", status, headers);
+  }
+
+  const body: unknown = await upstream.json().catch(() => undefined);
+  if (!isAcceptedResponse(body)) return feedbackProxyResult(502, sanitizedError(502), "invalid_upstream_response", 502, headers);
+
+  const duplicate = "duplicate" in body && body.duplicate === true;
+  const status = upstream.status === 200 && duplicate ? 200 : 202;
+  return feedbackProxyResult(status, { accepted: true, duplicate }, "accepted", upstream.status, headers);
+}
+
+async function submitFeedback(
+  feedback: NonNullable<ReturnType<typeof parseFeedbackPayload>>,
+  fetcher: typeof fetch,
+  resolveYokaibaApiOrigin: typeof yokaibaApiOrigin,
+): Promise<FeedbackProxyResult> {
+  let upstreamUrl: string;
+  try {
+    upstreamUrl = `${resolveYokaibaApiOrigin()}${FEEDBACK_PATH}`;
+  } catch {
+    return feedbackProxyResult(500, { error: "Feedback is temporarily unavailable. Please try again." }, "configuration_error");
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetcher(upstreamUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(feedback),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+  } catch (error) {
+    const timedOut = isTimeout(error);
+    const status = timedOut ? 504 : 502;
+    const body = {
+      error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again.",
+    };
+    return feedbackProxyResult(status, body, timedOut ? "timeout" : "upstream_error");
+  }
+
+  return readUpstreamResponse(upstream);
+}
+
 export async function handleFeedbackRequest(
   request: VercelRequest,
   response: VercelResponse,
@@ -40,48 +130,10 @@ export async function handleFeedbackRequest(
     logMetric("invalid_request", 400, startedAt);
     return;
   }
-  let upstreamUrl: string;
-  try {
-    upstreamUrl = `${resolveYokaibaApiOrigin()}${FEEDBACK_PATH}`;
-  } catch {
-    response.status(500).json({ error: "Feedback is temporarily unavailable. Please try again." });
-    logMetric("configuration_error", 500, startedAt);
-    return;
-  }
-  try {
-    const upstream = await fetcher(upstreamUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(feedback),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-    });
-    const requestId = upstream.headers.get("x-request-id");
-    if (requestId) response.setHeader("x-yokaiba-request-id", requestId);
-    for (const header of ["ratelimit-limit", "ratelimit-policy", "ratelimit-remaining", "ratelimit-reset", "retry-after"]) {
-      const value = upstream.headers.get(header);
-      if (value) response.setHeader(header, value);
-    }
-    if (!upstream.ok) {
-      const status = [400, 409, 429, 503].includes(upstream.status) ? upstream.status : 502;
-      response.status(status).json(sanitizedError(status));
-      logMetric(status === 429 ? "rate_limited" : "upstream_error", status, startedAt);
-      return;
-    }
-    const body: unknown = await upstream.json().catch(() => undefined);
-    if (typeof body !== "object" || body === null || !("accepted" in body) || body.accepted !== true) {
-      response.status(502).json(sanitizedError(502));
-      logMetric("invalid_upstream_response", 502, startedAt);
-      return;
-    }
-    const duplicate = "duplicate" in body && body.duplicate === true;
-    response.status(upstream.status === 200 && duplicate ? 200 : 202).json({ accepted: true, duplicate });
-    logMetric("accepted", upstream.status, startedAt);
-  } catch (error) {
-    const timedOut = typeof error === "object" && error !== null && "name" in error && (error as { name?: unknown }).name === "TimeoutError";
-    const status = timedOut ? 504 : 502;
-    response.status(status).json({ error: timedOut ? "Yokaiba took too long to respond. Please try again." : "Yokaiba is unavailable. Please try again." });
-    logMetric(timedOut ? "timeout" : "upstream_error", status, startedAt);
-  }
+  const result = await submitFeedback(feedback, fetcher, resolveYokaibaApiOrigin);
+  applyForwardedHeaders(response, result.headers);
+  response.status(result.status).json(result.body);
+  logMetric(result.metricOutcome, result.metricStatus, startedAt);
 }
 
 export default async function handler(request: VercelRequest, response: VercelResponse): Promise<void> {
