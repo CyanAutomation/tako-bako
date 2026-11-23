@@ -77,6 +77,23 @@ test("completion modal offers optional ratings and keeps progression actions vis
   assert.match(markup, /id="celebration-close"/);
 });
 
+test("completion modal renders an escaped learning recommendation fallback for A2UI", () => {
+  const markup = renderApp(view({
+    pendingCelebration: true,
+    puzzleCompleted: true,
+    learningRecommendation: {
+      strategy: "adjacency",
+      title: "A strategy to carry forward",
+      focus: "Neighbours",
+      body: "Uses next-to or adjacent positions. Look for this kind of reasoning in your next puzzle.",
+    },
+  }));
+
+  assert.match(markup, /class="learning-recommendation-fallback/);
+  assert.match(markup, /data-a2ui-learning-recommendation hidden/);
+  assert.match(markup, /Neighbours: Uses next-to or adjacent positions/);
+});
+
 test("the grid identifies the event order with numbered base rows", () => {
   const markup = renderApp(view());
 

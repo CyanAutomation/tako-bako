@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { A2UI_BASIC_CATALOG_ID, buildHintCoachSurface, buildStrategySurface, hintCoachContent } from "./messages";
+import { A2UI_BASIC_CATALOG_ID, buildHintCoachSurface, buildLearningRecommendationSurface, buildStrategySurface, hintCoachContent } from "./messages";
 import type { ClueStrategy } from "../clue-strategy-catalog";
 
 function surface(message: unknown) {
@@ -45,6 +45,32 @@ describe("Tako Bako A2UI message components", () => {
       dismissLabel: "Dismiss note",
     });
     assert.deepEqual(dismiss?.action, { event: { name: "dismiss_hint", context: {} } });
+  });
+
+  it("adds a host-bound review action only when the app supplies a matched clue ID", () => {
+    const created = surface(buildHintCoachSurface({
+      surfaceId: "tako-hint-coach",
+      title: "Order",
+      body: "Follow the sequence.",
+      focusClueId: "clue-7",
+    }));
+    const components = created.components as Record<string, unknown>[];
+    const review = components.find(component => component.id === "review_clue") as { action?: unknown } | undefined;
+
+    assert.deepEqual(review?.action, { event: { name: "focus_clue", context: { clueId: "clue-7" } } });
+  });
+
+  it("builds a learning recommendation surface from the fixed strategy catalog", () => {
+    const created = surface(buildLearningRecommendationSurface({
+      surfaceId: "tako-learning-recommendation",
+      strategy: "adjacency",
+    }));
+
+    assert.equal(created.surfaceId, "tako-learning-recommendation");
+    assert.deepEqual(created.dataModel, {
+      label: "For next time",
+      body: "Neighbours: Uses next-to or adjacent positions. Look for this kind of reasoning in your next puzzle.",
+    });
   });
 
   it("bounds surface IDs and text before creating protocol messages", () => {

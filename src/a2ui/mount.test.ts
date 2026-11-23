@@ -47,6 +47,30 @@ describe("A2UI view mounting", () => {
     assert.equal(coachTarget.childElementCount, 0);
   });
 
+  it("upgrades a learning recommendation fallback when a puzzle is complete", () => {
+    const document = parseHTML(`<html><body><main>
+      <section class="learning-recommendation"><div class="learning-recommendation-fallback">Try a strategy</div><div data-a2ui-learning-recommendation hidden></div></section>
+    </main></body></html>`).document;
+    const root = document.querySelector("main") as HTMLElement;
+    const mount = new A2uiSurfaceMount(() => {});
+
+    mount.mount(root, {
+      puzzle: puzzle(),
+      clueStrategies: {},
+      learningRecommendation: {
+        strategy: "adjacency",
+        title: "A strategy to carry forward",
+        focus: "Neighbours",
+        body: "Uses next-to or adjacent positions. Look for this kind of reasoning in your next puzzle.",
+      },
+    });
+
+    assert.equal((root.querySelector("[data-a2ui-learning-recommendation]") as HTMLElement).hidden, false);
+    assert.equal((root.querySelector(".learning-recommendation-fallback") as HTMLElement).hidden, true);
+    assert.match(root.textContent ?? "", /Neighbours/);
+    mount.dispose();
+  });
+
   it("leaves accessible fallback content visible when a surface cannot be built", () => {
     const document = parseHTML(`<html><body><main>
       <details class="clue-strategy-disclosure"><span class="clue-strategy-fallback">Fallback strategy</span><div data-a2ui-strategy data-clue-index="0" hidden></div></details>

@@ -44,8 +44,8 @@ export function a2uiText(id: string, path: string, variant: "body" | "caption" =
   return { id, component: "Text", variant, text: { "@path": path } };
 }
 
-export function a2uiButton(id: string, textId: string, eventName: string): A2uiComponentMessage {
-  return { id, component: "Button", child: textId, action: { event: { name: eventName, context: {} } } };
+export function a2uiButton(id: string, textId: string, eventName: string, context: Record<string, unknown> = {}): A2uiComponentMessage {
+  return { id, component: "Button", child: textId, action: { event: { name: eventName, context } } };
 }
 
 export function a2uiDivider(id: string): A2uiComponentMessage {
@@ -85,6 +85,25 @@ export function buildStrategySurface({ surfaceId, strategy }: {
   });
 }
 
+/** Creates a fixed, app-owned learning focus from an allowlisted strategy ID. */
+export function buildLearningRecommendationSurface({ surfaceId, strategy }: {
+  surfaceId: string;
+  strategy: ClueStrategy;
+}): A2uiSurfaceMessage[] {
+  const definition = CLUE_STRATEGIES[strategy];
+  if (!definition) throw new TypeError("Learning strategy is unsupported.");
+  const components = [
+    a2uiCard("root", "learning_content"),
+    a2uiColumn("learning_content", ["learning_label", "learning_body"]),
+    a2uiText("learning_label", "/label", "caption"),
+    a2uiText("learning_body", "/body"),
+  ];
+  return createSurface(surfaceId, components, {
+    label: "For next time",
+    body: `${definition.label}: ${definition.description} Look for this kind of reasoning in your next puzzle.`,
+  });
+}
+
 export interface HintCoachContent {
   title: string;
   body: string;
@@ -103,21 +122,32 @@ export function hintCoachContent(hint: ParsedHintResponse, strategy?: ClueStrate
   };
 }
 
-/** Creates a fixed coaching surface with one host-validated dismiss action. */
-export function buildHintCoachSurface({ surfaceId, title, body }: {
+/** Creates a fixed coaching surface with host-validated dismiss and optional matched-clue actions. */
+export function buildHintCoachSurface({ surfaceId, title, body, focusClueId }: {
   surfaceId: string;
   title: string;
   body: string;
+  focusClueId?: string;
 }): A2uiSurfaceMessage[] {
   assertText(title, "title", MAX_LABEL_LENGTH);
   assertText(body, "body", MAX_BODY_LENGTH);
+  if (focusClueId !== undefined) assertText(focusClueId, "clue ID", 128);
   const components = [
     a2uiCard("root", "coach_content"),
-    a2uiColumn("coach_content", ["coach_title", "coach_body", "dismiss"]),
+    a2uiColumn("coach_content", ["coach_title", "coach_body", "dismiss", ...(focusClueId ? ["review_clue"] : [])]),
     a2uiText("coach_title", "/title", "caption"),
     a2uiText("coach_body", "/body"),
     a2uiButton("dismiss", "dismiss_label", "dismiss_hint"),
     a2uiText("dismiss_label", "/dismissLabel"),
+    ...(focusClueId ? [
+      a2uiButton("review_clue", "review_clue_label", "focus_clue", { clueId: focusClueId }),
+      a2uiText("review_clue_label", "/reviewClueLabel"),
+    ] : []),
   ];
-  return createSurface(surfaceId, components, { title, body, dismissLabel: "Dismiss note" });
+  return createSurface(surfaceId, components, {
+    title,
+    body,
+    dismissLabel: "Dismiss note",
+    ...(focusClueId ? { reviewClueLabel: "Review this clue" } : {}),
+  });
 }

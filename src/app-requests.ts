@@ -1,6 +1,7 @@
 import { parseAnswerVerification } from "./answer-verification";
 import { parseClueStrategyResults } from "./clue-strategy-results";
 import { parseHintResponse, type ParsedHintResponse } from "./hint-response";
+import { parseLearningRecommendationResponse, type StrategyUsageCounts } from "./learning-recommendation";
 import type { HintRequestBody } from "./hint-request";
 import type { Answer, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
@@ -49,4 +50,29 @@ export async function requestHintResponse(body: HintRequestBody, signal: AbortSi
   if (!isActive()) return undefined;
   if (!response.ok || !hint) throw new Error("Hint unavailable");
   return hint;
+}
+
+export interface LearningRecommendationRequest {
+  puzzleToken: string;
+  hintsUsed: number;
+  mistakes: number;
+  elapsedMs: number;
+  strategyUsageCounts: StrategyUsageCounts;
+}
+
+/** Requests one bounded post-puzzle strategy choice for the active puzzle. */
+export async function requestLearningRecommendation(
+  body: LearningRecommendationRequest,
+  signal: AbortSignal,
+  isActive: () => boolean,
+) {
+  const response = await fetch("/api/learning-recommendation", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!isActive() || !response.ok) return undefined;
+  const recommendation = parseLearningRecommendationResponse(await response.json());
+  return isActive() ? recommendation : undefined;
 }

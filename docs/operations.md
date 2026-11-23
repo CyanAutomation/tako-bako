@@ -12,6 +12,7 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 | `/api/puzzle` | POST | Verify a completed board with its signed puzzle token. |
 | `/api/hint` | POST | Request a bounded solver hint, with optional Jev selection. |
 | `/api/clue-strategies` | POST | Label clue reasoning strategies; known constraint kinds use deterministic labels. |
+| `/api/learning-recommendation` | POST | Choose a bounded strategy focus after a puzzle is completed. |
 | `/api/events` | POST | Forward validated anonymous puzzle outcomes to Yokaiba. |
 | `/api/feedback` | POST | Forward anonymous difficulty feedback for a signed puzzle. |
 | `/api/health` | GET | Report readiness of Tako Bako and its Yokaiba dependency. |
@@ -29,14 +30,15 @@ Vercel's JSON body parser rejects requests that exceed these endpoint limits bef
 | `/api/puzzle` | 2 MB |
 | `/api/hint` | 2 MB |
 | `/api/clue-strategies` | 256 KB |
+| `/api/learning-recommendation` | 32 KB |
 | `/api/events` | 4 KB |
 | `/api/feedback` | 4 KB |
 
-The smaller telemetry and feedback budgets reflect their bounded, allow-listed payloads. Hint and puzzle requests retain the larger parser budget for signed tokens and solver request data; the handlers still validate their individual fields and lengths.
+The smaller telemetry, learning, and feedback budgets reflect their bounded, allow-listed payloads. Hint and puzzle requests retain the larger parser budget for signed tokens and solver request data; the handlers still validate their individual fields and lengths.
 
 ## Local simulator development
 
-`npm run dev:sim` explicitly starts the Vite app and an HTTP simulator on loopback. Open the app at <http://127.0.0.1:5173>; the simulator listens at <http://127.0.0.1:4174>. The Vite proxy sends `/api/*` requests to that local process, which adapts the app's generation, verification, hint, clue-strategy, health, event, and feedback routes. Responses include `X-Tako-Bako-Simulator: true`. Startup fails if the simulator cannot bind or become ready; it never falls back to hosted Yokaiba. Ctrl+C stops both processes.
+`npm run dev:sim` explicitly starts the Vite app and an HTTP simulator on loopback. Open the app at <http://127.0.0.1:5173>; the simulator listens at <http://127.0.0.1:4174>. The Vite proxy sends `/api/*` requests to that local process, which adapts the app's generation, verification, hint, clue-strategy, learning-recommendation, health, event, and feedback routes. Learning recommendations use the deterministic local fallback; the simulator never calls Jev. Responses include `X-Tako-Bako-Simulator: true`. Startup fails if the simulator cannot bind or become ready; it never falls back to hosted Yokaiba. Ctrl+C stops both processes.
 
 The simulator uses four deterministic fixtures generated from the current Yokaiba source: Tournament Order v2 at Level 1, Open Division v2 at Level 5, Championship Bridge v1 at Level 8, and Championship Circuit v2 at Level 9. One fixture is selected by `templateId`; the request seed is echoed as `requestedSeed`, while `seed` records the seed used to generate the fixture. The requested seed does not alter fixture content. A requested difficulty must exactly match the fixture level, otherwise generation returns `422` with the available level. `allowSeedFallback` is accepted for request compatibility but does not select another fixture or level. `difficultyModel` is accepted and reflected in response metadata but does not rerun Yokaiba's model.
 
@@ -117,15 +119,15 @@ Set `OPENROUTER_API_KEY` in the Vercel project's **server-side** environment to 
 | `OPENROUTER_API_KEY` | Yes, for Jev | Authenticates model decision requests. |
 | `JEV_MODEL` | No | Model ID; defaults to `~typesafe/jev-latest`. Pin an ID for repeatable labels. |
 
-Without an OpenRouter key, with an invalid key, or when OpenRouter is unavailable, model requests are skipped and deterministic hint/label fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key; the application does not impose per-client or daily model-call quotas.
+Without an OpenRouter key, with an invalid key, or when OpenRouter is unavailable, model requests are skipped and deterministic hint, label, and learning-recommendation fallbacks remain available. Keep these values out of browser code and the repository. Configure a spend limit and usage alert for the OpenRouter key. The browser requests at most one recommendation per completed puzzle, and the endpoint emits `learning_recommendation` outcome and duration metrics. This browser guard is not a per-client or daily server-side model-call quota.
 
 Event ingestion uses Yokaiba’s rate limiting: `/api/events` limits its parsed request body to 4 KB and forwards only allowlisted event fields, while Yokaiba's Worker applies its existing REST rate limit to `/v1/events`. The proxy passes Yokaiba's 429 response and rate-limit headers back to the caller.
 
-Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
+Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. After a completed puzzle, Jev can choose a reasoning strategy from the fixed catalog using bounded counts for hints, mistakes, elapsed time, and strategies used. When Jev is enabled, Yokaiba validates the signed token before the summary reaches Jev. The token, board, solution, and clue text are not sent to Jev. Jev never decides correctness or writes user-facing recommendation copy; the app maps its validated choice to catalog text. Invalid or failed model responses use a deterministic least-used strategy.
 
 ## A2UI browser surfaces
 
-The browser uses Google's A2UI Basic Catalog for the clue strategy disclosure and the post-hint reasoning coach. Surface messages are assembled by app code from validated clue, strategy, or placement data. Model output does not provide component trees, URLs, executable code, or actions. The DOM adapter accepts one version 1.0 surface and a small allowlist of layout, text, card, divider, and button components; its only action is the host-checked hint dismissal. Text is inserted as text content. If a surface fails validation or cannot render, the equivalent HTML fallback remains visible. Jev continues to operate through the existing server-side hint and clue-strategy endpoints.
+The browser uses Google's A2UI Basic Catalog for clue strategy disclosures, the post-hint reasoning coach, and the completion learning card. Surface messages are assembled by app code from validated clue, strategy, or placement data. Model output does not provide component trees, URLs, executable code, or actions. The DOM adapter accepts one version 1.0 surface and a small allowlist of layout, text, card, divider, and button components; its actions are limited to dismissing a hint coach or focusing a clue already matched to that hint. Shared coach-panel markup and semantic card components provide reusable A2UI and HTML fallback views. Text is inserted as text content. If a surface fails validation or cannot render, the equivalent HTML fallback remains visible. Jev decisions use the server-side hint, clue-strategy, and learning-recommendation endpoints.
 
 ## Events, privacy, and metrics
 

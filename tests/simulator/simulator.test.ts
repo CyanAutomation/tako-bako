@@ -321,6 +321,13 @@ test("all simulator routes work when any unexpected fetch is treated as a failur
     const clueStrategy = await simulator.handle(post("/api/clue-strategies", {
       clues: [{ id: "known-clue", text: "A clue", constraintKind: "matches" }],
     }));
+    const learningRecommendation = await simulator.handle(post("/api/learning-recommendation", {
+      puzzleToken: token,
+      hintsUsed: 1,
+      mistakes: 0,
+      elapsedMs: 12_000,
+      strategyUsageCounts: { direct_match: 1 },
+    }));
     const feedback = await simulator.handle(post("/api/feedback", {
       puzzleToken: token,
       rating: "just_right",
@@ -336,6 +343,7 @@ test("all simulator routes work when any unexpected fetch is treated as a failur
     assert.equal(event.status, 202);
     assert.equal(restEvent.status, 202);
     assert.equal(clueStrategy.status, 200);
+    assert.equal(learningRecommendation.status, 200);
     assert.equal(feedback.status, 202);
     assert.equal(health.status, 200);
   } finally {
