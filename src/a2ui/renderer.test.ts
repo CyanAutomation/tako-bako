@@ -69,6 +69,15 @@ describe("A2UI DOM renderer boundary", () => {
     }
   });
 
+  it("rejects deeply nested untrusted component properties before traversing them recursively", () => {
+    const messages = buildHintCoachSurface({ surfaceId: "tako-hint-coach", title: "Order", body: "Follow the sequence." }) as unknown as TestMessage[];
+    let nested: unknown = "leaf";
+    for (let index = 0; index < 128; index += 1) nested = { child: nested };
+    messages[0]!.createSurface.components[0]!.unexpected = nested;
+
+    assert.equal(validateA2uiMessages(messages, "tako-hint-coach").ok, false);
+  });
+
   it("keeps the last good DOM when a later surface is invalid", () => {
     const document = parseHTML("<html><body><main id='target'></main></body></html>").document;
     const target = document.querySelector("#target") as HTMLElement;

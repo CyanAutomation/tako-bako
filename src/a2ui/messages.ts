@@ -91,9 +91,10 @@ export interface HintCoachContent {
 }
 
 export function hintCoachContent(hint: ParsedHintResponse, strategy?: ClueStrategy): HintCoachContent {
+  const definition = strategy ? CLUE_STRATEGIES[strategy] : undefined;
   if (hint.kind === "clue") {
-    return strategy
-      ? { title: CLUE_STRATEGIES[strategy].label, body: `“${hint.clue.text}” ${CLUE_STRATEGIES[strategy].description}` }
+    return definition
+      ? { title: definition.label, body: `“${hint.clue.text}” ${definition.description}` }
       : { title: "Think through the clue", body: `“${hint.clue.text}” Look for a relationship that rules out one of the remaining pairings.` };
   }
   return {

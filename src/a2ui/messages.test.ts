@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { A2UI_BASIC_CATALOG_ID, buildHintCoachSurface, buildStrategySurface } from "./messages";
+import { A2UI_BASIC_CATALOG_ID, buildHintCoachSurface, buildStrategySurface, hintCoachContent } from "./messages";
+import type { ClueStrategy } from "../clue-strategy-catalog";
 
 function surface(message: unknown) {
   assert.ok(Array.isArray(message));
@@ -53,5 +54,15 @@ describe("Tako Bako A2UI message components", () => {
       title: "Think",
       body: "x".repeat(2_000),
     }), /outside the supported length/i);
+  });
+
+  it("uses generic hint coaching when a strategy is unknown at runtime", () => {
+    const content = hintCoachContent({
+      kind: "clue",
+      clue: { id: "clue-1", text: "Aki lives next to the judoka." },
+    }, "future_strategy" as ClueStrategy);
+
+    assert.equal(content.title, "Think through the clue");
+    assert.match(content.body, /Aki lives next to the judoka/);
   });
 });

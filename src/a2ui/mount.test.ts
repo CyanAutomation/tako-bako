@@ -61,4 +61,22 @@ describe("A2UI view mounting", () => {
     assert.equal((root.querySelector(".clue-strategy-fallback") as HTMLElement).hidden, false);
     mount.dispose();
   });
+
+  it("does not mount a strategy surface when the clue index is missing or empty", () => {
+    const document = parseHTML(`<html><body><main>
+      <details><span class="clue-strategy-fallback">Missing index fallback</span><div data-a2ui-strategy hidden></div></details>
+      <details><span class="clue-strategy-fallback">Empty index fallback</span><div data-a2ui-strategy data-clue-index="" hidden></div></details>
+    </main></body></html>`).document;
+    const root = document.querySelector("main") as HTMLElement;
+    const mount = new A2uiSurfaceMount(() => {});
+
+    mount.mount(root, { puzzle: puzzle(), clueStrategies: { "clue-1": "adjacency" } });
+
+    const targets = root.querySelectorAll<HTMLElement>("[data-a2ui-strategy]");
+    const fallbacks = root.querySelectorAll<HTMLElement>(".clue-strategy-fallback");
+    assert.equal(targets.length, 2);
+    for (const target of targets) assert.equal(target.hidden, true);
+    for (const fallback of fallbacks) assert.equal(fallback.hidden, false);
+    mount.dispose();
+  });
 });

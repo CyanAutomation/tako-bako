@@ -31,8 +31,10 @@ export class A2uiSurfaceMount {
   }
 
   private mountStrategy(target: HTMLElement, view: A2uiViewState): void {
-    const clueIndex = Number(target.dataset.clueIndex);
-    const clue = Number.isInteger(clueIndex) ? view.puzzle?.clues[clueIndex] : undefined;
+    const rawClueIndex = target.dataset.clueIndex;
+    if (rawClueIndex === undefined || rawClueIndex.trim() === "") return;
+    const clueIndex = Number(rawClueIndex);
+    const clue = Number.isSafeInteger(clueIndex) && clueIndex >= 0 ? view.puzzle?.clues[clueIndex] : undefined;
     if (!clue) return;
     const strategy = clue.strategy ?? view.clueStrategies[clue.id];
     if (!strategy) return;

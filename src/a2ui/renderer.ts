@@ -1,6 +1,3 @@
-import { basicCatalog } from "@a2ui/web_core/catalogs/basic/v1";
-import { MessageProcessor, STRICT_VALIDATION } from "@a2ui/web_core/processing";
-import type { SurfaceModel } from "@a2ui/web_core/state";
 import { A2UI_BASIC_CATALOG_ID } from "./messages";
 import {
   createUiBadge,
@@ -32,19 +29,25 @@ export interface A2uiValidationResult {
 
 type RecordValue = Record<string, unknown>;
 type A2uiComponent = { id: string; type: string; properties: RecordValue };
+interface A2uiSurface {
+  id: string;
+  dataModel: Record<string, string>;
+  components: Map<string, A2uiComponent>;
+}
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasForbiddenCall(value: unknown): boolean {
-  if (Array.isArray(value)) return value.some(hasForbiddenCall);
+function hasForbiddenCall(value: unknown, depth = 0): boolean {
+  if (depth > MAX_DEPTH) return true;
+  if (Array.isArray(value)) return value.some(child => hasForbiddenCall(child, depth + 1));
   if (!isRecord(value)) return false;
   return Object.entries(value).some(([key, child]) =>
-    key === "@call" || key === "functionCall" || key === "callRendererFunction" || key === "callAgentFunction" || hasForbiddenCall(child));
+    key === "@call" || key === "functionCall" || key === "callRendererFunction" || key === "callAgentFunction" || hasForbiddenCall(child, depth + 1));
 }
 
-function validateSurfaceEnvelope(message: unknown, expectedSurfaceId: string): { surfaceId: string; components: unknown[] } | undefined {
+function validateSurfaceEnvelope(message: unknown, expectedSurfaceId: string): { surfaceId: string; components: unknown[]; dataModel: Record<string, string> } | undefined {
   if (!isRecord(message) || Object.keys(message).some(key => key !== "version" && key !== "createSurface")) return undefined;
   if (message.version !== "1.0" || !isRecord(message.createSurface)) return undefined;
   const surface = message.createSurface;
@@ -53,76 +56,115 @@ function validateSurfaceEnvelope(message: unknown, expectedSurfaceId: string): {
   if (!Array.isArray(surface.components) || surface.components.length === 0 || surface.components.length > MAX_COMPONENTS) return undefined;
   if (!isRecord(surface.dataModel) || Object.keys(surface.dataModel).some(key => !SURFACE_DATA_KEYS.has(key))) return undefined;
   if (Object.values(surface.dataModel).some(value => typeof value !== "string" || value.length > 2_048)) return undefined;
-  if (hasForbiddenCall(message)) return undefined;
-  return { surfaceId: expectedSurfaceId, components: surface.components };
+  return { surfaceId: expectedSurfaceId, components: surface.components, dataModel: surface.dataModel as Record<string, string> };
 }
 
-function validateComponentAllowlist(components: unknown[], surfaceId: string): boolean {
-  for (const component of components) {
-    if (!isRecord(component) || typeof component.id !== "string" || !COMPONENT_IDS.test(component.id)) return false;
-    if (typeof component.component !== "string" || !COMPONENTS.has(component.component)) return false;
-    if (component.component === "Text" && component.variant !== undefined && component.variant !== "body" && component.variant !== "caption") return false;
-    if (component.component === "Button") {
-      if (surfaceId !== "tako-hint-coach" || !isRecord(component.action) || !isRecord(component.action.event)) return false;
-      const event = component.action.event;
-      if (event.name !== "dismiss_hint" || !isRecord(event.context) || Object.keys(event.context).length !== 0) return false;
-    } else if (component.action !== undefined) {
-      return false;
-    }
+function validateComponent(value: unknown, surfaceId: string, dataModel: Record<string, string>): value is RecordValue & { id: string; component: string } {
+  if (!isRecord(value) || typeof value.id !== "string" || !COMPONENT_IDS.test(value.id)) return false;
+  if (typeof value.component !== "string" || !COMPONENTS.has(value.component)) return false;
+
+  const fields: Record<string, readonly string[]> = {
+    Card: ["child"],
+    Column: ["children"],
+    Row: ["children"],
+    Text: ["variant", "text"],
+    Button: ["child", "action"],
+    Divider: [],
+  };
+  const allowedFields = new Set(["id", "component", ...fields[value.component]!]);
+  if (Object.keys(value).some(key => !allowedFields.has(key))) return false;
+
+  if (value.component === "Card") return typeof value.child === "string";
+  if (value.component === "Column" || value.component === "Row") {
+    return Array.isArray(value.children) && value.children.length > 0 && value.children.every(child => typeof child === "string");
+  }
+  if (value.component === "Text") {
+    if (value.variant !== undefined && value.variant !== "body" && value.variant !== "caption") return false;
+    if (!isRecord(value.text) || Object.keys(value.text).length !== 1 || typeof value.text["@path"] !== "string") return false;
+    const path = value.text["@path"] as string;
+    return path.startsWith("/") && Object.hasOwn(dataModel, path.slice(1));
+  }
+  if (value.component === "Button") {
+    if (surfaceId !== "tako-hint-coach" || typeof value.child !== "string" || !isRecord(value.action)) return false;
+    if (Object.keys(value.action).length !== 1 || !isRecord(value.action.event)) return false;
+    const event = value.action.event;
+    return Object.keys(event).length === 2
+      && event.name === "dismiss_hint"
+      && isRecord(event.context)
+      && Object.keys(event.context).length === 0;
   }
   return true;
 }
 
-/** Applies the application's narrow A2UI contract before the official protocol validator. */
+function childIds(component: A2uiComponent): string[] {
+  if (component.type === "Card" || component.type === "Button") {
+    const child = component.properties.child;
+    return typeof child === "string" ? [child] : [];
+  }
+  if (component.type === "Column" || component.type === "Row") {
+    const children = component.properties.children;
+    return Array.isArray(children) ? children.filter((child): child is string => typeof child === "string") : [];
+  }
+  return [];
+}
+
+function validateTopology(surfaceId: string, components: Map<string, A2uiComponent>): boolean {
+  if (components.get("root")?.type !== "Card") return false;
+  const visited = new Set<string>();
+  function visit(id: string, ancestry: Set<string>): boolean {
+    if (ancestry.size >= MAX_DEPTH || ancestry.has(id)) return false;
+    const component = components.get(id);
+    if (!component) return false;
+    visited.add(id);
+    const nextAncestry = new Set(ancestry).add(id);
+    return childIds(component).every(child => visit(child, nextAncestry));
+  }
+  return surfaceId.length > 0 && visit("root", new Set()) && visited.size === components.size;
+}
+
+function validatedSurface(messages: unknown, expectedSurfaceId: string): A2uiSurface | undefined {
+  if (!Array.isArray(messages) || messages.length !== 1) return undefined;
+  const serialized = JSON.stringify(messages);
+  if (typeof serialized !== "string" || new TextEncoder().encode(serialized).byteLength > MAX_MESSAGE_BYTES) return undefined;
+  const envelope = validateSurfaceEnvelope(messages[0], expectedSurfaceId);
+  if (!envelope || hasForbiddenCall(messages[0])) return undefined;
+  const components = new Map<string, A2uiComponent>();
+  for (const value of envelope.components) {
+    if (!validateComponent(value, envelope.surfaceId, envelope.dataModel) || components.has(value.id)) return undefined;
+    components.set(value.id, { id: value.id, type: value.component, properties: value });
+  }
+  if (!validateTopology(envelope.surfaceId, components)) return undefined;
+  return { id: envelope.surfaceId, dataModel: envelope.dataModel, components };
+}
+
+/** Validates the app's small A2UI Basic Catalog subset before it reaches the DOM. */
 export function validateA2uiMessages(messages: unknown, expectedSurfaceId: string): A2uiValidationResult {
   try {
-    if (!Array.isArray(messages) || messages.length !== 1) return { ok: false, reason: "A2UI surfaces accept one createSurface message." };
-    const serialized = JSON.stringify(messages);
-    if (typeof serialized !== "string" || new TextEncoder().encode(serialized).byteLength > MAX_MESSAGE_BYTES) {
-      return { ok: false, reason: "A2UI surface exceeds the message size limit." };
-    }
-    const envelope = validateSurfaceEnvelope(messages[0], expectedSurfaceId);
-    if (!envelope || !validateComponentAllowlist(envelope.components, envelope.surfaceId)) {
-      return { ok: false, reason: "A2UI surface is outside the supported catalog, component, or action contract." };
-    }
-
-    const processor = new MessageProcessor([basicCatalog as never], undefined, {
-      version: "1.0",
-      validationConfig: { ...STRICT_VALIDATION, targetVersion: "1.0", maxDepth: MAX_DEPTH, allowedMessages: ["createSurface"] },
-    });
-    try {
-      processor.processMessages(messages as never);
-      const surface = processor.getSurface(envelope.surfaceId);
-      if (!surface || processor.getSurfaces().size !== 1 || surface.componentsModel.size !== envelope.components.length) {
-        return { ok: false, reason: "A2UI surface has an invalid component graph." };
-      }
-      surface.componentsModel.validateTopology({ rootId: "root", maxDepth: MAX_DEPTH });
-      return { ok: true, surfaceId: envelope.surfaceId, componentCount: surface.componentsModel.size };
-    } finally {
-      processor.dispose();
-    }
+    const surface = validatedSurface(messages, expectedSurfaceId);
+    if (!surface) return { ok: false, reason: "A2UI surface is outside the supported catalog, component, data, action, or topology contract." };
+    return { ok: true, surfaceId: surface.id, componentCount: surface.components.size };
   } catch {
     return { ok: false, reason: "A2UI surface failed protocol validation." };
   }
 }
 
-function resolveString(value: unknown, surface: SurfaceModel): string {
+function resolveString(value: unknown, surface: A2uiSurface): string {
   if (isRecord(value) && typeof value["@path"] === "string" && Object.keys(value).length === 1) {
-    value = surface.dataModel.get(value["@path"]);
+    const path = value["@path"].slice(1);
+    value = surface.dataModel[path];
   }
   if (typeof value !== "string") throw new Error("A2UI text did not resolve to a string.");
   return value;
 }
 
-function componentFor(surface: SurfaceModel, id: string): A2uiComponent {
-  const component = surface.componentsModel.get(id);
+function componentFor(surface: A2uiSurface, id: string): A2uiComponent {
+  const component = surface.components.get(id);
   if (!component) throw new Error("A2UI component reference is missing.");
-  return { id: component.id, type: component.type, properties: component.properties };
+  return component;
 }
 
-/** Native DOM adapter for the small A2UI Basic Catalog subset used by Tako Bako. */
+/** Native DOM adapter for the validated A2UI Basic Catalog subset used by Tako Bako. */
 export class A2uiDomRenderer {
-  private processor: MessageProcessor | undefined;
   private readonly document: Document;
 
   constructor(
@@ -133,41 +175,21 @@ export class A2uiDomRenderer {
   }
 
   render(messages: unknown, expectedSurfaceId: string): void {
-    const validation = validateA2uiMessages(messages, expectedSurfaceId);
-    if (!validation.ok || !validation.surfaceId) throw new Error(validation.reason ?? "A2UI surface is invalid.");
-
-    const processor = new MessageProcessor([basicCatalog as never], action => {
-      void this.onAction({ name: action.name, context: action.context });
-    }, {
-      version: "1.0",
-      validationConfig: { ...STRICT_VALIDATION, targetVersion: "1.0", maxDepth: MAX_DEPTH, allowedMessages: ["createSurface"] },
-    });
-    try {
-      processor.processMessages(messages as never);
-      const surface = processor.getSurface(validation.surfaceId);
-      if (!surface) throw new Error("A2UI surface could not be created.");
-      const root = this.renderComponent(surface, "root", new Set());
-      const previousProcessor = this.processor;
-      this.target.replaceChildren(root);
-      previousProcessor?.dispose();
-      this.processor = processor;
-    } catch (error) {
-      processor.dispose();
-      throw error;
-    }
+    const surface = validatedSurface(messages, expectedSurfaceId);
+    if (!surface) throw new Error("A2UI surface is outside the supported rendering contract.");
+    const root = this.renderComponent(surface, "root", new Set());
+    this.target.replaceChildren(root);
   }
 
   clear(): void {
     this.target.replaceChildren();
-    this.processor?.dispose();
-    this.processor = undefined;
   }
 
   dispose(): void {
     this.clear();
   }
 
-  private renderComponent(surface: SurfaceModel, id: string, ancestry: Set<string>, inline = false): HTMLElement {
+  private renderComponent(surface: A2uiSurface, id: string, ancestry: Set<string>, inline = false): HTMLElement {
     if (ancestry.has(id) || ancestry.size >= MAX_DEPTH) throw new Error("A2UI component topology is invalid.");
     const component = componentFor(surface, id);
     const nextAncestry = new Set(ancestry).add(id);
@@ -193,10 +215,11 @@ export class A2uiDomRenderer {
       }
       case "Button": {
         const action = component.properties.action;
-        if (typeof component.properties.child !== "string" || !isRecord(action)) throw new Error("A2UI button contract is invalid.");
+        if (typeof component.properties.child !== "string" || !isRecord(action) || !isRecord(action.event)) throw new Error("A2UI button contract is invalid.");
         const label = this.renderComponent(surface, component.properties.child, nextAncestry, true).textContent ?? "";
+        const event = action.event;
         return createUiButton(this.document, label,
-          () => surface.dispatchAction(action, component.id),
+          () => this.onAction({ name: event.name as string, context: event.context as Record<string, unknown> }),
           { className: "ui-button--a2ui" });
       }
       case "Divider":
