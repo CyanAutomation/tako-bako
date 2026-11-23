@@ -528,15 +528,15 @@ function render(): void {
 }
 
 function handleA2uiAction(action: A2uiHostAction): void {
-  if (!hintCoach) return;
-  const activeHint = hintCoach;
-  if (action.name === "dismiss_hint" && Object.keys(action.context).length === 0) {
+  if (action.name === "dismiss_hint") {
+    if (Object.keys(action.context).length !== 0 || !hintCoach) return;
     hintCoach = undefined;
     render();
     root.querySelector<HTMLButtonElement>("#hint")?.focus();
     return;
   }
-  if (action.name !== "focus_clue" || Object.keys(action.context).length !== 1 || typeof action.context.clueId !== "string" || activeHint.kind !== "clue") return;
+  const activeHint = hintCoach;
+  if (action.name !== "focus_clue" || Object.keys(action.context).length !== 1 || typeof action.context.clueId !== "string" || activeHint?.kind !== "clue") return;
   const clueId = action.context.clueId;
   const clue = puzzle?.clues.find(candidate => candidate.id === clueId
     && (candidate.id === activeHint.clue.id || candidate.text === activeHint.clue.text));

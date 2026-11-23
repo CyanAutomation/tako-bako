@@ -60,7 +60,7 @@ function validateSurfaceEnvelope(message: unknown, expectedSurfaceId: string): {
   return { surfaceId: expectedSurfaceId, components: surface.components, dataModel: surface.dataModel as Record<string, string> };
 }
 
-function validateComponent(value: unknown, surfaceId: string, dataModel: Record<string, string>): value is RecordValue & { id: string; component: string } {
+function validateComponent(value: unknown, dataModel: Record<string, string>): value is RecordValue & { id: string; component: string } {
   if (!isRecord(value) || typeof value.id !== "string" || !COMPONENT_IDS.test(value.id)) return false;
   if (typeof value.component !== "string" || !COMPONENTS.has(value.component)) return false;
 
@@ -86,7 +86,7 @@ function validateComponent(value: unknown, surfaceId: string, dataModel: Record<
     return path.startsWith("/") && Object.hasOwn(dataModel, path.slice(1));
   }
   if (value.component === "Button") {
-    if (surfaceId !== "tako-hint-coach" || typeof value.child !== "string" || !isRecord(value.action)) return false;
+    if (typeof value.child !== "string" || !isRecord(value.action)) return false;
     if (Object.keys(value.action).length !== 1 || !isRecord(value.action.event)) return false;
     const event = value.action.event;
     if (Object.keys(event).length !== 2 || !isRecord(event.context)) return false;
@@ -134,7 +134,7 @@ function validatedSurface(messages: unknown, expectedSurfaceId: string): A2uiSur
   if (!envelope || hasForbiddenCall(messages[0])) return undefined;
   const components = new Map<string, A2uiComponent>();
   for (const value of envelope.components) {
-    if (!validateComponent(value, envelope.surfaceId, envelope.dataModel) || components.has(value.id)) return undefined;
+    if (!validateComponent(value, envelope.dataModel) || components.has(value.id)) return undefined;
     components.set(value.id, { id: value.id, type: value.component, properties: value });
   }
   if (!validateTopology(envelope.surfaceId, components)) return undefined;
