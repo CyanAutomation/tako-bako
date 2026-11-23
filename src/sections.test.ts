@@ -56,6 +56,8 @@ describe("puzzle UI sections", () => {
 
     assert.ok(markup.includes('<details class="clue-strategy-disclosure"><summary>Reasoning</summary>'));
     assert.ok(markup.includes('class="clue-strategy" title="Reasoning strategy">Direct match</span>'));
+    assert.ok(markup.includes('class="clue-strategy-description">Connects one person or item directly to another.</span>'));
+    assert.ok(markup.includes('class="clue-strategy-a2ui" data-a2ui-strategy data-clue-index="0" hidden'));
   });
 
   it("escapes clue and category text before rendering it as markup", () => {

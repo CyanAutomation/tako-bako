@@ -123,6 +123,10 @@ Event ingestion uses Yokaiba’s rate limiting: `/api/events` limits its parsed 
 
 Known Yokaiba constraint kinds receive deterministic clue labels. Jev classifies other clue text only after Yokaiba accepts the signed puzzle token. For hints, Yokaiba supplies a progress-based hint and Jev can select among bounded candidates; deterministic policy limits the first hint to the current strength and later escalation to at most one strength step. Jev never decides correctness or invents a hint. Classification receives aggregate gameplay features; candidate ranking receives clue candidates and marked cells. Neither request receives the signed puzzle token or solution. Invalid or failed model responses fall back to solver-provided deterministic behavior.
 
+## A2UI browser surfaces
+
+The browser uses Google's A2UI Basic Catalog for the clue strategy disclosure and the post-hint reasoning coach. Surface messages are assembled by app code from validated clue, strategy, or placement data. Model output does not provide component trees, URLs, executable code, or actions. The DOM adapter accepts one version 1.0 surface and a small allowlist of layout, text, card, divider, and button components; its only action is the host-checked hint dismissal. Text is inserted as text content. If a surface fails validation or cannot render, the equivalent HTML fallback remains visible. Jev continues to operate through the existing server-side hint and clue-strategy endpoints.
+
 ## Events, privacy, and metrics
 
 Outcome events use schema version 1 and include event-specific hint/mistake counters. They do not include a player identifier, seed, or answer cells. Elapsed time is omitted until a puzzle starts and then bounded to 0–24 hours. Yokaiba continues to accept legacy version 0 events from older clients. `/api/events` applies a 4 KB body limit, validates and allowlists event input, and forwards the event to Yokaiba; the Worker bounds its JSON request body and rate-limits `/v1/events` under its existing REST policy.

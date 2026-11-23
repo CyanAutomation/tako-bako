@@ -2000,6 +2000,75 @@ footer {
 }
 .clue-strategy-disclosure .clue-strategy { font-size: 0.6rem; }
 
+/* Reusable semantic primitives used by the constrained A2UI surfaces. */
+.ui-card {
+  padding: 0.75rem;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 78%, white);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  border-radius: var(--control-radius);
+}
+.ui-stack { display: flex; gap: 0.45rem; }
+.ui-stack--vertical { flex-direction: column; }
+.ui-stack--horizontal { flex-direction: row; align-items: center; flex-wrap: wrap; }
+.ui-text { margin: 0; color: var(--ink); font-size: 0.78rem; line-height: 1.45; }
+.ui-text--caption { color: var(--muted); font-size: 0.68rem; font-weight: 700; }
+.ui-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.12rem 0.4rem;
+  color: var(--navy);
+  background: var(--jade-light);
+  border: 1px solid var(--jade);
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.ui-button {
+  min-height: 2.3rem;
+  padding: 0.45rem 0.75rem;
+  color: var(--paper);
+  background: var(--navy);
+  border: 2px solid var(--ink);
+  border-radius: var(--control-radius);
+  box-shadow: 2px 2px 0 var(--ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ui-button:hover { background: var(--jade); }
+.ui-button:focus-visible { outline: 3px solid var(--jade); outline-offset: 3px; }
+.ui-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.ui-divider { width: 100%; margin: 0.1rem 0; border: 0; border-top: 1px solid var(--line); }
+
+.hint-coach {
+  margin: 0.85rem 0 1rem;
+  padding: 0.8rem;
+  background: color-mix(in srgb, var(--jade-light) 42%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--jade) 60%, var(--line));
+  border-radius: var(--panel-radius);
+}
+.hint-coach-fallback { display: grid; justify-items: start; gap: 0.4rem; }
+.hint-coach-fallback .eyebrow { margin: 0; color: var(--jade); }
+.hint-coach-fallback h2 { margin: 0; font-size: 0.95rem; }
+.hint-coach-fallback p:not(.eyebrow) { max-width: 70ch; margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+.hint-coach-a2ui .ui-card { padding: 0; background: transparent; border: 0; }
+.hint-coach-a2ui .ui-badge { color: var(--jade); background: transparent; border: 0; padding: 0; font-size: 0.72rem; }
+.hint-coach-a2ui .ui-button { margin-top: 0.15rem; }
+.clue-strategy-fallback { display: grid; justify-items: start; gap: 0.2rem; }
+.clue-strategy-description { max-width: 38ch; color: var(--muted); font-size: 0.6rem; line-height: 1.4; }
+.clue-strategy-a2ui { max-width: 32rem; }
+.clue-strategy-a2ui .ui-card { padding: 0.45rem 0.55rem; }
+.clue-strategy-a2ui .ui-stack { gap: 0.25rem; }
+.clue-strategy-a2ui .ui-text { font-size: 0.65rem; }
+.clue-strategy-a2ui .ui-badge { padding: 0.08rem 0.35rem; font-size: 0.58rem; }
+.clue-strategy-a2ui[hidden],
+.hint-coach-a2ui[hidden],
+.clue-strategy-fallback[hidden],
+.hint-coach-fallback[hidden] { display: none !important; }
+
 @media (max-width: 760px) {
   .board-tools { grid-column: 1 / -1; }
 }
