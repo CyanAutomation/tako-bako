@@ -121,6 +121,69 @@ async function cancelBody(response: Response): Promise<void> {
   if (response.body) await response.body.cancel().catch(() => {});
 }
 
+interface ExternalTargetResponse {
+  response: Response;
+  validatedUrl: URL;
+}
+
+async function fetchTargetWithRetries(
+  target: string,
+  fetchImpl: typeof fetch,
+  lookupImpl: AddressLookup,
+  sleep: (milliseconds: number) => Promise<unknown>,
+  timeoutMs: number,
+  maxRetries: number,
+): Promise<ExternalTargetResponse> {
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const validatedUrl = await validateExternalTarget(target, lookupImpl);
+      const response = await fetchImpl(validatedUrl, {
+        method: "GET",
+        redirect: "manual",
+        headers: { accept: "text/html,application/json;q=0.9,*/*;q=0.8", "user-agent": "TakoBako-link-check/1.0" },
+        signal: globalThis.AbortSignal.timeout(timeoutMs),
+      });
+
+      if (!RETRYABLE_STATUSES.has(response.status) || attempt === maxRetries) return { response, validatedUrl };
+      await cancelBody(response);
+      await sleep(retryDelay(response.headers.get("retry-after"), attempt));
+    } catch (error) {
+      if (error instanceof UnsafeExternalTargetError || attempt === maxRetries) throw error;
+      await sleep(250 * 2 ** attempt);
+    }
+  }
+
+  throw new Error("External link request did not produce a response");
+}
+
+async function redirectTarget(
+  response: Response,
+  validatedUrl: URL,
+  redirectCount: number,
+  maxRedirects: number,
+): Promise<string | undefined> {
+  const location = response.headers.get("location");
+  const isRedirect = [301, 302, 303, 307, 308].includes(response.status);
+  if (!isRedirect || location === null) return undefined;
+  if (redirectCount >= maxRedirects) {
+    await cancelBody(response);
+    throw new Error(`External link exceeded the ${maxRedirects}-redirect limit`);
+  }
+
+  await cancelBody(response);
+  try {
+    return new URL(location, validatedUrl).href;
+  } catch {
+    throw new UnsafeExternalTargetError("External link returned an invalid redirect URL");
+  }
+}
+
+function validateExternalFetchOptions(timeoutMs: number, maxRetries: number, maxRedirects: number): void {
+  if (!Number.isInteger(maxRetries) || maxRetries < 0) throw new TypeError("maxRetries must be a non-negative integer");
+  if (!Number.isInteger(maxRedirects) || maxRedirects < 0) throw new TypeError("maxRedirects must be a non-negative integer");
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError("timeoutMs must be positive");
+}
+
 export async function fetchExternalLink(input: string, {
   fetchImpl = globalThis.fetch,
   lookupImpl = resolveExternalHost,
@@ -129,52 +192,14 @@ export async function fetchExternalLink(input: string, {
   maxRetries = MAX_RETRIES,
   maxRedirects = MAX_REDIRECTS,
 }: ExternalFetchOptions = {}): Promise<Response> {
-  if (!Number.isInteger(maxRetries) || maxRetries < 0) throw new TypeError("maxRetries must be a non-negative integer");
-  if (!Number.isInteger(maxRedirects) || maxRedirects < 0) throw new TypeError("maxRedirects must be a non-negative integer");
-  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError("timeoutMs must be positive");
+  validateExternalFetchOptions(timeoutMs, maxRetries, maxRedirects);
 
   let target = input;
   for (let redirectCount = 0; ; redirectCount += 1) {
-    let response: Response | undefined;
-    let validatedUrl: URL | undefined;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-      try {
-        validatedUrl = await validateExternalTarget(target, lookupImpl);
-        response = await fetchImpl(validatedUrl, {
-          method: "GET",
-          redirect: "manual",
-          headers: { accept: "text/html,application/json;q=0.9,*/*;q=0.8", "user-agent": "TakoBako-link-check/1.0" },
-          signal: globalThis.AbortSignal.timeout(timeoutMs),
-        });
-
-        if (!RETRYABLE_STATUSES.has(response.status) || attempt === maxRetries) break;
-        const waitMs = retryDelay(response.headers.get("retry-after"), attempt);
-        await cancelBody(response);
-        await sleep(waitMs);
-      } catch (error) {
-        if (error instanceof UnsafeExternalTargetError || attempt === maxRetries) throw error;
-        await sleep(250 * 2 ** attempt);
-      }
-    }
-
-    if (!response || !validatedUrl) throw new Error("External link request did not produce a response");
-    const location = response.headers.get("location");
-    const isRedirect = [301, 302, 303, 307, 308].includes(response.status);
-    if (!isRedirect || location === null) return response;
-    if (redirectCount >= maxRedirects) {
-      await cancelBody(response);
-      throw new Error(`External link exceeded the ${maxRedirects}-redirect limit`);
-    }
-
-    await cancelBody(response);
-    let redirectedUrl: URL;
-    try {
-      redirectedUrl = new URL(location, validatedUrl);
-    } catch {
-      throw new UnsafeExternalTargetError("External link returned an invalid redirect URL");
-    }
-    target = redirectedUrl.href;
+    const { response, validatedUrl } = await fetchTargetWithRetries(target, fetchImpl, lookupImpl, sleep, timeoutMs, maxRetries);
+    const redirectedTarget = await redirectTarget(response, validatedUrl, redirectCount, maxRedirects);
+    if (redirectedTarget === undefined) return response;
+    target = redirectedTarget;
   }
 }
 

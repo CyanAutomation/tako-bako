@@ -33,6 +33,8 @@ import {
 import { createOrReusePuzzleFeedbackRequest } from "./feedback-submission";
 import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
 import { createSnackbarController } from "./snackbar";
+import { applyDisclosureToggle } from "./disclosure-state";
+import { findOverlappingBlocker } from "./snackbar-placement";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -71,9 +73,13 @@ let pendingNewChallenge = false;
 let pendingProgressReset = false;
 let pendingCelebration = false;
 let resetReturnFocusSelector: string | undefined;
-let cluesOpen = !window.matchMedia("(max-width: 860px)").matches;
-let clueFiltersOpen = false;
-let smartMarkingToolsOpen = false;
+const disclosureState = {
+  cluesOpen: !window.matchMedia("(max-width: 860px)").matches,
+  clueFiltersOpen: false,
+  smartMarkingToolsOpen: false,
+  feedbackEntryOpen: false,
+  actionMenuOpen: false,
+};
 let clueFilter: ClueFilter = "all";
 let activeCellKey: string | undefined;
 let challengeOptionsOpen = false;
@@ -83,8 +89,6 @@ let hintsUsed = 0;
 let mistakes = 0;
 let puzzleCompleted = false;
 let feedbackUi: { selectedRating?: PuzzleFeedbackRating; selectedReason?: PuzzleFeedbackReason; submitting: boolean; status?: "success" | "error" } = { submitting: false };
-let feedbackEntryOpen = false;
-let actionMenuOpen = false;
 const submittedFeedbackFingerprints = new Set<string>();
 const pendingFeedbackRequests = new Map<string, PuzzleFeedbackRequest>();
 
@@ -220,13 +224,13 @@ function showLandingPage(): void {
   pendingCelebration = false;
   puzzleCompleted = false;
   feedbackUi = { submitting: false };
-  feedbackEntryOpen = false;
-  actionMenuOpen = false;
+  disclosureState.feedbackEntryOpen = false;
+  disclosureState.actionMenuOpen = false;
   resetReturnFocusSelector = undefined;
   activeCellKey = undefined;
   clueFilter = "all";
-  clueFiltersOpen = false;
-  smartMarkingToolsOpen = false;
+  disclosureState.clueFiltersOpen = false;
+  disclosureState.smartMarkingToolsOpen = false;
   challengeOptionsOpen = false;
   sharedPuzzleOpen = false;
   puzzleStartedAt = undefined;
@@ -308,10 +312,10 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   pendingFeedbackRequests.clear();
   puzzleCompleted = false;
   feedbackUi = { submitting: false };
-  feedbackEntryOpen = false;
-  actionMenuOpen = false;
-  smartMarkingToolsOpen = false;
-  clueFiltersOpen = false;
+  disclosureState.feedbackEntryOpen = false;
+  disclosureState.actionMenuOpen = false;
+  disclosureState.smartMarkingToolsOpen = false;
+  disclosureState.clueFiltersOpen = false;
   clueStrategies = Object.fromEntries(data.clues.flatMap(clue => clue.strategy ? [[clue.id, clue.strategy] as const] : []));
   puzzleLoadFailed = false;
   puzzleStartedAt = Date.now();
@@ -444,11 +448,11 @@ function render(): void {
       submittedFeedbackFingerprints.has(puzzle.puzzleFingerprint)
       || hasSubmittedPuzzleFeedback(localStorage, puzzle.puzzleFingerprint)
     )),
-    feedbackEntryOpen,
-    actionMenuOpen,
-    cluesOpen,
-    clueFiltersOpen,
-    smartMarkingToolsOpen,
+    feedbackEntryOpen: disclosureState.feedbackEntryOpen,
+    actionMenuOpen: disclosureState.actionMenuOpen,
+    cluesOpen: disclosureState.cluesOpen,
+    clueFiltersOpen: disclosureState.clueFiltersOpen,
+    smartMarkingToolsOpen: disclosureState.smartMarkingToolsOpen,
     clueFilter,
     challengeOptionsOpen,
     sharedPuzzleOpen,
@@ -466,12 +470,7 @@ function updateSnackbarPlacement(): void {
   element.classList.remove("snackbar--inline");
   const toast = element.getBoundingClientRect();
   const blockers = root.querySelectorAll<HTMLElement>(".workspace-bar, .grid-navigation, .grid-card, .clue-drawer, .puzzle-heading, .header-actions, .landing-copy > h1, .landing-route");
-  const overlap = [...blockers].find(blocker => {
-    const rect = blocker.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0
-      && toast.left < rect.right && toast.right > rect.left
-      && toast.top < rect.bottom && toast.bottom > rect.top;
-  });
+  const overlap = findOverlappingBlocker(toast, [...blockers]);
   if (overlap) {
     element.classList.add("snackbar--inline");
     overlap.parentElement?.insertBefore(element, overlap);
@@ -614,8 +613,8 @@ function chooseFeedbackRating(rating: PuzzleFeedbackRating): void {
     status: undefined,
   };
   if (!puzzleCompleted) {
-    actionMenuOpen = true;
-    feedbackEntryOpen = true;
+    disclosureState.actionMenuOpen = true;
+    disclosureState.feedbackEntryOpen = true;
   }
   render();
   root.querySelector<HTMLButtonElement>(`[data-feedback-rating="${CSS.escape(rating)}"]`)?.focus();
@@ -624,8 +623,8 @@ function chooseFeedbackRating(rating: PuzzleFeedbackRating): void {
 function chooseFeedbackReason(reason: PuzzleFeedbackReason): void {
   feedbackUi = { ...feedbackUi, selectedReason: feedbackUi.selectedReason === reason ? undefined : reason, status: undefined };
   if (!puzzleCompleted) {
-    actionMenuOpen = true;
-    feedbackEntryOpen = true;
+    disclosureState.actionMenuOpen = true;
+    disclosureState.feedbackEntryOpen = true;
   }
   render();
   root.querySelector<HTMLButtonElement>(`[data-feedback-reason="${CSS.escape(reason)}"]`)?.focus();
@@ -848,14 +847,12 @@ root.addEventListener("keydown", event => {
   handleGridKeydown(event);
 });
 
-root.addEventListener("toggle", event => {
+function handleDisclosureToggle(event: Event): void {
   const details = event.target as HTMLDetailsElement;
-  if (details.classList.contains("action-menu")) actionMenuOpen = details.open;
-  if (details.classList.contains("feedback-entry")) feedbackEntryOpen = details.open;
-  if (details.classList.contains("clue-drawer")) cluesOpen = details.open;
-  if (details.classList.contains("clue-filter-disclosure")) clueFiltersOpen = details.open;
-  if (details.classList.contains("board-tools")) smartMarkingToolsOpen = details.open;
-}, true);
+  applyDisclosureToggle(disclosureState, details.classList, details.open);
+}
+
+root.addEventListener("toggle", handleDisclosureToggle, true);
 
 root.addEventListener("change", event => {
   const input = event.target as HTMLInputElement;

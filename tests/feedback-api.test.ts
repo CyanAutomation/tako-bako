@@ -68,6 +68,48 @@ test("Vercel feedback proxy hides upstream internals and handles methods", async
   assert.equal(method.headers.get("allow"), "POST");
 });
 
+test("Vercel feedback proxy preserves duplicate and rate-limit metadata and sanitizes failures", async () => {
+  const duplicate = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, duplicate.response,
+    (async () => new Response(JSON.stringify({ accepted: true, duplicate: true }), {
+      status: 200,
+      headers: { "content-type": "application/json", "x-request-id": "duplicate-123", "retry-after": "10" },
+    })) as typeof fetch);
+  assert.equal(duplicate.statusCode, 200);
+  assert.equal(duplicate.headers.get("x-yokaiba-request-id"), "duplicate-123");
+  assert.equal(duplicate.headers.get("retry-after"), "10");
+  assert.deepEqual(duplicate.body, { accepted: true, duplicate: true });
+
+  const unexpectedStatus = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, unexpectedStatus.response,
+    (async () => new Response("private upstream detail", { status: 418 })) as typeof fetch);
+  assert.equal(unexpectedStatus.statusCode, 502);
+  assert.doesNotMatch(JSON.stringify(unexpectedStatus.body), /private upstream detail/);
+
+  const malformed = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, malformed.response,
+    (async () => new Response("not-json", { status: 200 })) as typeof fetch);
+  assert.equal(malformed.statusCode, 502);
+
+  const unavailable = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, unavailable.response,
+    (async () => { throw new Error("private network detail"); }) as typeof fetch);
+  assert.equal(unavailable.statusCode, 502);
+  assert.doesNotMatch(JSON.stringify(unavailable.body), /private network detail/);
+
+  const timeout = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, timeout.response,
+    (async () => { throw Object.assign(new Error("timeout details"), { name: "TimeoutError" }); }) as typeof fetch);
+  assert.equal(timeout.statusCode, 504);
+  assert.doesNotMatch(JSON.stringify(timeout.body), /timeout details/);
+
+  const misconfigured = responseHarness();
+  await handleFeedbackRequest({ method: "POST", body: validBody() } as VercelRequest, misconfigured.response,
+    undefined, () => { throw new Error("private configuration detail"); });
+  assert.equal(misconfigured.statusCode, 500);
+  assert.doesNotMatch(JSON.stringify(misconfigured.body), /private configuration detail/);
+});
+
 test("server-side Yokaiba origin override accepts local origins and rejects paths or credentials", async () => {
   const { yokaibaApiOrigin } = await import("../server/yokaiba-origin.js");
   assert.equal(yokaibaApiOrigin("http://127.0.0.1:8787"), "http://127.0.0.1:8787");

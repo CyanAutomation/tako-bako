@@ -64,12 +64,13 @@ Useful commands:
 | `npm run test:e2e:sim` | Start local app and simulator, then run simulator gameplay tests |
 | `npm run dev:sim` | Start Vite and the local Yokaiba simulator for fully local gameplay |
 | `npm run test:coverage` | Write V8 coverage under `coverage/v8` |
+| `npm run fallow:health` | Report code health, complexity, hotspots, and refactoring targets |
 | `npm run lint` | Lint source files |
 | `npm run build` | Type-check and build the app and API |
 | `npm run preview` | Preview the production build locally |
 | `npm run check:external-links` | Check external links in README and `docs/` (requires network access and `curl`) |
 
-The full gate runs `npm run check`. For coverage-based CRAP scores, use the pinned tool command `npx --yes fallow@3.33.1 health --coverage coverage/v8`; it downloads the CLI without adding it to project dependencies. TypeScript checks run separately for the app (`tsconfig.app.json`), API (`tsconfig.api.json`), and Node tooling (`tsconfig.node.json`).
+The full gate runs `npm run check`. For coverage-based CRAP scores, run `npm run test:coverage` followed by `npm run fallow:health -- --coverage coverage/v8`. TypeScript checks run separately for the app (`tsconfig.app.json`), API (`tsconfig.api.json`), and Node tooling (`tsconfig.node.json`).
 
 The pull-request gate also runs a Chromium smoke test against the production build. Install the browser with `npx playwright install chromium` before running `npm run test:e2e` locally. External links in the README and `docs/` are checked by a separate weekly workflow, or manually with `workflow_dispatch`. This check needs network access and `curl`, so it is separate from the normal pull-request gate.
 

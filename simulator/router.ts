@@ -4,10 +4,10 @@ import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
 import { parseDifficultyModel } from "../src/puzzle-input.js";
 import { isScenarioId } from "../src/scenarios.js";
 import { parseClues } from "../server/clue-strategy-input.js";
+import { MAX_REQUEST_BODY_BYTES } from "./constants.js";
 import { loadFixtures, type SimulatorFixture } from "./fixture-loader.js";
 
 const GENERATION_CACHE_CONTROL = "public, max-age=0, s-maxage=300, stale-while-revalidate=3600";
-const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_TOKEN_LENGTH = 3_000;
 const MAX_HINT_INDEX = 100;
 const GENERATION_QUERY_FIELDS = new Set(["templateId", "seed", "difficultyLevel", "allowSeedFallback", "difficultyModel"]);
@@ -241,49 +241,68 @@ function hintKind(value: unknown, appCompatibilityRoute: boolean): "clue" | "eli
   return undefined;
 }
 
+interface HintRequest {
+  kind: "clue" | "elimination" | "placement";
+  index: number;
+}
+
+function hasAllowedHintFields(body: Record<string, unknown>, appCompatibilityRoute: boolean): boolean {
+  if (appCompatibilityRoute) return true;
+  const allowedFields = new Set(["puzzleToken", "kind", "hintIndex"]);
+  return Object.keys(body).every(field => allowedFields.has(field));
+}
+
+function parseHintRequest(body: Record<string, unknown>, appCompatibilityRoute: boolean): HintRequest | undefined {
+  const kind = hintKind(body.kind, appCompatibilityRoute);
+  const requestedIndex = appCompatibilityRoute ? body.hintsUsed : body.hintIndex;
+  const index = requestedIndex === undefined ? 0 : requestedIndex;
+  if (!kind || typeof index !== "number" || !Number.isInteger(index) || index < 0 || index > MAX_HINT_INDEX) return undefined;
+  return { kind, index };
+}
+
+function placementHint(fixture: SimulatorFixture, board: unknown, index: number): Response {
+  const marks = parseBoardMarks(board, fixture);
+  if (!marks) return errorResponse(400, "invalid_request", "The board context is invalid");
+  const base = fixture.publicPuzzle.spec.categories.find(category => category.id === fixture.publicPuzzle.spec.baseCategory)!;
+  const placements = fixture.publicPuzzle.spec.categories
+    .filter(category => category.id !== base.id)
+    .flatMap(category => base.values.map((subject, row) => ({
+      subject,
+      category: category.id,
+      value: fixture.solution.assignments[category.id]![row]!,
+    })))
+    .filter(placement => placementAgreesWithBoard(fixture, placement, marks));
+  if (placements.length === 0) return errorResponse(409, "no_consistent_hint", "No fixture placement agrees with the current marks");
+
+  const marked = new Set(marks.filter(mark => mark.mark === "yes").map(mark => `${mark.categoryId}\u0000${mark.subject}\u0000${mark.value}`));
+  const unmarked = placements.filter(placement => !marked.has(`${placement.category}\u0000${placement.subject}\u0000${placement.value}`));
+  const pool = unmarked.length > 0 ? unmarked : placements;
+  return jsonResponse({ body: { kind: "placement", placement: pool[index % pool.length] } });
+}
+
+function clueHint(fixture: SimulatorFixture, kind: "clue" | "elimination", index: number): Response {
+  const eliminationClues = fixture.publicPuzzle.clues.filter(clue => clue.constraint.kind === "notMatches");
+  const cluePool = kind === "elimination" && eliminationClues.length > 0 ? eliminationClues : fixture.publicPuzzle.clues;
+  const clue = cluePool[index % cluePool.length];
+  if (!clue) return errorResponse(503, "not_configured", "No local clue hints are available");
+  const responseKind = kind === "elimination" && clue.constraint.kind === "notMatches" ? "elimination" : "clue";
+  return jsonResponse({ body: { kind: responseKind, clue: { id: clue.id, text: clue.text } } });
+}
+
 async function handleHint(request: Request, fixtures: readonly SimulatorFixture[], appCompatibilityRoute: boolean): Promise<Response> {
   if (request.method !== "POST") return jsonResponse({ status: 405, body: { error: { code: "method_not_allowed", message: "Method not allowed" } }, headers: { allow: "POST" } });
   const body = await readJsonObject(request);
-  const allowedFields = appCompatibilityRoute
-    ? undefined
-    : new Set(["puzzleToken", "kind", "hintIndex"]);
-  if (!body || (allowedFields && Object.keys(body).some(field => !allowedFields.has(field)))) {
+  if (!body || !hasAllowedHintFields(body, appCompatibilityRoute)) {
     return errorResponse(400, "invalid_request", "A valid puzzle hint request is required");
   }
   const fixture = fixtureForToken(fixtures, body.puzzleToken);
   if (!fixture) return errorResponse(400, "invalid_token", "Unknown simulation puzzle token");
-  const requestedKind = hintKind(body.kind, appCompatibilityRoute);
-  const requestedIndex = appCompatibilityRoute ? body.hintsUsed : body.hintIndex;
-  const index = requestedIndex === undefined ? 0 : requestedIndex;
-  if (!requestedKind || typeof index !== "number" || !Number.isInteger(index) || index < 0 || index > MAX_HINT_INDEX) {
+  const hint = parseHintRequest(body, appCompatibilityRoute);
+  if (!hint) {
     return errorResponse(400, "invalid_request", "A supported hint kind and index are required");
   }
-
-  if (requestedKind === "placement") {
-    const marks = parseBoardMarks(body.board, fixture);
-    if (!marks) return errorResponse(400, "invalid_request", "The board context is invalid");
-    const base = fixture.publicPuzzle.spec.categories.find(category => category.id === fixture.publicPuzzle.spec.baseCategory)!;
-    const placements = fixture.publicPuzzle.spec.categories
-      .filter(category => category.id !== base.id)
-      .flatMap(category => base.values.map((subject, row) => ({
-        subject,
-        category: category.id,
-        value: fixture.solution.assignments[category.id]![row]!,
-      })))
-      .filter(placement => placementAgreesWithBoard(fixture, placement, marks));
-    if (placements.length === 0) return errorResponse(409, "no_consistent_hint", "No fixture placement agrees with the current marks");
-    const marked = new Set(marks.filter(mark => mark.mark === "yes").map(mark => `${mark.categoryId}\u0000${mark.subject}\u0000${mark.value}`));
-    const unmarked = placements.filter(placement => !marked.has(`${placement.category}\u0000${placement.subject}\u0000${placement.value}`));
-    const pool = unmarked.length > 0 ? unmarked : placements;
-    return jsonResponse({ body: { kind: "placement", placement: pool[index % pool.length] } });
-  }
-
-  const eliminationClues = fixture.publicPuzzle.clues.filter(clue => clue.constraint.kind === "notMatches");
-  const cluePool = requestedKind === "elimination" && eliminationClues.length > 0 ? eliminationClues : fixture.publicPuzzle.clues;
-  const clue = cluePool[index % cluePool.length];
-  if (!clue) return errorResponse(503, "not_configured", "No local clue hints are available");
-  const responseKind = requestedKind === "elimination" && clue.constraint.kind === "notMatches" ? "elimination" : "clue";
-  return jsonResponse({ body: { kind: responseKind, clue: { id: clue.id, text: clue.text } } });
+  if (hint.kind === "placement") return placementHint(fixture, body.board, hint.index);
+  return clueHint(fixture, hint.kind, hint.index);
 }
 
 async function handleEvents(request: Request, appCompatibilityRoute: boolean, fixtures: readonly SimulatorFixture[]): Promise<Response> {
@@ -330,42 +349,53 @@ export interface Simulator {
   handle(request: Request): Promise<Response>;
 }
 
+type SimulatorRoute = (request: Request) => Promise<Response>;
+
+function handlePuzzleCompatibilityRoute(request: Request, fixtures: readonly SimulatorFixture[]): Promise<Response> {
+  if (request.method === "GET") return handleGeneration(request, fixtures);
+  if (request.method === "POST") return handleVerification(request, fixtures);
+  return Promise.resolve(methodNotAllowed("GET, POST"));
+}
+
+async function handleHealthRoute(request: Request, includeYokaiba: boolean): Promise<Response> {
+  if (request.method !== "GET") return methodNotAllowed("GET");
+  const body = includeYokaiba ? { status: "ok", dependencies: { yokaiba: "ok" } } : { status: "ok" };
+  return jsonResponse({ body });
+}
+
+function createRoutes(fixtures: readonly SimulatorFixture[], feedback: Map<string, string>): Map<string, SimulatorRoute> {
+  return new Map<string, SimulatorRoute>([
+    ["/api/puzzle", request => handlePuzzleCompatibilityRoute(request, fixtures)],
+    ["/v1/puzzles/generate", request => handleGeneration(request, fixtures)],
+    ["/v1/puzzles/verify", request => handleVerification(request, fixtures)],
+    ["/api/hint", request => handleHint(request, fixtures, true)],
+    ["/v1/puzzles/hint", request => handleHint(request, fixtures, false)],
+    ["/api/events", request => handleEvents(request, true, fixtures)],
+    ["/v1/events", request => handleEvents(request, false, fixtures)],
+    ["/api/feedback", request => handleFeedback(request, fixtures, feedback)],
+    ["/v1/feedback", request => handleFeedback(request, fixtures, feedback)],
+    ["/api/clue-strategies", handleClueStrategies],
+    ["/healthz", request => handleHealthRoute(request, false)],
+    ["/api/health", request => handleHealthRoute(request, true)],
+  ]);
+}
+
+async function dispatchRequest(request: Request, routes: Map<string, SimulatorRoute>): Promise<Response> {
+  if ((await request.clone().arrayBuffer()).byteLength > MAX_REQUEST_BODY_BYTES) {
+    return errorResponse(413, "payload_too_large", "Request body is too large");
+  }
+  const route = routes.get(new URL(request.url).pathname);
+  return route ? route(request) : errorResponse(404, "not_found", "Unknown simulator route");
+}
+
 /** Create a fully local request handler. It deliberately has no fetch/provider dependency. */
 export function createSimulator(fixtures: SimulatorFixture[] = loadFixtures()): Simulator {
   const feedback = new Map<string, string>();
   const tokens = new Set(fixtures.map(fixture => fixture.publicPuzzle.puzzleToken));
   if (tokens.size !== fixtures.length) throw new Error("Simulator fixture tokens must be unique");
+  const routes = createRoutes(fixtures, feedback);
 
   return {
-    async handle(request: Request): Promise<Response> {
-      if ((await request.clone().arrayBuffer()).byteLength > MAX_REQUEST_BODY_BYTES) {
-        return errorResponse(413, "payload_too_large", "Request body is too large");
-      }
-      const pathname = new URL(request.url).pathname;
-      if (pathname === "/api/puzzle") {
-        if (request.method === "GET") return handleGeneration(request, fixtures);
-        if (request.method === "POST") return handleVerification(request, fixtures);
-        return methodNotAllowed("GET, POST");
-      }
-      if (pathname === "/v1/puzzles/generate") return handleGeneration(request, fixtures);
-      if (pathname === "/v1/puzzles/verify") return handleVerification(request, fixtures);
-      if (pathname === "/api/hint") return handleHint(request, fixtures, true);
-      if (pathname === "/v1/puzzles/hint") return handleHint(request, fixtures, false);
-      if (pathname === "/api/events") return handleEvents(request, true, fixtures);
-      if (pathname === "/v1/events") return handleEvents(request, false, fixtures);
-      if (pathname === "/api/feedback" || pathname === "/v1/feedback") return handleFeedback(request, fixtures, feedback);
-      if (pathname === "/api/clue-strategies") return handleClueStrategies(request);
-      if (pathname === "/healthz") {
-        return request.method === "GET"
-          ? jsonResponse({ body: { status: "ok" } })
-          : methodNotAllowed("GET");
-      }
-      if (pathname === "/api/health") {
-        return request.method === "GET"
-          ? jsonResponse({ body: { status: "ok", dependencies: { yokaiba: "ok" } } })
-          : methodNotAllowed("GET");
-      }
-      return errorResponse(404, "not_found", "Unknown simulator route");
-    },
+    handle: request => dispatchRequest(request, routes),
   };
 }

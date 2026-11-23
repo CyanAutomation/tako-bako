@@ -22,7 +22,7 @@ export interface PuzzleFeedbackResponse {
   duplicate: boolean;
 }
 
-export const PUZZLE_FEEDBACK_STORAGE_PREFIX = "tako-bako.feedback.v1:";
+const PUZZLE_FEEDBACK_STORAGE_PREFIX = "tako-bako.feedback.v1:";
 
 export interface FeedbackStorage {
   getItem(key: string): string | null;
