@@ -159,6 +159,6 @@ jobs:
           {
             echo "## Course puzzle smoke test"
             echo
-            printf 'Level `%s` (`%s`, `%s`) returned HTTP `%s` with the requested difficulty and public response shape.\n' \
+            printf 'Level %s (%s, %s) returned HTTP %s with the requested difficulty and public response shape.\n' \
               "$DIFFICULTY_LEVEL" "$TEMPLATE_ID" "$DIFFICULTY_MODEL" "$http_status"
           } >> "$GITHUB_STEP_SUMMARY"
