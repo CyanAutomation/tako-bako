@@ -85,6 +85,14 @@ test("the grid identifies the event order with numbered base rows", () => {
   assert.match(markup, /<th scope="row">2\. B<\/th>/);
 });
 
+test("renders a dismissible hint coach fallback that A2UI can upgrade", () => {
+  const markup = renderApp(view({ hintCoach: { kind: "clue", clue: { id: "clue-1", text: "A is not first." } } }));
+  assert.match(markup, /class="hint-coach-fallback"/);
+  assert.match(markup, /A is not first\./);
+  assert.match(markup, /data-dismiss-hint="true"/);
+  assert.match(markup, /data-a2ui-hint-coach hidden/);
+});
+
 test("keeps the product name visible on the landing screen", () => {
   const landing = renderApp(view({ puzzle: undefined }));
   assert.match(landing, /<p class="eyebrow">Tako Bako Logic Dojo<\/p>/);

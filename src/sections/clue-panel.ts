@@ -1,5 +1,5 @@
 import type { Category } from "../puzzle";
-import { clueStrategyLabel, type ClueStrategy } from "../clue-strategy-catalog";
+import { CLUE_STRATEGIES, clueStrategyLabel, type ClueStrategy } from "../clue-strategy-catalog";
 import { escapeHtml } from "../ui-escape";
 import { renderBadge, renderPanel } from "../ui-feedback";
 import { renderButton } from "../ui-buttons";
@@ -44,7 +44,7 @@ function renderClueItem(clue: ClueItem, index: number, category: Category, usedC
   const used = usedClueIds.has(clue.id);
   const related = clueIsRelated(clue.text, category);
   const strategy = clue.strategy
-    ? `<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy" title="Reasoning strategy">${escapeHtml(clueStrategyLabel(clue.strategy))}</span></details>`
+    ? `<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy-fallback"><span class="clue-strategy" title="Reasoning strategy">${escapeHtml(clueStrategyLabel(clue.strategy))}</span><span class="clue-strategy-description">${escapeHtml(CLUE_STRATEGIES[clue.strategy].description)}</span></span><div class="clue-strategy-a2ui" data-a2ui-strategy data-clue-index="${index}" hidden></div></details>`
     : "";
   const button = renderButton({
     label: used ? "✓" : String(index + 1),

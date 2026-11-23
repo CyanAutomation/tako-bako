@@ -5,6 +5,8 @@ import { courseProgressLabel, nextCourse, type Course } from "./curriculum";
 import type { ChallengeProgress } from "./progress-types";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
+import type { ParsedHintResponse } from "./hint-response";
+import { hintCoachContent } from "./a2ui/messages";
 import { renderBoardToolbar } from "./sections/board-toolbar";
 import { renderCluePanel, type ClueFilter } from "./sections/clue-panel";
 import { renderCurriculum } from "./sections/curriculum";
@@ -39,6 +41,7 @@ export interface AppViewState {
   activeCellKey: string | undefined;
   usedClueIds: ReadonlySet<string>;
   clueStrategies: Record<string, ClueStrategy>;
+  hintCoach?: ParsedHintResponse;
   pendingResetGridId: string | undefined;
   pendingBoardReset: boolean;
   pendingNewChallenge: boolean;
@@ -107,6 +110,17 @@ function renderResetModal(view: AppViewState): string {
 function renderNewChallengeModal(open: boolean): string {
   if (!open) return "";
   return `<div class="modal-backdrop">${renderDialog({ id: "new-challenge", eyebrow: "New challenge", title: "Leave this puzzle?", description: "Your marks are saved, but you will start a different puzzle.", actions: `${renderButton({ id: "cancel-new-challenge", label: "Keep solving" })}${renderButton({ id: "confirm-new-challenge", label: "Start new challenge", variant: "primary" })}` })}</div>`;
+}
+
+function renderHintCoach(view: AppViewState): string {
+  const hint = view.hintCoach;
+  if (!hint) return "";
+  const matchedClue = hint.kind === "clue"
+    ? view.puzzle?.clues.find(candidate => candidate.id === hint.clue.id || candidate.text === hint.clue.text)
+    : undefined;
+  const strategy = matchedClue?.strategy ?? (matchedClue ? view.clueStrategies[matchedClue.id] : undefined);
+  const content = hintCoachContent(hint, strategy);
+  return `<section class="hint-coach" aria-label="Reason with Tako"><div class="hint-coach-fallback"><p class="eyebrow">Reason with Tako</p><h2>${escapeHtml(content.title)}</h2><p>${escapeHtml(content.body)}</p>${renderButton({ label: "Dismiss note", className: "button button--secondary", data: { dismissHint: "true" } })}</div><div class="hint-coach-a2ui" data-a2ui-hint-coach hidden></div></section>`;
 }
 
 function renderProgressResetModal(open: boolean): string {
@@ -230,7 +244,7 @@ function renderPuzzle(view: AppViewState, current: Puzzle): string {
   const clueList = current.clues.map(clue => ({ ...clue, strategy: clue.strategy ?? view.clueStrategies[clue.id] }));
   const workspace = renderGridWorkspace({ categories, activeGridId: activeCategory.id, toolbar, grids });
   const clues = renderCluePanel({ clues: clueList, activeCategory, cluesOpen: view.cluesOpen, usedClueIds: view.usedClueIds, clueFilter: view.clueFilter, clueFiltersOpen: view.clueFiltersOpen });
-  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message: view.message, tone: view.messageTone })}<section class="workspace">${workspace}${clues}</section></main>${renderResetModal(view)}${renderNewChallengeModal(view.pendingNewChallenge)}${renderCelebrationModal(view)}`;
+  return `<main>${renderPuzzleHeader({ title, difficulty: courseLabel, message: view.message, tone: view.messageTone })}${renderHintCoach(view)}<section class="workspace">${workspace}${clues}</section></main>${renderResetModal(view)}${renderNewChallengeModal(view.pendingNewChallenge)}${renderCelebrationModal(view)}`;
 }
 
 function renderLandingAction(view: AppViewState): string {

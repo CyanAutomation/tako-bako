@@ -252,7 +252,8 @@ describe("answer verification navigation", () => {
 
     mountApp({ mascotUrl: "/mascot.png", markUrl: "/mark.png" });
     await flush();
-    assert.ok((root.innerHTML).includes('<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy" title="Reasoning strategy">Neighbours</span></details>'));
+    assert.ok((root.innerHTML).includes('<details class="clue-strategy-disclosure"><summary>Reasoning</summary><span class="clue-strategy-fallback"><span class="clue-strategy" title="Reasoning strategy">Neighbours</span>'));
+    assert.ok((root.innerHTML).includes('class="clue-strategy-a2ui" data-a2ui-strategy data-clue-index="1" hidden'));
 
     const click = (button: Partial<FakeButton>) => listeners.get("click")!({
       target: { closest: () => ({ id: "", disabled: false, dataset: {}, ...button }) },
@@ -465,9 +466,15 @@ describe("answer verification navigation", () => {
     await flush();
 
     assert.ok(app.root.innerHTML.includes("Hint: Start with the order clue."));
+    assert.ok(app.root.innerHTML.includes("Reason with Tako"));
+    assert.ok(app.root.innerHTML.includes('data-a2ui-hint-coach hidden'));
     assert.strictEqual(app.storage.get("tako-bako.clues.hint-success"), undefined);
     assert.match(app.root.innerHTML, /Mark clue 1 as reviewed/);
     assert.doesNotMatch(app.root.innerHTML, /Mark clue 1 as not reviewed/);
+
+    app.click({ dataset: { dismissHint: "true" } });
+    assert.doesNotMatch(app.root.innerHTML, /Reason with Tako/);
+    assert.match(app.root.innerHTML, /Hint: Start with the order clue\./);
 
     app.click({ dataset: { square: "club|Aki|Lions" } });
     app.click({ id: "undo" });

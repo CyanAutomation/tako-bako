@@ -35,6 +35,9 @@ import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
 import { createSnackbarController } from "./snackbar";
 import { applyDisclosureToggle } from "./disclosure-state";
 import { findOverlappingBlocker } from "./snackbar-placement";
+import type { A2uiSurfaceMount } from "./a2ui/mount";
+import type { A2uiHostAction } from "./a2ui/renderer";
+import type { ParsedHintResponse } from "./hint-response";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -86,6 +89,7 @@ let challengeOptionsOpen = false;
 let sharedPuzzleOpen = false;
 let puzzleStartedAt: number | undefined;
 let hintsUsed = 0;
+let hintCoach: ParsedHintResponse | undefined;
 let mistakes = 0;
 let puzzleCompleted = false;
 let feedbackUi: { selectedRating?: PuzzleFeedbackRating; selectedReason?: PuzzleFeedbackReason; submitting: boolean; status?: "success" | "error" } = { submitting: false };
@@ -157,6 +161,8 @@ const gameplay = createAppGameplayActions({
     set usedClueIds(value) { usedClueIds = value; },
     get clueStrategies() { return clueStrategies; },
     set clueStrategies(value) { clueStrategies = value; },
+    get hintCoach() { return hintCoach; },
+    set hintCoach(value) { hintCoach = value; },
   },
   setMessage,
   render,
@@ -208,6 +214,7 @@ function showLandingPage(): void {
   activePuzzleRequest?.abort();
   activePuzzleRequest = undefined;
   puzzle = null;
+  hintCoach = undefined;
   pendingFeedbackRequests.clear();
   board = {};
   loading = false;
@@ -269,6 +276,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
   invalidateClueStrategies();
+  hintCoach = undefined;
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
   const requestedDifficultyLevel = difficultyLevel;
@@ -437,6 +445,7 @@ function render(): void {
     activeCellKey,
     usedClueIds,
     clueStrategies,
+    hintCoach,
     pendingResetGridId,
     pendingBoardReset,
     pendingNewChallenge,
@@ -457,7 +466,36 @@ function render(): void {
     challengeOptionsOpen,
     sharedPuzzleOpen,
   });
+  if (a2uiSurfaces) a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach });
+  else if (puzzle && (hintCoach || puzzle.clues.some(clue => clue.strategy) || Object.keys(clueStrategies).length > 0)) {
+    loadA2uiSurfaces();
+  }
   scheduleSnackbarPlacement();
+}
+
+function handleA2uiAction(action: A2uiHostAction): void {
+  if (action.name !== "dismiss_hint" || Object.keys(action.context).length !== 0 || !hintCoach) return;
+  hintCoach = undefined;
+  render();
+  root.querySelector<HTMLButtonElement>("#hint")?.focus();
+}
+
+let a2uiSurfaces: A2uiSurfaceMount | undefined;
+let a2uiSurfacesLoading = false;
+let a2uiSurfacesFailed = false;
+
+function loadA2uiSurfaces(): void {
+  if (a2uiSurfaces || a2uiSurfacesLoading || a2uiSurfacesFailed) return;
+  a2uiSurfacesLoading = true;
+  void import("./a2ui/mount").then(({ A2uiSurfaceMount: SurfaceMount }) => {
+    a2uiSurfaces = new SurfaceMount(handleA2uiAction);
+    a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach });
+  }).catch(() => {
+    a2uiSurfacesFailed = true;
+    // HTML fallbacks remain usable if the optional A2UI renderer cannot load.
+  }).finally(() => {
+    a2uiSurfacesLoading = false;
+  });
 }
 
 function scheduleSnackbarPlacement(): void {
@@ -747,7 +785,14 @@ function handleBoardSquareClick(button: HTMLButtonElement): boolean {
   return true;
 }
 
+function handleDismissHintClick(button: HTMLButtonElement): boolean {
+  if (!button.dataset.dismissHint) return false;
+  handleA2uiAction({ name: "dismiss_hint", context: {} });
+  return true;
+}
+
 const clickActions: ((button: HTMLButtonElement) => boolean)[] = [
+  handleDismissHintClick,
   handleFeedbackClick,
   handlePuzzleNavigationClick,
   handleBoardActionClick,

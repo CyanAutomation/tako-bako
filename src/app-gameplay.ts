@@ -29,6 +29,7 @@ interface AppGameplayState {
   pendingCelebration: boolean;
   usedClueIds: Set<string>;
   clueStrategies: Record<string, ClueStrategy>;
+  hintCoach: ParsedHintResponse | undefined;
 }
 
 interface AppGameplayDependencies {
@@ -167,11 +168,13 @@ export function createAppGameplayActions({ state, setMessage, render, recordOutc
     };
     const body = createHintRequestBody(options);
     state.loading = true;
+    state.hintCoach = undefined;
     setMessage("Tako is finding the next helpful nudge…");
     render();
     try {
       const hint = await requestHintResponse(body, requestController.signal, isActiveRequest);
       if (!hint) return;
+      state.hintCoach = hint;
       applyHintResponse(hint, requestedPuzzleId, requestedBoard);
       state.hintsUsed = requestedHintsUsed + 1;
       recordHintUsage(requestedPuzzle, requestedDifficultyLevel, requestedPuzzleStartedAt, state.hintsUsed, state.mistakes);

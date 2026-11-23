@@ -60,6 +60,11 @@ test("simulated Beginner Level 1 starts through the app API and renders fixture 
     await expect(page.getByRole("tab", { name: category.label })).toBeVisible();
   }
   await expect(page.getByText(beginner.publicPuzzle.clues[0]!.text, { exact: true })).toBeVisible();
+  const strategy = page.locator(".clue-strategy-disclosure").first();
+  await strategy.waitFor({ state: "attached" });
+  await strategy.locator("summary").click();
+  await expect(strategy.locator("[data-a2ui-strategy]")).toBeVisible();
+  await expect(strategy.locator(".clue-strategy-fallback")).toBeHidden();
   expect(pageErrors).toEqual([]);
 });
 
@@ -104,6 +109,11 @@ test("the simulated hint flow displays a valid fixture clue", async ({ page }) =
   expect(response.status()).toBe(200);
   const hint = await response.json() as { kind: string; clue: { id: string; text: string } };
   expect(beginner.publicPuzzle.clues.some(clue => clue.id === hint.clue.id && clue.text === hint.clue.text)).toBe(true);
+  await expect(page.getByRole("status")).toContainText(`Hint: ${hint.clue.text}`);
+  await expect(page.getByRole("region", { name: "Reason with Tako" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dismiss note" })).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss note" }).click();
+  await expect(page.getByRole("region", { name: "Reason with Tako" })).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText(`Hint: ${hint.clue.text}`);
   expect(pageErrors).toEqual([]);
 });

@@ -47,6 +47,8 @@ Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5�
 
 Clues can be filtered as All, To review, or Used. Starting a new puzzle closes the clue-filter disclosure. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. The grid collection is a labelled region; grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
 
+Open a clue’s **Reasoning** disclosure to see its strategy and a short explanation. Hints also open a dismissible reasoning coach. These surfaces use app-owned A2UI components and keep ordinary HTML fallbacks available.
+
 ### Puzzle Challenge
 
 Puzzle Challenge guides players through twelve levels: Beginner uses Tournament Order 1–4; Intermediate uses Open Division 5–7 and Championship Bridge 8; Advanced uses Championship Bridge 9 and Championship Circuit 10–12. Each tier's introductory description is available from a labelled information disclosure. Levels unlock sequentially, and the header shows completion within the active tier. Hints begin with a clue and can offer an elimination or a revealed placement as progress increases. Daily puzzles roll over at midnight UTC and advance with a correct answer. Players can also replay a tier, start the daily puzzle fresh, or reset Challenge progress without deleting saved boards or breaking shared links.
@@ -115,6 +117,8 @@ src/                       Browser application
   puzzle-board/            Board marking and solution helpers
   puzzle-cache/            Puzzle response cache and freshness policy
   sections/                Board, clue, curriculum, and grid views
+  a2ui/                    Validated A2UI surfaces and DOM adapter
+  ui-primitives.ts         Shared semantic DOM primitives for A2UI views
 api/                       Vercel serverless handlers
 server/                    Shared API and provider modules
 simulator/                 Development-only local HTTP simulator and private fixtures
