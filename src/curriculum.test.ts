@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { assertPartialMatch } from "../test-utils.js";
 
-import { courseFor, courseForId, courseProgressLabel, courses, defaultDifficultyModelForCourse, firstAvailableCourse, nextCourse, puzzleParametersForCourse } from "./curriculum";
+import { courseFor, courseForId, courseProgressLabel, courses, defaultDifficultyModelForCourse, firstAvailableCourse, nextCourse, puzzleParametersForCourse } from "./curriculum.js";
 
 describe("Puzzle Challenge curriculum", () => {
   it("[TB-CHALLENGE-01] maps all twelve player-facing courses to their calibrated Yokaiba parameters", () => {
