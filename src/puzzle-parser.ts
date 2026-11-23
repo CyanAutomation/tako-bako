@@ -1,6 +1,6 @@
-import { isClueStrategy } from "./clue-strategy-catalog";
-import { strategyForConstraintKind } from "./clue-strategy-constraints";
-import type { Category, Clue, Puzzle } from "./puzzle";
+import { isClueStrategy } from "./clue-strategy-catalog.js";
+import { strategyForConstraintKind } from "./clue-strategy-constraints.js";
+import type { Category, Clue, Puzzle } from "./puzzle.js";
 
 const MAX_CATEGORIES = 8;
 const MAX_VALUES_PER_CATEGORY = 16;

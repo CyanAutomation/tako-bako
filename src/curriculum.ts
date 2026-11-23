@@ -68,5 +68,5 @@ export function puzzleParametersForCourse(course: Course): { templateId: Course[
 
 /** Keep challenge levels with known v5 target gaps on the proven v4 model. */
 export function defaultDifficultyModelForCourse(course: Course): "v4" | "v5" {
-  return course.difficultyLevel === 7 || course.difficultyLevel === 11 || course.difficultyLevel === 12 ? "v4" : "v5";
+  return course.difficultyLevel === 11 || course.difficultyLevel === 12 ? "v4" : "v5";
 }

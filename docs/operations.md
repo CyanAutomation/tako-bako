@@ -18,6 +18,8 @@ The project is configured as a Vite app in `vercel.json`. Vercel runs `npm run b
 
 `/api/health` returns HTTP 200 when Yokaiba is reachable and HTTP 503 when it is unavailable. It does not require credentials.
 
+The scheduled deployment smoke workflow checks both health and puzzle generation. It requests one fixed seed for each of the twelve Challenge levels using that course's configured template and difficulty model, then checks the returned level and public response shape. Generation is tested separately because a healthy Yokaiba worker can still fail a targeted puzzle request.
+
 ### Request body limits
 
 Vercel's JSON body parser rejects requests that exceed these endpoint limits before the handler runs:
@@ -57,6 +59,8 @@ The simulator deliberately does not reproduce seed-based generation, the full di
 ## Puzzle verification and cache policy
 
 The Yokaiba Worker must have `PUZZLE_TOKEN_SECRET` configured with `wrangler secret put PUZZLE_TOKEN_SECRET` and be redeployed. Yokaiba issues a signed token with generated puzzles; the solution itself is not sent to the browser. If the secret is absent or verification is unavailable, players can continue marking a board, but answer checking will not work.
+
+The `/api/puzzle` proxy validates generated puzzles with the browser parser before returning them. That parser projects only playable puzzle fields and drops the internal difficulty profile and deduction trace, whose placements and eliminations can reveal the answer. An invalid upstream puzzle returns a non-cacheable HTTP 502 response. Keep full traces in internal audit output rather than public puzzle responses.
 
 The intended maximum puzzle age is five minutes from generation. The API stamps generated responses with `X-Tako-Bako-Generated-At`; that timestamp is retained when an edge serves a stale-while-revalidate response. Browser local storage derives its expiry from the generation time rather than starting a new five-minute window when a response is received. This lets another tab on the same browser reuse a fresh puzzle.
 
