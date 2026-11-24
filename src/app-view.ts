@@ -6,7 +6,9 @@ import type { ChallengeProgress } from "./progress-types";
 import type { Board, Puzzle } from "./puzzle";
 import type { ClueStrategy } from "./clue-strategy-catalog";
 import type { ParsedHintResponse } from "./hint-response";
+import type { LearningRecommendation } from "./learning-recommendation";
 import { hintCoachContent } from "./a2ui/messages";
+import { renderCoachPanel } from "./ui-components/coach-panel";
 import { renderBoardToolbar } from "./sections/board-toolbar";
 import { renderCluePanel, type ClueFilter } from "./sections/clue-panel";
 import { renderCurriculum } from "./sections/curriculum";
@@ -42,6 +44,7 @@ export interface AppViewState {
   usedClueIds: ReadonlySet<string>;
   clueStrategies: Record<string, ClueStrategy>;
   hintCoach?: ParsedHintResponse;
+  learningRecommendation?: LearningRecommendation;
   pendingResetGridId: string | undefined;
   pendingBoardReset: boolean;
   pendingNewChallenge: boolean;
@@ -120,7 +123,27 @@ function renderHintCoach(view: AppViewState): string {
     : undefined;
   const strategy = matchedClue?.strategy ?? (matchedClue ? view.clueStrategies[matchedClue.id] : undefined);
   const content = hintCoachContent(hint, strategy);
-  return `<section class="hint-coach" aria-label="Reason with Tako"><div class="hint-coach-fallback"><p class="eyebrow">Reason with Tako</p><h2>${escapeHtml(content.title)}</h2><p>${escapeHtml(content.body)}</p>${renderButton({ label: "Dismiss note", className: "button button--secondary", data: { dismissHint: "true" } })}</div><div class="hint-coach-a2ui" data-a2ui-hint-coach hidden></div></section>`;
+  return renderCoachPanel({
+    kind: "hint",
+    label: "Reason with Tako",
+    eyebrow: "Reason with Tako",
+    title: content.title,
+    body: content.body,
+    actionLabel: "Dismiss note",
+    ...(matchedClue ? { focusClueLabel: "Review this clue" } : {}),
+  });
+}
+
+function renderLearningRecommendation(view: AppViewState): string {
+  const recommendation = view.learningRecommendation;
+  if (!recommendation) return "";
+  return renderCoachPanel({
+    kind: "learning",
+    label: "Next puzzle focus",
+    eyebrow: "For next time",
+    title: recommendation.title,
+    body: `${recommendation.focus}: ${recommendation.body}`,
+  });
 }
 
 function renderProgressResetModal(open: boolean): string {
@@ -140,7 +163,7 @@ function renderCelebrationModal(view: AppViewState): string {
   const actions = next
     ? `${renderButton({ id: "celebration-close", label: "Return to the dojo" })}${renderButton({ id: "celebration-continue", label: `Start ${next.label}`, variant: "primary" })}`
     : renderButton({ id: "celebration-close", label: "Return to the dojo", variant: "primary" });
-  const content = `${renderMascotNote(view.mascotUrl, { title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" })}${renderFeedbackControls(view, "celebration")}`;
+  const content = `${renderMascotNote(view.mascotUrl, { title: "Excellent deduction.", copy: "Patient marking and clear logic brought every tile into place.", mood: "celebrate" })}${renderLearningRecommendation(view)}${renderFeedbackControls(view, "celebration")}`;
   return `<div class="modal-backdrop celebration-backdrop">${renderDialog({ id: "celebration", className: "celebration-dialog", eyebrow: "Solved!", title, description: copy, content, actions })}</div>`;
 }
 

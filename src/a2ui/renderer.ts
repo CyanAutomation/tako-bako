@@ -7,12 +7,13 @@ import {
   createUiStack,
   createUiText,
 } from "../ui-primitives";
+import { createUiCoachCard } from "../ui-components/coach-card";
 
 const MAX_MESSAGE_BYTES = 16_384;
 const MAX_COMPONENTS = 32;
 const MAX_DEPTH = 8;
 const COMPONENTS = new Set(["Card", "Column", "Row", "Text", "Button", "Divider"]);
-const SURFACE_DATA_KEYS = new Set(["label", "description", "title", "body", "dismissLabel"]);
+const SURFACE_DATA_KEYS = new Set(["label", "description", "title", "body", "dismissLabel", "reviewClueLabel"]);
 const COMPONENT_IDS = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 
 export interface A2uiHostAction {
@@ -59,7 +60,7 @@ function validateSurfaceEnvelope(message: unknown, expectedSurfaceId: string): {
   return { surfaceId: expectedSurfaceId, components: surface.components, dataModel: surface.dataModel as Record<string, string> };
 }
 
-function validateComponent(value: unknown, surfaceId: string, dataModel: Record<string, string>): value is RecordValue & { id: string; component: string } {
+function validateComponent(value: unknown, dataModel: Record<string, string>): value is RecordValue & { id: string; component: string } {
   if (!isRecord(value) || typeof value.id !== "string" || !COMPONENT_IDS.test(value.id)) return false;
   if (typeof value.component !== "string" || !COMPONENTS.has(value.component)) return false;
 
@@ -85,13 +86,16 @@ function validateComponent(value: unknown, surfaceId: string, dataModel: Record<
     return path.startsWith("/") && Object.hasOwn(dataModel, path.slice(1));
   }
   if (value.component === "Button") {
-    if (surfaceId !== "tako-hint-coach" || typeof value.child !== "string" || !isRecord(value.action)) return false;
+    if (typeof value.child !== "string" || !isRecord(value.action)) return false;
     if (Object.keys(value.action).length !== 1 || !isRecord(value.action.event)) return false;
     const event = value.action.event;
-    return Object.keys(event).length === 2
-      && event.name === "dismiss_hint"
-      && isRecord(event.context)
-      && Object.keys(event.context).length === 0;
+    if (Object.keys(event).length !== 2 || !isRecord(event.context)) return false;
+    if (event.name === "dismiss_hint") return Object.keys(event.context).length === 0;
+    return event.name === "focus_clue"
+      && Object.keys(event.context).length === 1
+      && typeof event.context.clueId === "string"
+      && event.context.clueId.length > 0
+      && event.context.clueId.length <= 128;
   }
   return true;
 }
@@ -130,7 +134,7 @@ function validatedSurface(messages: unknown, expectedSurfaceId: string): A2uiSur
   if (!envelope || hasForbiddenCall(messages[0])) return undefined;
   const components = new Map<string, A2uiComponent>();
   for (const value of envelope.components) {
-    if (!validateComponent(value, envelope.surfaceId, envelope.dataModel) || components.has(value.id)) return undefined;
+    if (!validateComponent(value, envelope.dataModel) || components.has(value.id)) return undefined;
     components.set(value.id, { id: value.id, type: value.component, properties: value });
   }
   if (!validateTopology(envelope.surfaceId, components)) return undefined;
@@ -204,7 +208,8 @@ export class A2uiDomRenderer {
       }
       case "Card": {
         if (typeof component.properties.child !== "string") throw new Error("A2UI card child is invalid.");
-        return createUiCard(this.document, [this.renderComponent(surface, component.properties.child, nextAncestry)]);
+        const children = [this.renderComponent(surface, component.properties.child, nextAncestry)];
+        return id === "root" ? createUiCoachCard(this.document, children) : createUiCard(this.document, children);
       }
       case "Text": {
         const text = resolveString(component.properties.text, surface);

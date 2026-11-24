@@ -47,7 +47,7 @@ Four scenarios are available: Tournament Order (4×4 warm-up), Open Division (5�
 
 Clues can be filtered as All, To review, or Used. Starting a new puzzle closes the clue-filter disclosure. Used-clue status is saved separately from board marks. The clue panel identifies the active grid and highlights clues that mention it. Use arrow keys to move through grid cells. The grid collection is a labelled region; grid tabs, clue filters, board actions, and dialogs expose their names and selected state to assistive technology. Readiness feedback reports confirmed matches and whether the solution is ready to check.
 
-Open a clue’s **Reasoning** disclosure to see its strategy and a short explanation. Hints also open a dismissible reasoning coach. These surfaces use app-owned A2UI components and keep ordinary HTML fallbacks available.
+Open a clue’s **Reasoning** disclosure to see its strategy and a short explanation. Hints open a dismissible reasoning coach, and the completion dialog offers a strategy focus to carry into the next puzzle. These surfaces use reusable app-owned A2UI components and keep ordinary HTML fallbacks available.
 
 ### Puzzle Challenge
 
@@ -82,7 +82,7 @@ Selected test contracts and product behavior are mapped in [test traceability](d
 
 ## Deployment and API
 
-Vercel serves the Vite app and six serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, anonymous outcome events, puzzle difficulty feedback, and readiness. The scheduled deployment smoke test checks health and requests one seeded puzzle for each Challenge level. The public puzzle response contains only validated player fields; it does not include solver traces or answer data. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
+Vercel serves the Vite app and seven serverless handlers. Puzzle generation and answer verification share `/api/puzzle`; the other handlers provide hints, clue labels, post-puzzle learning recommendations, anonymous outcome events, puzzle difficulty feedback, and readiness. The scheduled deployment smoke test checks health and requests one seeded puzzle for each Challenge level. The public puzzle response contains only validated player fields; it does not include solver traces or answer data. See the [operations endpoint reference](docs/operations.md#deployment) for route methods and the [operations guide](docs/operations.md) for caching, security headers, and provider configuration.
 
 `GET /api/puzzle` accepts a required `seed`, an optional allow-listed `templateId`, an optional `difficultyLevel` from 1 to 12, and an optional `difficultyModel` from `v4`, `v5`, or `compare`. Verification (`POST /api/puzzle`) and hints (`POST /api/hint`) require the signed `puzzleToken` returned with a generated puzzle. These endpoints support the app's own flows.
 
@@ -102,7 +102,7 @@ If Yokaiba is unavailable, the endpoint returns HTTP 503 with `status: "degraded
 
 ## Configuration
 
-Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification and puzzle feedback require Yokaiba's signed puzzle token and its configured D1 feedback binding. Jev's optional clue labels and hint selection require `OPENROUTER_API_KEY` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
+Playing locally does not require API keys. Puzzle generation is available without optional model services. Answer verification and puzzle feedback require Yokaiba's signed puzzle token and its configured D1 feedback binding. Jev's optional clue labels, hint selection, and post-puzzle strategy focus require `OPENROUTER_API_KEY` in the Vercel server-side environment. `JEV_MODEL` is optional. Keep credentials out of browser code and the repository.
 
 See [operations and configuration details](docs/operations.md) for defaults, rate limits, fallback behavior, cache policy, and security notes.
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseHTML } from "linkedom";
-import { buildHintCoachSurface, buildStrategySurface } from "./messages";
+import { buildHintCoachSurface, buildLearningRecommendationSurface, buildStrategySurface } from "./messages";
 import { A2uiDomRenderer, validateA2uiMessages } from "./renderer";
 
 interface TestComponent {
@@ -32,6 +32,50 @@ describe("A2UI DOM renderer boundary", () => {
     renderer.dispose();
   });
 
+  it("renders a validated learning card with the reusable semantic coach-card component", () => {
+    const document = parseHTML("<html><body><main id='target'></main></body></html>").document;
+    const target = document.querySelector("#target") as HTMLElement;
+    const renderer = new A2uiDomRenderer(target, () => {});
+
+    renderer.render(buildLearningRecommendationSurface({
+      surfaceId: "tako-learning-recommendation",
+      strategy: "adjacency",
+    }), "tako-learning-recommendation");
+
+    const card = target.querySelector(".ui-coach-card");
+    assert.ok(card);
+    assert.equal(card.getAttribute("role"), "note");
+    assert.match(card.textContent ?? "", /Neighbours/);
+    renderer.dispose();
+  });
+
+  it("validates and dispatches an allowlisted button on a non-hint surface", async () => {
+    const document = parseHTML("<html><body><main id='target'></main></body></html>").document;
+    const target = document.querySelector("#target") as HTMLElement;
+    const actions: unknown[] = [];
+    const renderer = new A2uiDomRenderer(target, action => { actions.push(action); });
+    const messages = buildLearningRecommendationSurface({
+      surfaceId: "tako-learning-recommendation",
+      strategy: "adjacency",
+    });
+    const surface = messages[0]!.createSurface;
+    const content = surface.components.find(component => component.id === "learning_content")!;
+    content.children = [...content.children as string[], "dismiss_button"];
+    surface.components.push(
+      { id: "dismiss_button", component: "Button", child: "dismiss_label", action: { event: { name: "dismiss_hint", context: {} } } },
+      { id: "dismiss_label", component: "Text", text: { "@path": "/dismissLabel" } },
+    );
+    surface.dataModel.dismissLabel = "Dismiss note";
+
+    assert.equal(validateA2uiMessages(messages, "tako-learning-recommendation").ok, true);
+    renderer.render(messages, "tako-learning-recommendation");
+    (target.querySelector("button") as HTMLButtonElement).click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.deepEqual(actions, [{ name: "dismiss_hint", context: {} }]);
+    renderer.dispose();
+  });
+
   it("dispatches only the declared A2UI event through the host action callback", async () => {
     const document = parseHTML("<html><body><main id='target'></main></body></html>").document;
     const target = document.querySelector("#target") as HTMLElement;
@@ -43,6 +87,25 @@ describe("A2UI DOM renderer boundary", () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     assert.deepEqual(actions, [{ name: "dismiss_hint", context: {} }]);
+    renderer.dispose();
+  });
+
+  it("passes a matched clue ID through the validated review action", async () => {
+    const document = parseHTML("<html><body><main id='target'></main></body></html>").document;
+    const target = document.querySelector("#target") as HTMLElement;
+    const actions: unknown[] = [];
+    const renderer = new A2uiDomRenderer(target, action => { actions.push(action); });
+    renderer.render(buildHintCoachSurface({
+      surfaceId: "tako-hint-coach",
+      title: "Order",
+      body: "Follow the sequence.",
+      focusClueId: "clue-7",
+    }), "tako-hint-coach");
+
+    (target.querySelectorAll("button")[1] as HTMLButtonElement).click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    assert.deepEqual(actions, [{ name: "focus_clue", context: { clueId: "clue-7" } }]);
     renderer.dispose();
   });
 
@@ -67,6 +130,11 @@ describe("A2UI DOM renderer boundary", () => {
       mutate(messages);
       assert.equal(validateA2uiMessages(messages, "tako-hint-coach").ok, false);
     }
+
+    const invalidFocus = buildHintCoachSurface({ surfaceId: "tako-hint-coach", title: "Order", body: "Follow the sequence.", focusClueId: "clue-7" }) as unknown as TestMessage[];
+    const review = invalidFocus[0]!.createSurface.components.find(component => component.id === "review_clue");
+    if (review?.action) review.action.event.context.unexpected = true;
+    assert.equal(validateA2uiMessages(invalidFocus, "tako-hint-coach").ok, false);
   });
 
   it("rejects deeply nested untrusted component properties before traversing them recursively", () => {

@@ -1,13 +1,15 @@
 import type { ClueStrategy } from "../clue-strategy-catalog";
 import type { ParsedHintResponse } from "../hint-response";
+import type { LearningRecommendation } from "../learning-recommendation";
 import type { Puzzle } from "../puzzle";
-import { buildHintCoachSurface, buildStrategySurface, hintCoachContent } from "./messages";
+import { buildHintCoachSurface, buildLearningRecommendationSurface, buildStrategySurface, hintCoachContent } from "./messages";
 import { A2uiDomRenderer, type A2uiHostAction } from "./renderer";
 
 export interface A2uiViewState {
   puzzle: Puzzle | null;
   clueStrategies: Record<string, ClueStrategy>;
   hintCoach?: ParsedHintResponse;
+  learningRecommendation?: LearningRecommendation;
 }
 
 /** Owns the short-lived A2UI renderers created after the app replaces its view DOM. */
@@ -24,6 +26,7 @@ export class A2uiSurfaceMount {
       this.mountStrategy(target, view);
     }
     if (view.hintCoach) this.mountHintCoach(root, view, view.hintCoach);
+    if (view.learningRecommendation) this.mountLearningRecommendation(root, view.learningRecommendation);
   }
 
   dispose(): void {
@@ -65,10 +68,29 @@ export class A2uiSurfaceMount {
     try {
       renderer.render(buildHintCoachSurface({
         surfaceId: "tako-hint-coach",
+        ...(clue ? { focusClueId: clue.id } : {}),
         ...hintCoachContent(hint, strategy),
       }), "tako-hint-coach");
       target.hidden = false;
       const fallback = target.parentElement?.querySelector<HTMLElement>(".hint-coach-fallback");
+      if (fallback) fallback.hidden = true;
+      this.renderers.push(renderer);
+    } catch {
+      renderer.dispose();
+    }
+  }
+
+  private mountLearningRecommendation(root: ParentNode, recommendation: LearningRecommendation): void {
+    const target = root.querySelector<HTMLElement>("[data-a2ui-learning-recommendation]");
+    if (!target) return;
+    const renderer = new A2uiDomRenderer(target, this.onAction);
+    try {
+      renderer.render(buildLearningRecommendationSurface({
+        surfaceId: "tako-learning-recommendation",
+        strategy: recommendation.strategy,
+      }), "tako-learning-recommendation");
+      target.hidden = false;
+      const fallback = target.parentElement?.querySelector<HTMLElement>(".learning-recommendation-fallback");
       if (fallback) fallback.hidden = true;
       this.renderers.push(renderer);
     } catch {

@@ -2,7 +2,7 @@ import { markBoard, squareKey } from "./puzzle-board/marks";
 import { updateBoardView as updateBoardDom } from "./app-board-view";
 import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
-import { fetchClueStrategies } from "./app-requests";
+import { fetchClueStrategies, requestLearningRecommendation } from "./app-requests";
 import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
@@ -38,6 +38,7 @@ import { findOverlappingBlocker } from "./snackbar-placement";
 import type { A2uiSurfaceMount } from "./a2ui/mount";
 import type { A2uiHostAction } from "./a2ui/renderer";
 import type { ParsedHintResponse } from "./hint-response";
+import { buildLearningRecommendation, fallbackLearningStrategy, strategyUsageCountsForGame, type LearningRecommendation } from "./learning-recommendation";
 
 export interface AppAssets {
   mascotUrl: string;
@@ -90,6 +91,10 @@ let sharedPuzzleOpen = false;
 let puzzleStartedAt: number | undefined;
 let hintsUsed = 0;
 let hintCoach: ParsedHintResponse | undefined;
+let learningRecommendation: LearningRecommendation | undefined;
+let learningRecommendationRequestPuzzleId: string | undefined;
+let learningRecommendationGeneration = 0;
+let activeLearningRecommendationRequest: AbortController | undefined;
 let mistakes = 0;
 let puzzleCompleted = false;
 let feedbackUi: { selectedRating?: PuzzleFeedbackRating; selectedReason?: PuzzleFeedbackReason; submitting: boolean; status?: "success" | "error" } = { submitting: false };
@@ -129,6 +134,51 @@ function recordOutcome(event: "puzzle_started" | "puzzle_completed" | "hint_used
     mistakes,
     smartMarkingEnabled: smartMarking,
   });
+  if (event === "puzzle_completed") requestPuzzleLearningRecommendation();
+}
+
+function requestPuzzleLearningRecommendation(): void {
+  const currentPuzzle = puzzle;
+  if (!currentPuzzle || !puzzleCompleted || learningRecommendationRequestPuzzleId === currentPuzzle.id) return;
+  learningRecommendationRequestPuzzleId = currentPuzzle.id;
+  const strategyUsageCounts = strategyUsageCountsForGame(currentPuzzle.clues, clueStrategies, usedClueIds);
+  learningRecommendation = buildLearningRecommendation(fallbackLearningStrategy(strategyUsageCounts));
+
+  const token = currentPuzzle.puzzleToken;
+  if (!token) return;
+  const requestGeneration = ++learningRecommendationGeneration;
+  activeLearningRecommendationRequest?.abort();
+  const requestController = new AbortController();
+  activeLearningRecommendationRequest = requestController;
+  const isActiveRequest = () => requestGeneration === learningRecommendationGeneration
+    && puzzle?.id === currentPuzzle.id
+    && puzzle.puzzleToken === token
+    && puzzleCompleted;
+
+  void requestLearningRecommendation({
+    puzzleToken: token,
+    hintsUsed,
+    mistakes,
+    elapsedMs: clampElapsedMs(puzzleStartedAt) ?? 0,
+    strategyUsageCounts,
+  }, requestController.signal, isActiveRequest).then(recommendation => {
+    if (recommendation && isActiveRequest() && recommendation.strategy !== learningRecommendation?.strategy) {
+      learningRecommendation = recommendation;
+      render();
+    }
+  }).catch(() => {
+    // The deterministic app-owned suggestion remains visible if the optional service fails.
+  }).finally(() => {
+    if (requestGeneration === learningRecommendationGeneration) activeLearningRecommendationRequest = undefined;
+  });
+}
+
+function resetLearningRecommendation(): void {
+  learningRecommendationGeneration += 1;
+  activeLearningRecommendationRequest?.abort();
+  activeLearningRecommendationRequest = undefined;
+  learningRecommendationRequestPuzzleId = undefined;
+  learningRecommendation = undefined;
 }
 
 const gameplay = createAppGameplayActions({
@@ -210,6 +260,7 @@ function showLandingPage(): void {
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
   invalidateClueStrategies();
+  resetLearningRecommendation();
   currentFetchId += 1;
   activePuzzleRequest?.abort();
   activePuzzleRequest = undefined;
@@ -276,6 +327,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
   invalidateClueStrategies();
+  resetLearningRecommendation();
   hintCoach = undefined;
   const requestedSeed = seed;
   const requestedTemplateId = templateId;
@@ -317,6 +369,7 @@ async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none
 
 function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: DifficultyModel | undefined): void {
   puzzle = data;
+  resetLearningRecommendation();
   pendingFeedbackRequests.clear();
   puzzleCompleted = false;
   feedbackUi = { submitting: false };
@@ -446,6 +499,7 @@ function render(): void {
     usedClueIds,
     clueStrategies,
     hintCoach,
+    learningRecommendation,
     pendingResetGridId,
     pendingBoardReset,
     pendingNewChallenge,
@@ -466,18 +520,30 @@ function render(): void {
     challengeOptionsOpen,
     sharedPuzzleOpen,
   });
-  if (a2uiSurfaces) a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach });
-  else if (puzzle && (hintCoach || puzzle.clues.some(clue => clue.strategy) || Object.keys(clueStrategies).length > 0)) {
+  if (a2uiSurfaces) a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach, learningRecommendation });
+  else if (puzzle && (hintCoach || learningRecommendation || puzzle.clues.some(clue => clue.strategy) || Object.keys(clueStrategies).length > 0)) {
     loadA2uiSurfaces();
   }
   scheduleSnackbarPlacement();
 }
 
 function handleA2uiAction(action: A2uiHostAction): void {
-  if (action.name !== "dismiss_hint" || Object.keys(action.context).length !== 0 || !hintCoach) return;
-  hintCoach = undefined;
+  if (action.name === "dismiss_hint") {
+    if (Object.keys(action.context).length !== 0 || !hintCoach) return;
+    hintCoach = undefined;
+    render();
+    root.querySelector<HTMLButtonElement>("#hint")?.focus();
+    return;
+  }
+  const activeHint = hintCoach;
+  if (action.name !== "focus_clue" || Object.keys(action.context).length !== 1 || typeof action.context.clueId !== "string" || activeHint?.kind !== "clue") return;
+  const clueId = action.context.clueId;
+  const clue = puzzle?.clues.find(candidate => candidate.id === clueId
+    && (candidate.id === activeHint.clue.id || candidate.text === activeHint.clue.text));
+  if (!clue) return;
+  disclosureState.cluesOpen = true;
   render();
-  root.querySelector<HTMLButtonElement>("#hint")?.focus();
+  root.querySelector<HTMLButtonElement>(`[data-clue-id="${CSS.escape(clue.id)}"]`)?.focus();
 }
 
 let a2uiSurfaces: A2uiSurfaceMount | undefined;
@@ -489,7 +555,7 @@ function loadA2uiSurfaces(): void {
   a2uiSurfacesLoading = true;
   void import("./a2ui/mount").then(({ A2uiSurfaceMount: SurfaceMount }) => {
     a2uiSurfaces = new SurfaceMount(handleA2uiAction);
-    a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach });
+    a2uiSurfaces.mount(root, { puzzle, clueStrategies, hintCoach, learningRecommendation });
   }).catch(() => {
     a2uiSurfacesFailed = true;
     // HTML fallbacks remain usable if the optional A2UI renderer cannot load.
@@ -791,7 +857,17 @@ function handleDismissHintClick(button: HTMLButtonElement): boolean {
   return true;
 }
 
+function handleReviewHintClueClick(button: HTMLButtonElement): boolean {
+  if (!button.dataset.reviewHintClue) return false;
+  const activeHint = hintCoach;
+  if (activeHint?.kind !== "clue") return true;
+  const clue = puzzle?.clues.find(candidate => candidate.id === activeHint.clue.id || candidate.text === activeHint.clue.text);
+  if (clue) handleA2uiAction({ name: "focus_clue", context: { clueId: clue.id } });
+  return true;
+}
+
 const clickActions: ((button: HTMLButtonElement) => boolean)[] = [
+  handleReviewHintClueClick,
   handleDismissHintClick,
   handleFeedbackClick,
   handlePuzzleNavigationClick,

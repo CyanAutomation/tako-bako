@@ -58,7 +58,11 @@ function mountTestPuzzle(
   const root = {
     innerHTML: "",
     addEventListener: (name: string, listener: (event: never) => void) => listeners.set(name, listener),
-    querySelector: (selector: string) => selector === "#challenge-menu" ? challengeMenuButton : null,
+    querySelector: (selector: string) => selector === "#challenge-menu"
+      ? challengeMenuButton
+      : selector.startsWith('[data-clue-id="')
+        ? { focus: () => { focusedSelector = selector; } }
+        : null,
   };
   const storage = new Map<string, string>(Object.entries(initialStorage));
   const sessionStorage = new Map<string, string>();
@@ -345,6 +349,61 @@ describe("answer verification navigation", () => {
 
     assert.ok(app.root.innerHTML.includes("Not quite yet. Your notes are saved"));
     assert.strictEqual(app.storage.get(PROGRESS_STORAGE_KEY), undefined);
+  });
+
+  it("requests one post-puzzle learning strategy and upgrades the completion card", async () => {
+    const recommendationRequests: Record<string, unknown>[] = [];
+    const app = mountTestPuzzle("learning-recommendation", async (input, init) => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/puzzle" && init?.method === "POST") return new Response(JSON.stringify({ correct: true }), { status: 200 });
+      if (url === "/api/learning-recommendation") {
+        recommendationRequests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return new Response(JSON.stringify({ strategy: "adjacency" }), { status: 200 });
+      }
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`)), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ dataset: { square: "club|Aki|Lions" } });
+    app.click({ dataset: { square: "club|Ben|Wolves" } });
+    app.click({ id: "check-solution" });
+    await flush();
+
+    assert.match(app.root.innerHTML, /Neighbours: Uses next-to or adjacent positions/);
+    assert.equal(recommendationRequests.length, 1);
+    const request = recommendationRequests[0]!;
+    assert.equal(request.puzzleToken, "learning-recommendation-token");
+    assert.equal(request.hintsUsed, 0);
+    assert.equal(request.mistakes, 0);
+    assert.equal(Number.isSafeInteger(request.elapsedMs), true);
+    assert.deepEqual(request.strategyUsageCounts, {});
+    assert.equal(Object.hasOwn(request, "board"), false);
+    assert.equal(Object.hasOwn(request, "clues"), false);
+
+    app.click({ dataset: { feedbackRating: "just_right" } });
+    assert.equal(recommendationRequests.length, 1);
+  });
+
+  it("opens the matching clue from the reusable hint coach panel", async () => {
+    const app = mountTestPuzzle("review-hint-clue", async input => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/clue-strategies") return new Response(JSON.stringify({ strategies: [] }), { status: 200 });
+      if (url === "/api/hint") return new Response(JSON.stringify({ kind: "clue", clue: { id: "review-me", text: "Aki is next to the Lions coach." } }), { status: 200 });
+      const seed = new URL(url, "https://example.test").searchParams.get("seed")!;
+      return new Response(JSON.stringify(puzzleResponse(seed, `${seed}-token`, [{ id: "review-me", text: "Aki is next to the Lions coach." }])), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ id: "hint" });
+    await flush();
+    assert.match(app.root.innerHTML, /data-review-hint-clue="true"/);
+
+    app.click({ dataset: { reviewHintClue: "true" } });
+
+    assert.equal(app.focusedSelector, '[data-clue-id="review-me"]');
   });
 
   it("[TB-PROGRESS-RESET-01] clears Challenge progress while preserving saved puzzle state", async () => {

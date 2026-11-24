@@ -2008,6 +2008,7 @@ footer {
   border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
   border-radius: var(--control-radius);
 }
+.ui-coach-card { display: block; }
 .ui-stack { display: flex; gap: 0.45rem; }
 .ui-stack--vertical { flex-direction: column; }
 .ui-stack--horizontal { flex-direction: row; align-items: center; flex-wrap: wrap; }
@@ -2050,12 +2051,25 @@ footer {
   border: 1px solid color-mix(in srgb, var(--jade) 60%, var(--line));
   border-radius: var(--panel-radius);
 }
-.hint-coach-fallback { display: grid; justify-items: start; gap: 0.4rem; }
-.hint-coach-fallback .eyebrow { margin: 0; color: var(--jade); }
-.hint-coach-fallback h2 { margin: 0; font-size: 0.95rem; }
-.hint-coach-fallback p:not(.eyebrow) { max-width: 70ch; margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
-.hint-coach-a2ui .ui-card { padding: 0; background: transparent; border: 0; }
-.hint-coach-a2ui .ui-badge { color: var(--jade); background: transparent; border: 0; padding: 0; font-size: 0.72rem; }
+.learning-recommendation {
+  margin: 0.75rem 0;
+  padding: 0.7rem 0.8rem;
+  background: color-mix(in srgb, var(--jade-light) 34%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--jade) 55%, var(--line));
+  border-radius: var(--panel-radius);
+}
+.hint-coach-fallback,
+.learning-recommendation-fallback { display: grid; justify-items: start; gap: 0.4rem; }
+.hint-coach-fallback .eyebrow,
+.learning-recommendation-fallback .eyebrow { margin: 0; color: var(--jade); }
+.hint-coach-fallback h2,
+.learning-recommendation-fallback h2 { margin: 0; font-size: 0.95rem; }
+.hint-coach-fallback > p:not(.eyebrow),
+.learning-recommendation-fallback > p:not(.eyebrow) { max-width: 70ch; margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+.hint-coach-a2ui .ui-card,
+.learning-recommendation-a2ui .ui-card { padding: 0; background: transparent; border: 0; }
+.hint-coach-a2ui .ui-badge,
+.learning-recommendation-a2ui .ui-badge { color: var(--jade); background: transparent; border: 0; padding: 0; font-size: 0.72rem; }
 .hint-coach-a2ui .ui-button { margin-top: 0.15rem; }
 .clue-strategy-fallback { display: grid; justify-items: start; gap: 0.2rem; }
 .clue-strategy-description { max-width: 38ch; color: var(--muted); font-size: 0.6rem; line-height: 1.4; }
@@ -2066,8 +2080,10 @@ footer {
 .clue-strategy-a2ui .ui-badge { padding: 0.08rem 0.35rem; font-size: 0.58rem; }
 .clue-strategy-a2ui[hidden],
 .hint-coach-a2ui[hidden],
+.learning-recommendation-a2ui[hidden],
 .clue-strategy-fallback[hidden],
-.hint-coach-fallback[hidden] { display: none !important; }
+.hint-coach-fallback[hidden],
+.learning-recommendation-fallback[hidden] { display: none !important; }
 
 @media (max-width: 760px) {
   .board-tools { grid-column: 1 / -1; }

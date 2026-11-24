@@ -1,6 +1,8 @@
 import { parseEventPayload } from "../server/event-payload.js";
 import { parseFeedbackPayload } from "../server/feedback-payload.js";
 import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
+import { isClueStrategy } from "../src/clue-strategy-catalog.js";
+import { fallbackLearningStrategy, type StrategyUsageCounts } from "../src/learning-recommendation.js";
 import { parseDifficultyModel } from "../src/puzzle-input.js";
 import { isScenarioId } from "../src/scenarios.js";
 import { parseClues } from "../server/clue-strategy-input.js";
@@ -341,6 +343,26 @@ async function handleClueStrategies(request: Request): Promise<Response> {
   return jsonResponse({ body: { strategies } });
 }
 
+async function handleLearningRecommendation(request: Request, fixtures: readonly SimulatorFixture[]): Promise<Response> {
+  if (request.method !== "POST") return jsonResponse({ status: 405, body: { error: { code: "method_not_allowed", message: "Method not allowed" } }, headers: { allow: "POST" } });
+  const body = await readJsonObject(request);
+  if (!body || typeof body.puzzleToken !== "string" || !fixtureForToken(fixtures, body.puzzleToken)
+    || !Number.isSafeInteger(body.hintsUsed) || (body.hintsUsed as number) < 0 || (body.hintsUsed as number) > 100
+    || !Number.isSafeInteger(body.mistakes) || (body.mistakes as number) < 0 || (body.mistakes as number) > 100
+    || !Number.isSafeInteger(body.elapsedMs) || (body.elapsedMs as number) < 0 || (body.elapsedMs as number) > 86_400_000
+    || !isRecord(body.strategyUsageCounts)) {
+    return errorResponse(400, "invalid_request", "A valid local learning summary is required");
+  }
+  const strategyUsageCounts: StrategyUsageCounts = {};
+  for (const [strategy, count] of Object.entries(body.strategyUsageCounts)) {
+    if (!isClueStrategy(strategy) || !Number.isSafeInteger(count) || (count as number) < 0 || (count as number) > 64) {
+      return errorResponse(400, "invalid_request", "A valid local learning summary is required");
+    }
+    strategyUsageCounts[strategy] = count as number;
+  }
+  return jsonResponse({ body: { strategy: fallbackLearningStrategy(strategyUsageCounts) } });
+}
+
 function methodNotAllowed(allow: string): Response {
   return jsonResponse({ status: 405, body: { error: { code: "method_not_allowed", message: "Method not allowed" } }, headers: { allow } });
 }
@@ -375,6 +397,7 @@ function createRoutes(fixtures: readonly SimulatorFixture[], feedback: Map<strin
     ["/api/feedback", request => handleFeedback(request, fixtures, feedback)],
     ["/v1/feedback", request => handleFeedback(request, fixtures, feedback)],
     ["/api/clue-strategies", handleClueStrategies],
+    ["/api/learning-recommendation", request => handleLearningRecommendation(request, fixtures)],
     ["/healthz", request => handleHealthRoute(request, false)],
     ["/api/health", request => handleHealthRoute(request, true)],
   ]);
