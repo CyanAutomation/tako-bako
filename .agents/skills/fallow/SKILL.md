@@ -1,9 +1,9 @@
 ---
 name: fallow
-description: Codebase intelligence for TypeScript and JavaScript. Static analysis reports changed-code risk, cleanup opportunities, duplication, circular dependencies, complexity hotspots, architecture boundaries, design-system drift, feature flags, and opt-in security candidates. Optional local similar-code discovery finds functions that may implement the same intent despite different syntax. Runtime coverage can merge production execution data. Use when asked to audit PR risk, find unused code or dependencies, compare semantically similar functions, detect duplicates, inspect architecture boundaries, merge runtime coverage, auto-fix supported issues, or run fallow.
+description: Codebase intelligence for TypeScript and JavaScript. Static analysis reports changed-code risk, cleanup opportunities, duplication, circular dependencies, complexity hotspots, architecture boundaries, design-system drift, feature flags, and opt-in security candidates. Opt-in mutation testing reports the code changes that no test detects. Optional local similar-code discovery finds functions that may implement the same intent despite different syntax. Runtime coverage can merge production execution data. Use when asked to audit PR risk, find unused code or dependencies, compare semantically similar functions, detect duplicates, inspect architecture boundaries, merge runtime coverage, improve or check the tests of a change, auto-fix supported issues, or run fallow.
 license: MIT
 ---
-<!-- fallow:agent-install v1 skill=stub version=3.33.1 -->
+<!-- fallow:agent-install v1 skill=stub version=3.49.0 -->
 
 # Fallow
 
@@ -28,6 +28,7 @@ Read that `SKILL.md` before running fallow. Resolve current flags from `fallow -
 | prioritize refactoring | `fallow health --hotspots --targets` |
 | ask who owns code | `fallow health --ownership` |
 | check untested-but-reachable code | `fallow health --coverage-gaps` |
+| improve or check the tests of a change | `fallow mutation --plan --base <ref>` (The plan runs no code. Without `--plan`, the command runs the project tests against each mutant, so ask the user first.) |
 | consolidate duplication | `fallow dupes --trace dup:<fingerprint>` |
 | find feature flags | `fallow flags` |
 | check which architecture rules apply to a file before changing it | `fallow guard <files>` |

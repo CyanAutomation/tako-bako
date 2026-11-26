@@ -617,6 +617,40 @@ describe("puzzle difficulty feedback submission", () => {
   });
 });
 
+describe("app feedback submission", () => {
+  beforeEach(() => {
+    mock.restoreAll();
+  });
+
+  it("submits one feedback request per puzzle fingerprint and shows the saved state", async () => {
+    const fingerprint = "a".repeat(64);
+    const app = mountTestPuzzle("feedback-controller", async input => {
+      const url = String(input);
+      if (url === "/api/events") return new Response("{}", { status: 202 });
+      if (url === "/api/feedback") return new Response(JSON.stringify({ accepted: true, duplicate: false }), { status: 202 });
+      return new Response(JSON.stringify({
+        ...puzzleResponse("feedback-controller", "signed-token"),
+        puzzleFingerprint: fingerprint,
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    await flush();
+
+    app.click({ dataset: { feedbackRating: "just_right" } });
+    app.click({ dataset: { submitPuzzleFeedback: "true" } });
+    await flush();
+    app.click({ dataset: { submitPuzzleFeedback: "true" } });
+    await flush();
+
+    const feedbackCalls = app.fetchMock.mock.calls.filter(({ arguments: [input] }) => String(input) === "/api/feedback");
+    assert.equal(feedbackCalls.length, 1);
+    const body = JSON.parse(String(feedbackCalls[0]?.arguments[1]?.body));
+    assert.equal(body.rating, "just_right");
+    assert.equal(body.outcome, "in_progress");
+    assert.equal(app.storage.get(`tako-bako.feedback.v1:${fingerprint}`), "submitted");
+    assert.match(app.root.innerHTML, /Thanks for helping us tune these puzzles/);
+  });
+});
+
 describe("cross-tab puzzle cache", () => {
   beforeEach(() => {
     mock.restoreAll();
