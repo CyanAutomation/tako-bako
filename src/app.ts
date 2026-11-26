@@ -2,11 +2,10 @@ import { markBoard, squareKey } from "./puzzle-board/marks";
 import { updateBoardView as updateBoardDom } from "./app-board-view";
 import { activeGridForPuzzle, renderApp } from "./app-view";
 import { routeFromUrl, updatedPuzzleUrl, type PlayMode } from "./app-routing";
-import { fetchClueStrategies, requestLearningRecommendation } from "./app-requests";
+import { requestLearningRecommendation } from "./app-requests";
 import { clampElapsedMs, postGameEvent } from "./events";
 import { loadBoard, loadUsedClues, saveBoard, saveUsedClues } from "./puzzle-storage";
 import type { Board, Puzzle } from "./puzzle";
-import { DifficultyUnavailableError, loadPuzzle } from "./puzzle-loader";
 import { type DifficultyModel } from "./puzzle-input";
 import { dailySeed } from "./daily";
 import { DEFAULT_SCENARIO_ID, scenarioIdFromUrl, type ScenarioId } from "./scenarios";
@@ -20,17 +19,14 @@ import { trapDialogTab } from "./ui-dialog";
 import { handleGridCellKeydown, handleGridTabKeydown } from "./app-keyboard";
 import type { StatusTone } from "./ui-types";
 import { createAppGameplayActions } from "./app-gameplay";
+import { createAppFeedbackController } from "./app-feedback";
+import { createAppPuzzleSessionController, type PuzzleSessionRequest } from "./app-puzzle-session";
 import {
-  hasSubmittedPuzzleFeedback,
-  markPuzzleFeedbackSubmitted,
-  postPuzzleFeedback,
   PUZZLE_FEEDBACK_RATINGS,
   PUZZLE_FEEDBACK_REASONS,
   type PuzzleFeedbackRating,
   type PuzzleFeedbackReason,
-  type PuzzleFeedbackRequest,
 } from "./feedback";
-import { createOrReusePuzzleFeedbackRequest } from "./feedback-submission";
 import { shouldRecordPuzzleAbandoned } from "./puzzle-lifecycle";
 import { createSnackbarController } from "./snackbar";
 import { applyDisclosureToggle } from "./disclosure-state";
@@ -57,6 +53,7 @@ let message = "Choose your next puzzle when you are ready.";
 let messageTone: StatusTone = "neutral";
 const snackbar = createSnackbarController({ onExpire: () => render() });
 let difficultyUnavailable = false;
+let puzzleLoadFailed = false;
 let undoStack: Board[] = [];
 const SMART_MARKING_STORAGE_KEY = "tako-bako.smart-marking";
 // Preserve the previous preference during this terminology migration.
@@ -97,9 +94,7 @@ let learningRecommendationGeneration = 0;
 let activeLearningRecommendationRequest: AbortController | undefined;
 let mistakes = 0;
 let puzzleCompleted = false;
-let feedbackUi: { selectedRating?: PuzzleFeedbackRating; selectedReason?: PuzzleFeedbackReason; submitting: boolean; status?: "success" | "error" } = { submitting: false };
-const submittedFeedbackFingerprints = new Set<string>();
-const pendingFeedbackRequests = new Map<string, PuzzleFeedbackRequest>();
+
 
 function setMessage(text: string, tone: StatusTone = "neutral"): void {
   snackbar.clear();
@@ -219,6 +214,47 @@ const gameplay = createAppGameplayActions({
   recordOutcome,
 });
 
+const feedback = createAppFeedbackController({
+  state: {
+    get puzzle() { return puzzle; },
+    get puzzleCompleted() { return puzzleCompleted; },
+    get puzzleStartedAt() { return puzzleStartedAt; },
+    get hintsUsed() { return hintsUsed; },
+    get mistakes() { return mistakes; },
+    get smartMarking() { return smartMarking; },
+  },
+  storage: localStorage,
+  render,
+});
+
+const puzzleSession = createAppPuzzleSessionController({
+  state: {
+    get puzzle() { return puzzle; },
+    set puzzle(value) { puzzle = value; },
+    get loading() { return loading; },
+    set loading(value) { loading = value; },
+    get difficultyUnavailable() { return difficultyUnavailable; },
+    set difficultyUnavailable(value) { difficultyUnavailable = value; },
+    get puzzleLoadFailed() { return puzzleLoadFailed; },
+    set puzzleLoadFailed(value) { puzzleLoadFailed = value; },
+  },
+  storage: localStorage,
+  beforeLoad: () => {
+    gameplay.invalidateVerification();
+    gameplay.invalidateHint();
+    resetLearningRecommendation();
+    hintCoach = undefined;
+    if (shouldRecordPuzzleAbandoned(Boolean(puzzle), puzzleCompleted)) recordOutcome("puzzle_abandoned");
+  },
+  onActivate: activatePuzzle,
+  onClueStrategies: (_requestedPuzzle, strategies) => {
+    clueStrategies = { ...clueStrategies, ...strategies };
+    render();
+  },
+  setMessage,
+  render,
+});
+
 function startCourse(course: Course, seed = newSeed(), urlMode: "push" | "replace" | "none" = "push"): void {
   challengeOptionsOpen = false;
   activeCourse = course;
@@ -250,23 +286,14 @@ function setPuzzleUrl(seed: string, mode: "push" | "replace" | "none", requested
   if (url) window.history[mode === "push" ? "pushState" : "replaceState"]({}, "", url);
 }
 
-let currentFetchId = 0;
-let puzzleLoadFailed = false;
-let activePuzzleRequest: AbortController | undefined;
-let clueStrategyGeneration = 0;
-let activeClueStrategyRequest: AbortController | undefined;
-
 function showLandingPage(): void {
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
-  invalidateClueStrategies();
+  puzzleSession.cancel();
   resetLearningRecommendation();
-  currentFetchId += 1;
-  activePuzzleRequest?.abort();
-  activePuzzleRequest = undefined;
   puzzle = null;
   hintCoach = undefined;
-  pendingFeedbackRequests.clear();
+  feedback.reset();
   board = {};
   loading = false;
   difficultyUnavailable = false;
@@ -281,7 +308,6 @@ function showLandingPage(): void {
   pendingProgressReset = false;
   pendingCelebration = false;
   puzzleCompleted = false;
-  feedbackUi = { submitting: false };
   disclosureState.feedbackEntryOpen = false;
   disclosureState.actionMenuOpen = false;
   resetReturnFocusSelector = undefined;
@@ -298,81 +324,23 @@ function showLandingPage(): void {
   render();
 }
 
-function invalidateClueStrategies(): void {
-  clueStrategyGeneration += 1;
-  activeClueStrategyRequest?.abort();
-  activeClueStrategyRequest = undefined;
+function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
+  return puzzleSession.load({
+    seed,
+    templateId,
+    difficultyLevel,
+    ...(difficultyModel ? { difficultyModel } : {}),
+    playMode,
+    course: activeCourse,
+    urlMode,
+  });
 }
 
-async function loadClueStrategies(requestedPuzzle: Puzzle): Promise<void> {
-  if (!requestedPuzzle.puzzleToken || requestedPuzzle.clues.every(clue => clue.strategy)) return;
-  const requestGeneration = ++clueStrategyGeneration;
-  activeClueStrategyRequest?.abort();
-  const requestController = new AbortController();
-  activeClueStrategyRequest = requestController;
-  try {
-    const strategies = await fetchClueStrategies(requestedPuzzle, requestController.signal);
-    if (!strategies) return;
-    if (requestGeneration !== clueStrategyGeneration || puzzle?.id !== requestedPuzzle.id) return;
-    clueStrategies = { ...clueStrategies, ...strategies };
-    render();
-  } catch {
-    // Clue labels are optional and must not block puzzle play.
-  } finally {
-    if (requestGeneration === clueStrategyGeneration) activeClueStrategyRequest = undefined;
-  }
-}
-
-async function fetchPuzzle(seed = newSeed(), urlMode: "push" | "replace" | "none" = "replace"): Promise<void> {
-  gameplay.invalidateVerification();
-  gameplay.invalidateHint();
-  invalidateClueStrategies();
-  resetLearningRecommendation();
-  hintCoach = undefined;
-  const requestedSeed = seed;
-  const requestedTemplateId = templateId;
-  const requestedDifficultyLevel = difficultyLevel;
-  const requestedDifficultyModel = difficultyModel;
-  const requestedPlayMode = playMode;
-  const requestedCourse = activeCourse;
-  if (shouldRecordPuzzleAbandoned(Boolean(puzzle), puzzleCompleted)) recordOutcome("puzzle_abandoned");
-  loading = true;
-  difficultyUnavailable = false;
-  puzzleLoadFailed = false;
-  setMessage("Tako is setting up your puzzle…");
-  const fetchId = ++currentFetchId;
-  activePuzzleRequest?.abort();
-  const requestController = new AbortController();
-  activePuzzleRequest = requestController;
-  render();
-  try {
-    const data = await loadPuzzle(
-      { seed: requestedSeed, templateId: requestedTemplateId, difficultyLevel: requestedDifficultyLevel, ...(requestedDifficultyModel ? { difficultyModel: requestedDifficultyModel } : {}) },
-      { storage: localStorage, signal: requestController.signal, isCurrent: () => fetchId === currentFetchId },
-    );
-    if (fetchId !== currentFetchId) return;
-    activatePuzzle(data, requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);
-  } catch (error) {
-    if (fetchId !== currentFetchId) return;
-    puzzle = null;
-    puzzleLoadFailed = true;
-    difficultyUnavailable = error instanceof DifficultyUnavailableError;
-    setMessage(error instanceof Error ? error.message : "We couldn’t load this puzzle. Please try again.", "error");
-  } finally {
-    if (fetchId === currentFetchId) {
-      activePuzzleRequest = undefined;
-      loading = false;
-      render();
-    }
-  }
-}
-
-function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "replace" | "none", requestedPlayMode: PlayMode, requestedTemplateId: ScenarioId, requestedDifficultyLevel: number | undefined, requestedCourse: Course, requestedDifficultyModel: DifficultyModel | undefined): void {
+function activatePuzzle(data: Puzzle, request: PuzzleSessionRequest): void {
   puzzle = data;
   resetLearningRecommendation();
-  pendingFeedbackRequests.clear();
+  feedback.reset();
   puzzleCompleted = false;
-  feedbackUi = { submitting: false };
   disclosureState.feedbackEntryOpen = false;
   disclosureState.actionMenuOpen = false;
   disclosureState.smartMarkingToolsOpen = false;
@@ -390,10 +358,10 @@ function activatePuzzle(data: Puzzle, requestedSeed: string, urlMode: "push" | "
   const active = data.spec.categories.find(category => category.id === activeGridId);
   activeCellKey = base && active ? squareKey(active.id, base.values[0]!, active.values[0]!) : undefined;
   usedClueIds = loadUsedClues(data.id, data.clues.map(clue => clue.id));
-  void loadClueStrategies(data);
+  void puzzleSession.loadClueStrategies(data);
   // Keep the requested seed in the URL: Yokaiba may derive a different
   // internal seed while searching for the chosen difficulty level.
-  setPuzzleUrl(requestedSeed, urlMode, requestedPlayMode, requestedTemplateId, requestedDifficultyLevel, requestedCourse, requestedDifficultyModel);
+  setPuzzleUrl(request.seed, request.urlMode, request.playMode, request.templateId, request.difficultyLevel, request.course, request.difficultyModel);
   setMessage("As you solve, mark a match ✓, rule out a square ×, or leave it blank while you think.");
 }
 
@@ -506,11 +474,8 @@ function render(): void {
     pendingProgressReset,
     pendingCelebration,
     puzzleCompleted,
-    feedback: feedbackUi,
-    feedbackSubmitted: Boolean(puzzle?.puzzleFingerprint && (
-      submittedFeedbackFingerprints.has(puzzle.puzzleFingerprint)
-      || hasSubmittedPuzzleFeedback(localStorage, puzzle.puzzleFingerprint)
-    )),
+    feedback: feedback.ui,
+    feedbackSubmitted: feedback.isSubmitted(puzzle?.puzzleFingerprint),
     feedbackEntryOpen: disclosureState.feedbackEntryOpen,
     actionMenuOpen: disclosureState.actionMenuOpen,
     cluesOpen: disclosureState.cluesOpen,
@@ -638,9 +603,12 @@ function handleGridResetClick(button: HTMLButtonElement): boolean {
 function confirmProgressReset(): void {
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
-  currentFetchId += 1;
+  puzzleSession.cancel();
+  feedback.reset();
   loading = false;
   difficultyUnavailable = false;
+  puzzleLoadFailed = false;
+  setMessage("Choose your next puzzle when you are ready.");
   progress = resetProgress();
   saveProgress(localStorage, progress);
   activeCourse = firstAvailableCourse(progress.completed);
@@ -710,12 +678,7 @@ function handleCelebrationClick(button: HTMLButtonElement): boolean {
 }
 
 function chooseFeedbackRating(rating: PuzzleFeedbackRating): void {
-  feedbackUi = {
-    ...feedbackUi,
-    selectedRating: rating,
-    selectedReason: rating === "too_hard" ? feedbackUi.selectedReason : undefined,
-    status: undefined,
-  };
+  feedback.selectRating(rating);
   if (!puzzleCompleted) {
     disclosureState.actionMenuOpen = true;
     disclosureState.feedbackEntryOpen = true;
@@ -725,7 +688,7 @@ function chooseFeedbackRating(rating: PuzzleFeedbackRating): void {
 }
 
 function chooseFeedbackReason(reason: PuzzleFeedbackReason): void {
-  feedbackUi = { ...feedbackUi, selectedReason: feedbackUi.selectedReason === reason ? undefined : reason, status: undefined };
+  feedback.selectReason(reason);
   if (!puzzleCompleted) {
     disclosureState.actionMenuOpen = true;
     disclosureState.feedbackEntryOpen = true;
@@ -734,43 +697,12 @@ function chooseFeedbackReason(reason: PuzzleFeedbackReason): void {
   root.querySelector<HTMLButtonElement>(`[data-feedback-reason="${CSS.escape(reason)}"]`)?.focus();
 }
 
-async function submitPuzzleFeedback(): Promise<void> {
-  const requestedPuzzle = puzzle;
-  const fingerprint = requestedPuzzle?.puzzleFingerprint;
-  const rating = feedbackUi.selectedRating;
-  if (!requestedPuzzle || !fingerprint || !rating || feedbackUi.submitting) return;
-  if (submittedFeedbackFingerprints.has(fingerprint) || hasSubmittedPuzzleFeedback(localStorage, fingerprint)) return;
-  const request = createOrReusePuzzleFeedbackRequest(pendingFeedbackRequests, {
-    puzzle: requestedPuzzle,
-    rating,
-    reason: feedbackUi.selectedReason,
-    outcome: puzzleCompleted ? "completed" : "in_progress",
-    hintsUsed,
-    mistakes,
-    puzzleStartedAt,
-    smartMarkingEnabled: smartMarking,
-  }, () => crypto.randomUUID());
-  if (!request) return;
-  feedbackUi = { ...feedbackUi, submitting: true, status: undefined };
-  render();
-  try {
-    await postPuzzleFeedback(request);
-    submittedFeedbackFingerprints.add(fingerprint);
-    markPuzzleFeedbackSubmitted(localStorage, fingerprint);
-    pendingFeedbackRequests.delete(fingerprint);
-    if (puzzle?.puzzleFingerprint === fingerprint) feedbackUi = { submitting: false, status: "success" };
-  } catch {
-    if (puzzle?.puzzleFingerprint === fingerprint) feedbackUi = { ...feedbackUi, submitting: false, status: "error" };
-  }
-  if (puzzle?.puzzleFingerprint === fingerprint) render();
-}
-
 function handleFeedbackClick(button: HTMLButtonElement): boolean {
   if (button.dataset.feedbackRating && (PUZZLE_FEEDBACK_RATINGS as readonly string[]).includes(button.dataset.feedbackRating)) {
     chooseFeedbackRating(button.dataset.feedbackRating as PuzzleFeedbackRating);
   } else if (button.dataset.feedbackReason && (PUZZLE_FEEDBACK_REASONS as readonly string[]).includes(button.dataset.feedbackReason)) {
     chooseFeedbackReason(button.dataset.feedbackReason as PuzzleFeedbackReason);
-  } else if (button.dataset.submitPuzzleFeedback) void submitPuzzleFeedback();
+  } else if (button.dataset.submitPuzzleFeedback) void feedback.submit();
   else return false;
   return true;
 }
