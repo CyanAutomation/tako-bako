@@ -429,6 +429,22 @@ describe("answer verification navigation", () => {
     assert.match(app.root.innerHTML, /Puzzle Challenge progress reset\. Beginner Level 1 is ready\./);
   });
 
+  it("clears a puzzle-load failure when progress is reset", async () => {
+    const app = mountTestPuzzle("progress-reset-after-load-failure", async input => {
+      if (String(input) === "/api/events") return new Response("{}", { status: 202 });
+      return new Response(JSON.stringify({ error: "Puzzle service is unavailable." }), { status: 502 });
+    });
+    await flush();
+
+    assert.match(app.root.innerHTML, /Retry Beginner Level 1/);
+    app.click({ id: "open-progress-reset" });
+    app.click({ id: "confirm-progress-reset" });
+
+    assert.match(app.root.innerHTML, /Start Beginner Level 1/);
+    assert.doesNotMatch(app.root.innerHTML, /Retry Beginner Level 1/);
+    assert.doesNotMatch(app.root.innerHTML, /class="status status--error"/);
+  });
+
   it("shows verification failures as errors", async () => {
     const app = mountTestPuzzle("verification-error", async (input, init) => {
       const url = String(input);

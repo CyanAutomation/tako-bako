@@ -604,8 +604,11 @@ function confirmProgressReset(): void {
   gameplay.invalidateVerification();
   gameplay.invalidateHint();
   puzzleSession.cancel();
+  feedback.reset();
   loading = false;
   difficultyUnavailable = false;
+  puzzleLoadFailed = false;
+  setMessage("Choose your next puzzle when you are ready.");
   progress = resetProgress();
   saveProgress(localStorage, progress);
   activeCourse = firstAvailableCourse(progress.completed);
