@@ -1,7 +1,7 @@
-import { isClueStrategy } from "../src/clue-strategy-catalog.js";
-import { derivePlayerStateFeatures, type PlayerStateFeatures } from "../src/player-state.js";
-import { isBoundedInteger, isBoundedText, isRecord } from "./hint-validation.js";
-import type { BoardMark, HintClue, SelectionContext } from "./hint-context-types.js";
+import { isClueStrategy } from "../../src/clue-strategy-catalog.js";
+import { derivePlayerStateFeatures, type PlayerStateFeatures } from "../../src/player-state.js";
+import { isBoundedInteger, isBoundedText, isRecord } from "./validation.js";
+import type { BoardMark, HintClue, SelectionContext } from "./context-types.js";
 
 const MAX_CLUES = 64;
 const MAX_CLUE_ID_LENGTH = 128;

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { hintCandidates } from "../../api/hint-selection.js";
-import { parseSelectionContext } from "../../api/hint-context.js";
-import type { SelectionContext } from "../../api/hint-context-types.js";
+import { hintCandidates } from "../../server/hints/selection.js";
+import { parseSelectionContext } from "../../server/hints/context.js";
+import type { SelectionContext } from "../../server/hints/context-types.js";
 
 describe("hintCandidates", () => {
   it("omits a used solver clue and appends only fresh clues", () => {

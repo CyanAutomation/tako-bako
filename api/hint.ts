@@ -9,12 +9,12 @@ import {
   type PlayerStateAssessment,
 } from "../src/player-state.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { chooseHintPayload, hintCandidates } from "./hint-selection.js";
-import { parseHintRequest, type ParsedHintRequest } from "./hint-input.js";
-import { parseSelectionContext, playerStateFeatures } from "./hint-context.js";
-import type { SelectionContext } from "./hint-context-types.js";
-import { isRecord } from "./hint-validation.js";
-import { recordJevMetric } from "./jev-metrics.js";
+import { chooseHintPayload, hintCandidates } from "../server/hints/selection.js";
+import { parseHintRequest, type ParsedHintRequest } from "../server/hints/input.js";
+import { parseSelectionContext, playerStateFeatures } from "../server/hints/context.js";
+import type { SelectionContext } from "../server/hints/context-types.js";
+import { isRecord } from "../server/hints/validation.js";
+import { recordJevMetric } from "../server/jev-metrics.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
 const HINT_API_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;
