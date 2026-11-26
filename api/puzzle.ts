@@ -5,7 +5,7 @@ import { DIFFICULTY_LEVEL_PATTERN, isValidSeed, parseDifficultyModel, type Diffi
 import { parsePuzzle } from "../src/puzzle-parser.js";
 import { yokaibaGenerateParams } from "../src/yokaiba.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
-import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
+import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "../server/hints/validation.js";
 
 const YOKAIBA_ORIGIN = yokaibaApiOrigin();
 const YOKAIBA_GENERATE_URL = `${YOKAIBA_ORIGIN}/v1/puzzles/generate`;

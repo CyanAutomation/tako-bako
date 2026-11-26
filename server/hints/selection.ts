@@ -1,4 +1,4 @@
-import { clueStrategyLabel } from "../src/clue-strategy-catalog.js";
+import { clueStrategyLabel } from "../../src/clue-strategy-catalog.js";
 import {
   hintStrengthRank,
   MIN_PLAYER_STATE_CONFIDENCE,
@@ -6,11 +6,11 @@ import {
   type PlayerStateAssessment,
   type PlayerStateFeatures,
   type PlayerStatePolicy,
-} from "../src/player-state.js";
-import { requestJevDecision } from "../server/jev.js";
-import type { SelectionContext } from "./hint-context-types.js";
-import { isRecord } from "./hint-validation.js";
-import { recordJevMetric } from "./jev-metrics.js";
+} from "../../src/player-state.js";
+import { requestJevDecision } from "../jev.js";
+import type { SelectionContext } from "./context-types.js";
+import { isRecord } from "./validation.js";
+import { recordJevMetric } from "../jev-metrics.js";
 
 export interface HintCandidate {
   id: string;

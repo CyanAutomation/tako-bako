@@ -5,7 +5,7 @@ import { strategyForConstraintKind } from "../src/clue-strategy-constraints.js";
 import { parseClueStrategyResults } from "../src/clue-strategy-results.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
 import { parseClues, type InputClue } from "../server/clue-strategy-input.js";
-import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
+import { isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "../server/hints/validation.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
 const YOKAIBA_HINT_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;

@@ -1,4 +1,4 @@
-import type { ClueStrategy } from "../src/clue-strategy-catalog.js";
+import type { ClueStrategy } from "../../src/clue-strategy-catalog.js";
 
 export interface HintClue {
   id: string;

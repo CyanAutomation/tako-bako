@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 
-import { isBoundedText } from "../../api/hint-validation.js";
+import { isBoundedText } from "../../server/hints/validation.js";
 
 it("accepts only non-empty strings within the supplied length limit", () => {
   const cases: readonly { value: unknown; maximumLength: number; expected: boolean }[] = [

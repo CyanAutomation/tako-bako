@@ -3,8 +3,8 @@ import { CLUE_STRATEGIES, isClueStrategy, type ClueStrategy } from "../src/clue-
 import { fallbackLearningStrategy, LEARNING_RECOMMENDATION_CONFIDENCE, parseLearningRecommendationStrategy, type StrategyUsageCounts } from "../src/learning-recommendation.js";
 import { MAX_ELAPSED_MS, MAX_MISTAKES_COUNT } from "../src/events.js";
 import { hasJevApiKey, requestJevDecision } from "../server/jev.js";
-import { isBoundedInteger, isBoundedText, isRecord, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
-import { recordJevMetric } from "./jev-metrics.js";
+import { isBoundedInteger, isBoundedText, isRecord, MAX_PUZZLE_TOKEN_LENGTH } from "../server/hints/validation.js";
+import { recordJevMetric } from "../server/jev-metrics.js";
 import { yokaibaApiOrigin } from "../server/yokaiba-origin.js";
 
 const YOKAIBA_HINT_URL = `${yokaibaApiOrigin()}/v1/puzzles/hint`;

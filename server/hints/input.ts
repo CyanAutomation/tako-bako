@@ -1,5 +1,5 @@
-import type { HintStrength } from "../src/player-state.js";
-import { isBoundedInteger, isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./hint-validation.js";
+import type { HintStrength } from "../../src/player-state.js";
+import { isBoundedInteger, isBoundedText, MAX_PUZZLE_TOKEN_LENGTH } from "./validation.js";
 
 const MAX_HINT_COUNT = 100;
 const HINT_STRENGTHS: readonly HintStrength[] = ["clue", "elimination", "placement"];
