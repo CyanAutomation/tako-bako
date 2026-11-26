@@ -6,9 +6,9 @@ import { assertVercelFunctionLimit, findVercelFunctionFiles, VERCEL_FUNCTION_LIM
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const apiDirectory = resolve(projectRoot, "api");
-const functionFiles = await findVercelFunctionFiles(apiDirectory);
 
 try {
+  const functionFiles = await findVercelFunctionFiles(apiDirectory);
   assertVercelFunctionLimit(functionFiles);
   console.log(`Vercel API function count: ${functionFiles.length}/${VERCEL_FUNCTION_LIMIT}.`);
 } catch (error) {
